@@ -644,8 +644,12 @@ def promote(args):
         "UPDATE concepts SET state = ?, evidence = ?, next_review = ?, updated_at = ?"
         " WHERE id = ?", (args.state, args.evidence, nxt, now(), c['id']))
     con.commit()
-    print(f"{args.slug}: {c['state']}/{c['evidence']} ->"
-          f" {args.state}/{args.evidence} (review {nxt})")
+    if c['state'] == args.state and c['evidence'] == args.evidence:
+        print(f"{args.slug}: NO CHANGE — already {args.state}/{args.evidence}."
+              f" Owned count did not move. (review reset to {nxt})")
+    else:
+        print(f"{args.slug}: {c['state']}/{c['evidence']} ->"
+              f" {args.state}/{args.evidence} (NEW, review {nxt})")
 
 
 def demote(args):
@@ -695,18 +699,29 @@ ASPECTS = ('language', 'engineering', 'data', 'api', 'process')
 def misconception(args):
     con = connect()
     act = args.action
+    # one column, not a new table: separates a HIT (belief shown) from a
+    # SURVIVED test (belief absent). Without it a disproof can only be filed as
+    # a hit -- the exact error that inflated a count in session 9.
+    cols = [r[1] for r in con.execute("PRAGMA table_info(misconception_hits)")]
+    if 'kind' not in cols:
+        con.execute("ALTER TABLE misconception_hits ADD COLUMN kind TEXT"
+                    " NOT NULL DEFAULT 'hit'")
+        con.commit()
 
     if act == 'list':
         rows = con.execute(
             "SELECT m.*, (SELECT COUNT(*) FROM misconception_hits h"
-            "  WHERE h.misconception_id = m.id) n FROM misconceptions m"
-            " ORDER BY m.state, n DESC").fetchall()
+            "  WHERE h.misconception_id = m.id AND h.kind = 'hit') n,"
+            " (SELECT COUNT(*) FROM misconception_hits h"
+            "  WHERE h.misconception_id = m.id AND h.kind = 'survived') s"
+            " FROM misconceptions m ORDER BY m.state, n DESC").fetchall()
         if not rows:
             print("no misconceptions on record.")
             return
         for r in rows:
             mark = '*' if r['state'] == 'OPEN' else ' '
-            print(f"{mark} {r['slug']:<24} [{r['aspect']}] {r['n']} hit(s)"
+            surv = f", {r['s']} survived" if r['s'] else ""
+            print(f"{mark} {r['slug']:<24} [{r['aspect']}] {r['n']} hit(s){surv}"
                   f"{'' if r['state'] == 'OPEN' else '  RETIRED'}")
             print(f"    believes : {r['belief']}")
             print(f"    true     : {r['correction']}")
@@ -760,12 +775,39 @@ def misconception(args):
             (m['id'], current_session(con), args.concept, args.note.strip(), now()))
         con.commit()
         n = con.execute("SELECT COUNT(*) FROM misconception_hits WHERE"
-                        " misconception_id = ?", (m['id'],)).fetchone()[0]
+                        " misconception_id = ? AND kind = 'hit'",
+                        (m['id'],)).fetchone()[0]
         print(f"{args.slug}: hit #{n}"
               + (f" under {args.concept}" if args.concept else ""))
         if n >= 4:
             print("  4+ hits. Explaining it again is not working -- it needs a "
                   "gate that makes the belief impossible to act on.")
+        return
+
+    if act == 'survived':
+        # the belief was TESTED and did NOT appear. This is disproof evidence,
+        # not a hit -- it must never touch the hit counter. Reach for `retire`
+        # once the disproof is a real unaided artifact.
+        if not args.note.strip():
+            die("survived needs what he wrote that did NOT exhibit the belief. "
+                "That artifact is the whole point -- name it.")
+        if m['state'] == 'RETIRED':
+            print(f"{args.slug} is already retired.")
+            return
+        con.execute(
+            "INSERT INTO misconception_hits (misconception_id, session_id,"
+            " concept, note, ts, kind) VALUES (?,?,?,?,?,'survived')",
+            (m['id'], current_session(con), args.concept, args.note.strip(), now()))
+        con.commit()
+        s = con.execute("SELECT COUNT(*) FROM misconception_hits WHERE"
+                        " misconception_id = ? AND kind = 'survived'",
+                        (m['id'],)).fetchone()[0]
+        print(f"{args.slug}: survived #{s}"
+              + (f" under {args.concept}" if args.concept else "")
+              + " (belief absent -- NOT a hit)")
+        if s >= 2:
+            print("  2+ clean survivals. If one is an unaided artifact, "
+                  "`retire` it -- do not keep testing a belief he no longer holds.")
         return
 
     if act == 'retire':
@@ -2089,7 +2131,7 @@ def build_parser():
 
     s = sub.add_parser('misconception',
                        help='a false belief that crosses unrelated concepts')
-    s.add_argument('action', choices=('open', 'hit', 'retire', 'list'))
+    s.add_argument('action', choices=('open', 'hit', 'survived', 'retire', 'list'))
     s.add_argument('slug', nargs='?')
     s.add_argument('--name', default='')
     s.add_argument('--belief', default='')

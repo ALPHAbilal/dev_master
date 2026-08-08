@@ -76,7 +76,11 @@
       "Bash(python3 .claude/tutor/tutor_db.py session \"claude-opus-4-8\" \"FLOOR: widen owned language base via batched shallow rungs\")",
       "Bash(python3 .claude/tutor/tutor_db.py brief)",
       "Bash(sqlite3 .claude/tutor/tutor.db \"select slug,state from concepts where slug in \\('string-methods','none-identity','function-return','file-iteration','type-casting'\\);\")",
-      "Bash(sqlite3 .claude/tutor/tutor.db \"select state,count\\(*\\) from concepts group by state;\")"
+      "Bash(sqlite3 .claude/tutor/tutor.db \"select state,count\\(*\\) from concepts group by state;\")",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 .claude/tutor/tutor_db.py -h)",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\('.claude/tutor/tutor_db.py'\\).read\\(\\)\\); print\\('syntax OK'\\)\")",
+      "Bash(python3 .claude/tutor/tutor_db.py statusline)"
     ]
   }
 }
