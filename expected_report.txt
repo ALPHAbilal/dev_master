@@ -1,0 +1,11 @@
+Guests:
+1. ant
+2. cat
+3. dog
+4. fish
+
+Counts:
+cat: 2
+dog: 2
+ant: 2
+fish: 1

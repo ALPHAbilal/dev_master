@@ -36,6 +36,23 @@ contract, one blank page.
    failure modes. What must be true when it finishes. What must still be true if
    it crashes halfway. Nothing about how.
 
+   **When the gate has definite output, WRITE THE EXACT EXPECTED STDOUT up front
+   — to a file — and grade by mechanical diff, never by eye.** `contract-partially-read`
+   hit 10 times (colon dropped, filename ignored, "print each list" skipped while
+   the code was otherwise flawless). Every prose remedy failed, including asking
+   him to paste a filled-in checklist — he skipped the checklist too. A rule you
+   *state* is more text he can skim; the belief only dies against a gate it cannot
+   act through. So the judge is `diff`, not your eye:
+
+   ```
+   python3 <his_file> | diff - expected.txt      # empty output = pass
+   ```
+
+   Any byte off — a missing colon, a missing blank line, wrong order — is a FAIL
+   on that line, and you show him the diff. "Roughly the right shape" cannot pass
+   a byte-diff, which is the entire point. Do not eyeball-grade output a diff
+   could have judged, and do not issue more prose rules about reading carefully.
+
 3. **Say nothing while he writes.** Not a hint, not a nudge, not "you're close."
 
    When he says he is stuck, that is not silence broken — it is `phases/10-push.md`.
@@ -100,3 +117,6 @@ say "rebuild phase" — there is no such phase in v2.
   writes forever; leaving one open by accident is the one way this phase can
   break his day.
 - One gate at a time. Two open gates means neither is being measured.
+- If the gate has definite output and you did not write an exact expected-output
+  file and run `diff` against it, you have not graded the gate — you have given an
+  opinion. Eyeball-grading is how `contract-partially-read` survived 10 hits.
