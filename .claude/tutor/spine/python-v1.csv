@@ -1,0 +1,142 @@
+slug,name,definition,category,depth,requires,gate
+executing-a-file,Executing a file,what the interpreter actually does when you type python x.py,language,1,,narrates the steps from command to first line run
+variable-binding,Variable binding,a name is a label attached to an object not a box holding it,language,1,,predicts aliasing between two names
+builtin-types,Built-in types,int float str bool and how type() reports them,language,1,,predicts the type of a mixed expression
+type-conversion,Type conversion,turning one type into another explicitly and where it fails,language,1,builtin-types,converts user input to a number safely
+string-basics,String basics,indexing slicing concatenation and immutability of str,language,1,builtin-types,reverses a string without a library
+f-string,Formatted string literal,inline expression interpolation inside a string,language,1,string-basics,formats a number to two decimals inline
+truthiness,Truthiness,which values are falsy and why empty collections count,language,1,builtin-types,predicts the branch for an empty list
+none-value,None,the absence of a value and why it is not zero or empty,language,1,,distinguishes a missing key from a key set to None
+comparison-operators,Comparison operators,equality ordering and chained comparisons,language,1,builtin-types,writes a bounds check without an and
+boolean-operators,Boolean operators,and or not and short-circuit evaluation,language,1,truthiness,uses or to supply a default value
+conditional,Conditionals,if elif else and how order decides the branch,language,1,truthiness,writes a three-way branch with no dead arm
+while-loop,While loop,repetition governed by a condition and how it fails to end,language,1,conditional,writes a loop that terminates on a sentinel
+for-loop,For loop,iterating over the items of a collection,language,1,,sums a list without an index variable
+range,range,a lazy sequence of integers and its half-open interval,language,1,for-loop,produces the last ten items of a list by index
+list-type,List,an ordered mutable sequence,language,1,,builds a list in a loop
+indexing-slicing,Indexing and slicing,positional access negative indexes and the step,language,1,list-type,takes every second element in reverse
+dict-type,Dictionary,a mapping from keys to values,language,1,,counts occurrences of items in a list
+tuple-type,Tuple,an ordered immutable sequence and why immutability matters,language,1,list-type,returns two values from a function
+set-type,Set,an unordered collection of unique hashable items,language,1,list-type,removes duplicates while explaining lost order
+function-def,Function definition,naming a reusable block with parameters,language,1,,extracts a repeated block into a function
+return-value,Return,handing a value back versus printing it,language,1,function-def,explains why a function that prints is not composable
+function-arguments,Arguments,positional and keyword arguments and their order,language,1,function-def,calls a function with keywords out of order
+import-statement,Import,bringing names from another module into scope,language,1,,imports one function rather than a whole module
+name-main,Module entry point,what __name__ is and why the __main__ guard exists,language,1,"executing-a-file,import-statement",writes a file that is both runnable and importable
+len-builtin,len,the length protocol shared by every sized object,language,1,list-type,guards an index against an empty collection
+mutable-vs-immutable,Mutable versus immutable,which objects can change in place and what that costs,language,2,"list-type,tuple-type",predicts whether a function mutated its caller argument
+default-arguments,Default arguments,parameters with fallback values evaluated once at definition,language,2,function-arguments,explains the mutable default argument trap
+var-args,Variable arguments,star args and double star kwargs for open signatures,language,2,function-arguments,writes a wrapper that forwards every argument
+scope-legb,Scope,local enclosing global builtin and the order names resolve,language,2,function-def,predicts which binding a nested name sees
+global-nonlocal,global and nonlocal,rebinding a name from an inner scope and why it is rare,language,2,scope-legb,rewrites a global counter as a returned value
+identity-vs-equality,Identity versus equality,is compares objects and == compares values,language,2,mutable-vs-immutable,explains when two equal lists are not the same list
+copy-vs-deepcopy,Shallow versus deep copy,copying a container versus copying what it holds,language,2,mutable-vs-immutable,fixes an aliasing bug in nested data
+list-methods,List methods,append extend insert pop remove and their return values,language,2,list-type,explains why append returns None
+dict-methods,Dictionary methods,get items keys values setdefault and safe lookup,language,2,dict-type,reads a possibly-missing nested key without an exception
+sorting,Sorting,sorted versus sort and the key function,language,2,function-def,sorts records by a field then breaks ties by another
+enumerate,enumerate,index and item together without a manual counter,language,2,for-loop,rewrites a counter loop with enumerate
+zip-builtin,zip,walking several sequences in step and stopping at the shortest,language,2,for-loop,pairs two lists into a dictionary
+unpacking,Unpacking,destructuring sequences into names including the star form,language,2,tuple-type,swaps two variables without a temporary
+comprehension,Comprehension,building a list dict or set in a single expression,language,2,for-loop,rewrites a filtering loop as one comprehension
+ternary-expression,Conditional expression,a value chosen inline by a condition,language,2,conditional,replaces a four-line if with one assignment
+loop-else,break continue and loop else,leaving a loop early and the else that runs when you did not,language,2,while-loop,writes a search loop with a not-found branch
+exception-basics,Exceptions,raising and catching errors instead of returning error codes,failure,2,,catches only the exception the call can raise
+raise-statement,raise,signalling failure deliberately and re-raising after cleanup,failure,2,exception-basics,converts an invalid argument into a clear exception
+finally-cleanup,finally,code that runs whether or not the block failed,failure,2,exception-basics,releases a resource on both paths
+custom-exception,Custom exception,a named error type callers can catch specifically,failure,2,raise-statement,defines an error its caller can distinguish
+bare-except-trap,Over-broad except,why catching everything hides the bug you needed,failure,2,exception-basics,names what a bare except swallowed
+context-manager,Context manager,the with statement and guaranteed release,pattern,2,finally-cleanup,opens a file that closes on an exception
+file-io,File input and output,reading and writing text with encodings,stdlib,2,context-manager,writes then reads a file without corrupting non-ascii
+pathlib,pathlib,paths as objects instead of strings,stdlib,2,file-io,builds a cross-platform path and creates its parent
+json-module,json,serialising and parsing JSON and what types survive,stdlib,2,dict-type,round-trips nested data and names what changed
+iteration-protocol,Iteration protocol,what for actually calls under the hood,language,3,for-loop,explains why a file object can only be read once
+iterator,Iterator,a stateful cursor that yields items once,language,3,iteration-protocol,writes an iterator by hand
+generator,Generator,a function that produces values lazily with yield,language,3,iterator,converts a list-building function into a generator
+yield-keyword,yield,suspending a function and resuming it where it stopped,language,3,generator,traces execution order across two yields
+lazy-evaluation,Lazy evaluation,computing only what is consumed and why memory drops,pattern,3,generator,processes a file too large to fit in memory
+generator-pipeline,Generator pipeline,chained generators each doing one transformation,pattern,3,"generator,lazy-evaluation",builds a three-stage pipeline with no intermediate list
+first-class-functions,First-class functions,passing and returning functions as values,language,3,function-def,parameterises behaviour with a callback
+lambda,Lambda,a small anonymous function and when it hurts readability,language,3,first-class-functions,supplies a sort key inline
+closure,Closure,a function that captures the variables it was defined with,language,3,scope-legb,builds a counter without a global
+decorator,Decorator,wrapping a function to add behaviour without editing it,pattern,3,closure,writes a timing decorator that preserves the return value
+functools-wraps,functools.wraps,keeping the wrapped function's name and docstring,stdlib,3,decorator,explains what a decorator broke without it
+class-def,Class,a type with its own data and behaviour,language,3,function-def,converts a dict of related functions into a class
+init-method,__init__,constructing an instance and setting its state,language,3,class-def,writes a class that cannot be built in an invalid state
+self-parameter,self,the instance the method was called on,language,3,class-def,explains why a method has one more parameter than the call
+instance-vs-class-attribute,Instance versus class attribute,which state is shared across every instance,language,3,init-method,diagnoses a list shared by accident
+dunder-methods,Dunder methods,the protocol hooks the language calls for you,language,3,class-def,makes an object usable in a for loop
+repr-method,__repr__,a representation that helps you debug,language,3,dunder-methods,makes a failing test message readable
+inheritance,Inheritance,deriving a type from another and overriding behaviour,language,3,class-def,overrides one method and calls the original
+super-call,super,delegating to the parent implementation,language,3,inheritance,extends __init__ without duplicating it
+composition-over-inheritance,Composition over inheritance,holding a collaborator instead of subclassing it,arch,3,inheritance,replaces a fragile subclass with a passed-in object
+dataclass,dataclass,a class defined by its fields,stdlib,3,class-def,replaces a five-field constructor with one decorator
+property,property,a computed attribute behind normal access,language,3,class-def,adds validation without changing the caller
+classmethod-staticmethod,classmethod and staticmethod,methods bound to the type or to nothing,language,3,class-def,writes an alternative constructor
+duck-typing,Duck typing,depending on behaviour rather than declared type,arch,3,dunder-methods,writes a function that accepts any iterable
+type-hints,Type hints,annotations that document and are checked by tools,language,3,function-def,annotates a function including its return
+optional-union,Optional and union types,expressing a value that may be missing or one of several,language,3,type-hints,annotates a lookup that can fail
+collections-module,collections,defaultdict Counter deque and namedtuple,stdlib,3,dict-type,replaces a setdefault loop with defaultdict
+itertools,itertools,composable lazy iteration building blocks,stdlib,3,generator,batches an iterable into fixed-size chunks
+regex,Regular expressions,pattern matching over text and its failure modes,stdlib,3,string-basics,extracts a field and explains a greedy match
+datetime-module,datetime,timestamps durations and why timezones bite,stdlib,3,,stamps a record in UTC and formats it locally
+random-seed,Randomness and seeding,reproducible pseudo-random sequences,stdlib,3,,makes a sampling script reproducible
+argparse,argparse,declaring a command line interface,stdlib,3,name-main,adds a required argument and an optional flag
+logging-module,logging,levelled output that survives production,stdlib,3,,replaces prints with levels and a handler
+csv-module,csv,reading and writing delimited records correctly,stdlib,3,file-io,round-trips a field containing the delimiter
+sqlite3-module,sqlite3,an embedded database through the DB-API,stdlib,3,context-manager,inserts and queries with parameters not string formatting
+sql-injection,Parameterised queries,why string-formatted SQL is a defect not a style choice,failure,3,sqlite3-module,rewrites a formatted query as a parameterised one
+subprocess,subprocess,running another program and reading its result,stdlib,3,exception-basics,runs a command and reacts to a non-zero exit
+virtual-environment,Virtual environment,an isolated interpreter and dependency set,arch,3,,creates one and explains what it isolates
+requirements-pinning,Dependency pinning,recording exact versions so a run is reproducible,arch,3,virtual-environment,explains what an unpinned dependency broke
+pytest-basics,Automated tests,executable expectations that fail loudly,pattern,3,function-def,writes a test that fails before the fix and passes after
+assertion,Assertion,stating an invariant that must hold,pattern,3,,adds an assert that catches a bad argument early
+test-fixture,Test fixture,shared setup that keeps tests independent,pattern,3,pytest-basics,removes duplicated setup from three tests
+mocking,Mocking,substituting a collaborator to isolate the unit,pattern,3,pytest-basics,tests error handling without calling the real API
+module-vs-package,Modules and packages,files directories and what __init__ does,arch,4,import-statement,splits one file into a package that still imports
+import-system,Import resolution,how the interpreter finds a module and what sys.path is,arch,4,module-vs-package,diagnoses an import that works in one directory only
+circular-import,Circular imports,two modules that need each other and how to break the cycle,failure,4,import-system,breaks a cycle by moving the shared piece
+entry-point,Entry point,the single place a program starts,arch,4,name-main,gives a package one obvious way to run
+exit-code,Exit codes,how a program tells its caller it failed,failure,4,entry-point,exits non-zero on failure so a shell can react
+environment-variables,Environment variables,configuration supplied from outside the code,arch,4,entry-point,reads a key from the environment with a clear error if missing
+secret-handling,Secret handling,keeping credentials out of source and logs,failure,4,environment-variables,names every place a key could leak in a script
+config-vs-code,Configuration versus code,what belongs in a file and what belongs in a function,arch,4,environment-variables,moves a hardcoded constant without breaking defaults
+idempotency,Idempotency,an operation safe to repeat with the same result,pattern,4,,makes a write safe to run twice
+retry-backoff,Retry with backoff,repeating a failed call with growing delays,failure,4,exception-basics,retries only the errors worth retrying
+exponential-backoff-jitter,Exponential backoff with jitter,spreading retries so clients do not synchronise,failure,4,retry-backoff,explains what happens without jitter
+timeout,Timeout,bounding how long a call may block,failure,4,retry-backoff,sets a timeout and handles the expiry path
+rate-limit,Rate limiting,staying within a quota you do not control,api,4,timeout,paces requests to a documented limit
+concurrency-vs-parallelism,Concurrency versus parallelism,overlapping work versus simultaneous work,arch,4,,says which one a network-bound job needs
+gil,Global interpreter lock,why threads do not speed up pure Python computation,arch,4,concurrency-vs-parallelism,chooses threads or processes for a given job and defends it
+threading,Threads,concurrent execution sharing memory,stdlib,4,concurrency-vs-parallelism,runs ten network calls concurrently
+bounded-worker-pool,Bounded worker pool,a fixed number of workers draining a queue,pattern,4,threading,limits concurrency to N without spawning per item
+admission-control,Admission control,refusing or delaying work before it enters the system,pattern,4,bounded-worker-pool,rejects work that would exceed a budget
+queue-module,Queue,a thread-safe handoff between producers and consumers,stdlib,4,threading,connects a producer to several consumers
+race-condition,Race condition,a result that depends on timing between workers,failure,4,threading,names the interleaving that corrupts a shared counter
+asyncio-event-loop,Event loop,cooperative scheduling of many waiting tasks,stdlib,4,concurrency-vs-parallelism,explains what blocks an event loop
+async-await,async and await,suspending a coroutine while it waits,language,4,asyncio-event-loop,converts a sequential fetch loop to concurrent
+checkpointing,Checkpointing,recording progress so a crash resumes instead of restarting,pattern,4,idempotency,resumes a half-finished job without duplicating work
+atomic-write,Atomic write,writing to a temporary file then renaming into place,failure,4,file-io,explains what a crash mid-write costs without it
+correlation-id,Correlation ID,a stable identifier that survives every hop,pattern,4,idempotency,matches a response back to its request after reordering
+partial-failure,Partial failure accounting,reporting exactly which items succeeded and which did not,failure,4,exception-basics,returns per-item outcomes instead of one boolean
+poison-record,Poison record isolation,quarantining the one input that breaks the batch,failure,4,partial-failure,keeps a batch running past a malformed record
+fail-safe-default,Fail-safe default,choosing the harmless behaviour when unsure,failure,4,exception-basics,defends a default that loses nothing on error
+structured-logging,Structured logging,machine-readable events instead of prose,pattern,4,logging-module,logs an event you can later filter by field
+observability,Observability,being able to answer new questions from existing output,arch,4,structured-logging,names the question the current logs cannot answer
+batch-api,Batch API,submitting many requests as one job and polling for it,api,5,rate-limit,submits a batch and reconciles the results to inputs
+structured-output,Structured output,constraining a model response to a schema,api,5,json-module,defines a schema and handles a response that violates it
+token-budget,Token budgeting,accounting for cost before spending it,api,5,batch-api,estimates the cost of a run before submitting it
+streaming-vs-batch,Streaming versus batch,latency per item against throughput per job,arch,5,batch-api,chooses one for a given workload and defends it
+backpressure,Backpressure,slowing a producer that outruns its consumer,arch,5,queue-module,explains what an unbounded queue hides
+idempotency-key,Idempotency key,a token that makes a retried request safe at the server,api,5,"idempotency,correlation-id",designs a key that survives a client restart
+orchestrator,Orchestrator,the component that sequences stages and owns failure,arch,5,"checkpointing,partial-failure",draws the stages and says where a crash is survivable
+pipeline-stages,Pipeline stages,independent steps with defined handoffs,arch,5,generator-pipeline,splits a monolithic script into resumable stages
+ledger,Ledger,an append-only record of what happened,arch,5,checkpointing,reconstructs a run's history from the ledger alone
+staging-table,Staging area,holding output until it is verified then promoting it,arch,5,atomic-write,keeps a bad run from overwriting good data
+reconciliation,Reconciliation,proving output matches input item for item,pattern,5,"correlation-id,ledger",detects a silently dropped record
+data-integrity-invariant,Data integrity invariant,a property that must hold before and after every run,arch,5,reconciliation,states an invariant and writes the check that enforces it
+schema-migration,Schema migration,changing a data shape without losing what exists,arch,5,data-integrity-invariant,adds a column without rewriting a single existing value
+caching,Caching,trading memory or staleness for time,arch,5,idempotency,names what makes a cached entry invalid
+graceful-degradation,Graceful degradation,doing less rather than nothing when a dependency fails,arch,5,fail-safe-default,designs a reduced path for an outage
+dependency-injection,Dependency injection,passing collaborators in rather than constructing them,arch,5,composition-over-inheritance,makes a hard-to-test function testable
+layering-boundaries,Layering and boundaries,which module may know about which,arch,5,dependency-injection,names the boundary a change violated
+contract-testing,Contract testing,testing at the interface rather than the internals,pattern,5,"pytest-basics,layering-boundaries",writes a test that survives a rewrite of the internals

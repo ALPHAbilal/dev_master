@@ -1,0 +1,5 @@
+{'PROMPT_MODEL': 'gpt-4.1-nano', 'PROMPT_SYSTEM': 'reply: JSON only, no markdown', 'PROMPT_FILTER': 'a=b'}
+PROMPT_MODEL -> gpt-4.1-nano
+PROMPT_SYSTEM -> reply: JSON only, no markdown
+PROMPT_FILTER -> a=b
+accepted 3 skipped 2

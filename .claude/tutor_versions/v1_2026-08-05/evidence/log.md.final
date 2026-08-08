@@ -1,0 +1,11 @@
+rows = [{'n': 1}, {'n': 2}]
+
+with open('data.jsonl','w') as f:
+    for row in rows:
+        f.write(json.dumps(row))
+
+with open('data.jsonl','r') as f:
+    for line in f:
+    f.read(json.loads(line))
+
+    #i can't figure to continue this one 
