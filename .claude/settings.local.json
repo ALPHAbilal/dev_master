@@ -101,7 +101,8 @@
       "Bash(python3 .claude/tutor/tutor_db.py attempt snap BUILD_V1 guests-list --src guests_list.py)",
       "Bash(python3 .claude/tutor/tutor_db.py review add --slug guests-list --severity correctness --file guests_list.py --line 11 --finding \"Contract rule 4 \\(sorted alphabetically\\) not applied: output is insertion order 'cat,dog,ant,fish', but contract requires 'ant,cat,dog,fish'. On this exact input the program prints the wrong order.\")",
       "Bash(python3 .claude/tutor/tutor_db.py review add --slug guests-list --severity correctness --file guests_list.py --line 14 --finding \"Contract rule 5 specifies the line EXACTLY as 'Total: N guests' with a colon; code prints 'Total 4 guests' with no colon. Output does not match the required format.\")",
-      "Bash(python3 .claude/tutor/tutor_db.py misconception hit contract-partially-read --concept guests-list --note \"rule 5 gave exact format 'Total: N guests'; he printed 'Total 4 guests' -- dropped the colon. Approximated a format that was fully specified.\")"
+      "Bash(python3 .claude/tutor/tutor_db.py misconception hit contract-partially-read --concept guests-list --note \"rule 5 gave exact format 'Total: N guests'; he printed 'Total 4 guests' -- dropped the colon. Approximated a format that was fully specified.\")",
+      "Bash(python3 -)"
     ]
   }
 }
