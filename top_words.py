@@ -7,10 +7,7 @@ with open('words.txt', 'r') as f:
             for word in temp_list:
                 word_counts[word] = word_counts.get(word, 0) + 1
 
-sorted_counts = sorted(word_counts.items(), key=lambda items: items[1], reverse= True)
-
-name, age = sorted_counts[0]
-print(f"{name} is {age}")
-    
+for word, count in sorted(word_counts.items(), key=lambda items: items[1], reverse= True):
+    print(f"{word}: {count}")
 
 
