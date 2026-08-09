@@ -116,11 +116,36 @@ anything was happening. "Reading the ten files now, ~5 min" costs nothing.
 ## THE LOOP
 
 ```
-   assume ──► teach ──► gate ──► he writes ──► snap ──► diff ──► grade
-      │                                                            │
-      └──── veto: he says he lacks a prerequisite ◄────────────────┘
-                        insert that rung first
+   probe ──► assume ──► teach ──► gate ──► he writes ──► snap ──► diff ──► grade
+      │  ▲                                                            │
+      │  └── HIT? SKIP. do not teach, do not gate what he owns.       │
+      └──── veto: he says he lacks a prerequisite ◄──────────────────┘
+                        insert that rung first          MISS? correct, then
+                                                        TRANSFER: re-gate a
+                                                        DIFFERENT instance.
 ```
+
+### 0. probe first — spend no minute on the known  (TIME)
+
+Before you teach or gate anything, **probe it in one line.** On HIT, move on — no
+teaching, no ceremony. This is not optional politeness; it is where the hours go.
+On 2026-08-08, four of five concepts worked in a session were things he *already
+owned* — re-drilled anyway, because nobody checked first. `teach-open` now
+**refuses** a concept whose latest probe is a HIT. If you find yourself explaining
+something he just got right, you are burning his time and the gate above is telling
+you so. The `MOMENTUM` line in `brief` counts his HIT streak: 3+ means stop
+drilling siblings — widen the gate or offer the phase jump.
+
+### transfer on every miss — recognition is not ownership  (DEPTH)
+
+A MISS you correct and then *move on from* is F4 in the postmortem: he reproduces
+the shape of your example and you credit it as learning. **After any correction,
+immediately re-gate a STRUCTURALLY DIFFERENT instance** — different values, different
+names, different surface, same idea. He owns it only when he produces it on a case
+he has not seen. This is what made `none-identity`, `string-methods`, and
+`function-return` actually stick on 2026-08-08 — each was followed by a fresh
+instance (`y=None`, `word='HELLO'`, `area()`), not a nod. `transfer` never ran once
+in all of v1; run it every time a miss is corrected.
 
 ### 1. assume — before you teach anything
 

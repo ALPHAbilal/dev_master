@@ -168,6 +168,57 @@ def _position(con):
     print(f"POSITION {total} concepts: {parts}")
 
 
+def _momentum(con):
+    """The escalation signal. Computed from probes, not stored -- the trailing run
+    of consecutive HITs across the most recent questions. A streak means he has
+    OUTGROWN the current density: stop drilling siblings, widen or jump. Its
+    absence is exactly what made 9 sessions feel uniform."""
+    rows = con.execute(
+        "SELECT result FROM probes ORDER BY asked_at DESC, id DESC LIMIT 12").fetchall()
+    streak = 0
+    for r in rows:
+        if r['result'] == 'HIT':
+            streak += 1
+        else:
+            break
+    if streak == 0:
+        return
+    print(f"MOMENTUM {streak} HIT(s) in a row.")
+    if streak >= 3:
+        print("  He is clearing rungs first-pass. STOP drilling siblings of an owned"
+              " cluster. Either WIDEN the gate (one slice using 5+ owned concepts at"
+              " once) or offer the phase jump. Same density on a streak IS the drill trap.")
+
+
+def _density(con):
+    """The 20/60/20 ratio, by LOGGED events for the current session. It cannot see
+    prose length, so it is a proxy and says so -- but 'too much talking' becomes a
+    number instead of a vibe. explain = teaches + pushes; struggle = probes +
+    attempts; review = review findings raised."""
+    sid = con.execute("SELECT id FROM sessions ORDER BY id DESC LIMIT 1").fetchone()
+    if sid is None:
+        return
+    sid = sid['id']
+    explain = (con.execute("SELECT COUNT(*) FROM concepts WHERE taught_in=?", (sid,)).fetchone()[0]
+               + con.execute("SELECT COUNT(*) FROM stalls WHERE session_id=?", (sid,)).fetchone()[0])
+    struggle = (con.execute("SELECT COUNT(*) FROM probes WHERE session_id=?", (sid,)).fetchone()[0]
+                + con.execute("SELECT COUNT(*) FROM attempts WHERE session_id=?", (sid,)).fetchone()[0])
+    review = con.execute("SELECT COUNT(*) FROM reviews WHERE session_id=?", (sid,)).fetchone()[0]
+    tot = explain + struggle + review
+    if tot == 0:
+        return
+    pe, ps, pr = (round(100*explain/tot), round(100*struggle/tot), round(100*review/tot))
+    print(f"DENSITY this run (logged events, proxy): explain {pe}% / struggle {ps}%"
+          f" / review {pr}%  (target ~20/60/20)")
+    if struggle and ps < 50:
+        print("  struggle share is low -- you are talking more than he is producing."
+              " Fewer worked examples, wider gates.")
+    elif struggle >= 3 and pe < 10:
+        print("  explain share is near zero -- the overcorrection. He is being drilled"
+              " with almost no teaching. If a MISS has a real gap, TEACH it (teach-open"
+              " logs it); do not just re-gate. 0% explain is not a badge.")
+
+
 def brief():
     """Injected at SessionStart, so no agent has to remember to ask."""
     con = connect()
@@ -192,6 +243,8 @@ def brief():
     _position(con)
     if parked:
         print(f"  ({parked} concepts parked at depth 3+ — off the ladder, not lost)")
+    _momentum(con)
+    _density(con)
     due = con.execute(
         "SELECT slug FROM concepts WHERE next_review <= date('now')"
         " ORDER BY next_review").fetchall()
@@ -460,6 +513,22 @@ def teach_open(args):
     if attempts == 0:
         die(f"'{args.slug}' has never been probed. Explaining before an attempt is "
             f"the failure that killed every previous attempt. Probe it first.")
+    # v2.4: SKIP-ON-HIT. Teaching what he just got right is where the hours went --
+    # 4 of 5 concepts in one 2026-08-08 session were already owned and re-drilled.
+    # The signal for "he owns it, nothing to teach" is: latest probe HIT AND no
+    # diagnosed floor. A floor means a real failure was found -- teach into that
+    # even if a later confirmation probe hit. No floor + a HIT = he just produced
+    # it; re-probe a different instance if you doubt the HIT, do not explain.
+    latest = con.execute(
+        "SELECT result FROM probes WHERE concept_id = ? ORDER BY asked_at DESC,"
+        " id DESC LIMIT 1", (c['id'],)).fetchone()
+    has_floor = con.execute(
+        "SELECT COUNT(*) FROM floors WHERE concept_id = ?", (c['id'],)).fetchone()[0]
+    if latest and latest['result'] == 'HIT' and not has_floor:
+        die(f"'{args.slug}' latest probe is a HIT and no floor is recorded -- he just "
+            f"produced it, there is no failure to teach into. Move on, or if you "
+            f"suspect the HIT was shallow, re-probe a DIFFERENT instance and teach "
+            f"only if that misses.")
     if c['explanation']:
         print(f"ALREADY TAUGHT (session {c['taught_in']}). Reuse this text, do not "
               f"reword it — two agents teaching it two ways is the drift:\n")
@@ -470,7 +539,14 @@ def teach_open(args):
     if not is_floor:
         print(f"WARNING: '{args.slug}' is not a recorded floor. Teaching above the "
               f"floor patches a symptom. Descend first unless you know why not.")
-    print(f"teach-open {args.slug}: {attempts} prior attempts, {c['fails']} fails.")
+    # v2.4: record that teaching HAPPENED, cheaply, at open -- so the density
+    # meter stops reading 0% while prose explanation goes untracked. teach-close
+    # still writes the canonical cached text; this only stamps the event.
+    con.execute("UPDATE concepts SET taught_in = ?, updated_at = ? WHERE id = ?",
+                (current_session(con), now(), c['id']))
+    con.commit()
+    print(f"teach-open {args.slug}: {attempts} prior attempts, {c['fails']} fails."
+          f" (logged as an explain event this session)")
     print("Name the thing he already does but cannot say. Vocabulary first.")
     print("You must `gate open` before teach-close will succeed.")
 
