@@ -60,6 +60,63 @@ def block(msg):
     sys.exit(2)
 
 
+# ---- v3 phase routing: the hook is the ONLY dispatcher --------------------
+# SKILL.md no longer tells the agent which phase file to read. This does, from
+# the DB's real phase, every turn. The pointer is injected (phase-guard) and the
+# read is enforced (phase-gate) so it cannot be skipped.
+
+SKILL = PROJECT / '.claude' / 'skills' / 'tutor_v3'
+STATE = HERE / '.phase_gate.json'      # shared between the two hook processes
+
+# phase (from targets table) -> the one file that governs it
+PHASE_FILE = {
+    'INTAKE': 'phases/00-intake.md',
+    'SCAN':   'phases/01-scan.md',
+    'UNLOCK': 'phases/02-unlock.md',
+    'BUILD':  'phases/circle.md',
+}
+
+# tutor_db.py subcommands that DO tutoring — blocked until the phase file is read.
+# Read-only / meta commands (brief, status, statusline, tree, target, ...) are not.
+GATED_CMDS = {'probe', 'gate', 'attempt', 'promote', 'demote', 'teach-open',
+              'teach-close', 'push', 'review', 'misconception', 'transfer'}
+
+
+def active_target(con):
+    try:
+        return con.execute(
+            "SELECT * FROM targets WHERE phase != 'retired' ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+    except sqlite3.Error:
+        return None                 # v2 db without the targets table: no v3 routing
+
+
+def current_phase(con):
+    t = active_target(con)
+    if t is None:
+        return 'INTAKE'             # no anchor yet -> intake is the only legal move
+    return t['phase'] if t['phase'] in PHASE_FILE else 'INTAKE'
+
+
+def load_state():
+    try:
+        return json.loads(STATE.read_text())
+    except Exception:
+        return {}
+
+
+def save_state(d):
+    try:
+        STATE.write_text(json.dumps(d))
+    except Exception:
+        pass                        # never let a state write break the turn
+
+
+def guard_enabled(con):
+    row = con.execute("SELECT value FROM meta WHERE key='phase_guard'").fetchone()
+    return (row is None) or (row['value'] != 'off')   # default ON
+
+
 def cmd_brief(_data):
     """SessionStart: stdout is injected as context. No agent has to remember."""
     con = connect()
@@ -103,7 +160,9 @@ def cmd_brief(_data):
 
 
 def cmd_read_guard(data):
-    """The most-violated rule: showing him the file he is supposed to rebuild."""
+    """The most-violated rule: showing him the file he is supposed to rebuild.
+    Also records when the agent reads the active phase file (opens phase-gate)."""
+    _mark_phase_read(data)
     path = (data.get('tool_input') or {}).get('file_path')
     if not path:
         return
@@ -149,11 +208,95 @@ def cmd_stop_check(data):
               f"<result>.", file=sys.stderr)
 
 
+def cmd_phase_guard(data):
+    """UserPromptSubmit: point the agent at the ONE file that governs this turn.
+    stdout is injected as context, deterministically, before the agent answers."""
+    con = connect()
+    if not guard_enabled(con):
+        return
+    if active_target(con) is None:
+        return                      # not in a tutoring engagement: stay silent
+    phase = current_phase(con)
+    rel = PHASE_FILE[phase]
+    expected = str((SKILL / rel).resolve())
+    sid = data.get('session_id') or ''
+
+    st = load_state()
+    # reset the read-requirement only when the session or the phase changes;
+    # within one phase in one session the agent reads the file once.
+    if st.get('session_id') != sid or st.get('phase') != phase:
+        st = {'session_id': sid, 'phase': phase, 'expected': expected, 'read': False}
+        save_state(st)
+
+    gates = open_gates(con)
+    gate_note = ''
+    if gates:
+        g = gates[0]
+        gate_note = (f"\nOPEN GATE #{g['id']} ({g['slug']}): he writes {g['target']}, "
+                     f"you do not.")
+    already = " (already read this phase)" if st.get('read') else ""
+    print(
+        f"## TUTOR PHASE GUARD (deterministic router)\n"
+        f"ACTIVE PHASE = {phase}. The file that governs THIS turn is:\n"
+        f"  {SKILL.name}/{rel}\n"
+        f"Read it now and follow it{already}. Do not rely on SKILL.md to tell you "
+        f"which phase file to use — SKILL.md no longer routes; this hook does.\n"
+        f"The PreToolUse gate BLOCKS {sorted(GATED_CMDS)} until you have read that "
+        f"file this phase. LAW 0 always applies.{gate_note}")
+
+
+def cmd_phase_gate(data):
+    """PreToolUse(Bash): a gated tutor_db.py command cannot run until the active
+    phase file has actually been Read this session. Turns the pointer into a wall."""
+    cmd = (data.get('tool_input') or {}).get('command') or ''
+    if 'tutor_db.py' not in cmd:
+        return                      # not a tutor action: nothing to gate
+    # which subcommand? the token after tutor_db.py
+    try:
+        after = cmd.split('tutor_db.py', 1)[1].split()
+        sub = next((t for t in after if not t.startswith('-')), '')
+    except Exception:
+        return
+    if sub not in GATED_CMDS:
+        return
+    con = connect()
+    if not guard_enabled(con) or active_target(con) is None:
+        return
+    st = load_state()
+    sid = data.get('session_id') or ''
+    # fail OPEN if we have no matching state yet (phase-guard hasn't run) — never
+    # block on our own missing bookkeeping. Block only on a positive "not read".
+    if st.get('session_id') != sid or not st.get('expected'):
+        return
+    if st.get('read'):
+        return
+    phase = st.get('phase', '?')
+    block(f"BLOCKED by phase-gate: you are in phase {phase} and have not read the "
+          f"file that governs it.\nRead this first, then retry:\n  {st['expected']}\n"
+          f"(the phase router points here every turn; reading it is mandatory "
+          f"before {sub}.)")
+
+
+def _mark_phase_read(data):
+    """Called from read-guard: if the agent reads the expected phase file, the
+    gate opens for this phase+session."""
+    path = (data.get('tool_input') or {}).get('file_path')
+    if not path:
+        return
+    st = load_state()
+    exp = st.get('expected')
+    if exp and same_file(path, exp):
+        st['read'] = True
+        save_state(st)
+
+
 COMMANDS = {
     'brief': cmd_brief,
     'read-guard': cmd_read_guard,
     'write-guard': cmd_write_guard,
     'stop-check': cmd_stop_check,
+    'phase-guard': cmd_phase_guard,
+    'phase-gate': cmd_phase_gate,
 }
 
 

@@ -9,6 +9,47 @@ file.
 > "RADICAL SPINE" below — it supersedes "CHANGE 3 — phases stay" where they
 > conflict.
 
+> **2026-08-09 CORRECTION #2 (from Bilal) — the ladder STAYS. This supersedes the
+> "kill the ladder" language in RADICAL SPINE below.** The agent had wrongly
+> demoted the concept ladder to a demand-paged subsystem. Bilal's actual model is
+> three layers, and the ladder is Layer 2, not a subsystem:
+>
+> ```
+>   INPUT (data, agnostic to any specific repo/target):  a codebase + a target
+>       │
+>   PHASE 1 — SCAN:   AI scans the WHOLE real codebase, scrapes concepts AND all
+>       │             aspects (design, failure-handling, api, architecture — not
+>       │             just language). Grounded in true code, not toy data.
+>       │
+>   PHASE 2 — UNLOCK (the ladder): many task TYPES (question, micro-code, break-
+>       │             this, explain-this). Learner unlocks every concept, each
+>       │             taught from the real code + a real example + explanation.
+>       │             ── HARD GATE: all unlocked ──
+>       ▼
+>   PHASE 3 — BIG BUILD (the pillar): write the real scripts by hand, running the
+>                       9-verb CIRCLE (CIRCLE_SPEC.md).
+>   ════════════════════════════════════════════════════════════════════════════
+>   ACROSS ALL — LAW 0: question first, explain only residue, 20/60/20, AND a
+>                       hypothesis-verify loop (below).
+> ```
+>
+> **Codebase-agnostic:** PHASE 1 takes any repo as input; nothing names soufiane.
+>
+> **The hypothesis-verify loop (Bilal's core mechanic — the AI must never trust
+> working code):** the agent SUSPECTS a weak spot from his code or answer → forms
+> a hypothesis → TESTS it with a question or a small code task → is only SURE after
+> the test. Code that runs, or code he generated with AI, is NOT evidence of
+> understanding. A confirmed weakness goes onto the ladder; a falsified one is
+> dropped. This reuses v2's `push --hypothesis`, `misconception`, and `probe`
+> machinery, generalized: every credited concept must survive a test the agent
+> chose *because it would fail if the understanding were fake*.
+>
+> Net: the RADICAL part is (a) how the AI behaves (LAW 0 + hypothesis-verify),
+> (b) the ladder covering ALL aspects not just syntax, (c) the 9-verb circle as
+> PHASE 3 — NOT the removal of the ladder. Where text below says "kill the
+> ladder / demand-page concepts," read it as: the ladder is Layer 2, unlocked
+> before the big build, and concepts may ALSO surface JIT during the build.
+
 ## RADICAL SPINE — the target is the anchor, the circle is the engine
 
 Two principles Bilal set, in his words:

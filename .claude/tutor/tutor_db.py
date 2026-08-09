@@ -62,7 +62,11 @@ SCHEMA = HERE / 'schema.sql'
 # SEEN and EXPLAINED triggered no decision in 12 sessions, so they are gone.
 STATES = ('CANT', 'CAN')
 EVIDENCE = ('none', 'assisted', 'guided', 'unaided', 'transferred')
-FACULTIES = ('write', 'read', 'debug', 'recall', 'design', 'vocabulary')
+# v2 faculties stay legal (historical probes keep their meaning). v3 adds the
+# nine circle-verbs: `implement` aliases `write`, `understand` folds `read`.
+FACULTIES = ('write', 'read', 'debug', 'recall', 'design', 'vocabulary',
+             'understand', 'decompose', 'reason', 'implement',
+             'evaluate', 'communicate', 'improve')
 
 # v2 phases are the learner's four, plus the diagnostics that feed them.
 # The v1 names stay legal so 73 historical probes keep their meaning.
@@ -1703,6 +1707,74 @@ def learner(args):
         print(f"active learner: {args.name}")
 
 
+# ---- v3 circle: target (the anchor as data) + the unlock gate ------------
+
+def target(args):
+    """INTAKE writes the anchor here; every later phase reads it. The target and
+    its codebase are DATA, so a different repo needs zero code change."""
+    con = connect()
+    if args.target_cmd == 'show':
+        rows = con.execute(
+            "SELECT id, learner, name, codebase_path, phase, unlock_gate, size "
+            "FROM targets WHERE phase != 'retired' ORDER BY id").fetchall()
+        if not rows:
+            print("no target yet. run INTAKE: `target set ...`")
+            return
+        for r in rows:
+            print(f"#{r['id']} [{r['learner']}] {r['name']}  ({r['size']})")
+            print(f"    codebase: {r['codebase_path']}")
+            print(f"    phase: {r['phase']}   unlock-gate: {r['unlock_gate']}")
+        return
+    if args.target_cmd == 'set':
+        if not args.name or not args.learner:
+            die("a target needs --learner and --name; the anchor is not optional.")
+        if not args.additional:
+            con.execute("UPDATE targets SET phase='retired' "
+                        "WHERE learner=? AND phase!='retired'", (args.learner,))
+        con.execute(
+            "INSERT INTO targets (learner, name, codebase_path, inputs, outputs,"
+            " size, scripts, phase, unlock_gate, created_at) "
+            "VALUES (?,?,?,?,?,?,?, 'SCAN', 'open', ?)",
+            (args.learner, args.name, args.codebase, args.inputs, args.outputs,
+             args.size, args.scripts, now()))
+        con.commit()
+        tid = con.execute("SELECT last_insert_rowid()").fetchone()[0]
+        print(f"target #{tid} set: {args.name}")
+        print(f"  read it back to him in one sentence and let him correct it.")
+        print(f"  next: SCAN {args.codebase or '<codebase>'} (do not teach in SCAN)")
+        return
+    die("target: use `set` or `show`")
+
+
+def unlock_gate(args):
+    """The hard gate between the ladder (UNLOCK) and the pillar (BIG BUILD).
+    Refuses to open BUILD while any non-parked ladder concept is still CANT."""
+    con = connect()
+    row = con.execute("SELECT id, name, phase FROM targets WHERE id=?",
+                      (args.target_id,)).fetchone()
+    if not row:
+        die(f"no target #{args.target_id}")
+    remaining = con.execute(
+        "SELECT verb, COUNT(*) n FROM concepts "
+        "WHERE state='CANT' AND parked=0 AND verb IS NOT NULL "
+        "GROUP BY verb ORDER BY n DESC").fetchall()
+    total = sum(r['n'] for r in remaining)
+    if total:
+        print(f"GATE CLOSED for #{args.target_id} ({row['name']}): "
+              f"{total} ladder concept(s) still CANT. BIG BUILD stays locked.")
+        for r in remaining:
+            print(f"  {r['verb'] or '?':<12} {r['n']}")
+        print("  unlock these first (parked depth-3+ concepts do NOT block; "
+              "they return JIT during the build).")
+        return
+    con.execute("UPDATE targets SET phase='BUILD', unlock_gate='closed', "
+                "updated_at=? WHERE id=?", (now(), args.target_id))
+    con.commit()
+    print(f"GATE OPEN: #{args.target_id} ({row['name']}) -> BIG BUILD.")
+    print("  the ladder is unlocked. now the real scripts, by hand, through the "
+          "9-verb circle.")
+
+
 # ---- cli -----------------------------------------------------------------
 
 # ---- v2: attempts, phases, assumptions -----------------------------------
@@ -2322,6 +2394,24 @@ def build_parser():
     s.add_argument('--veto', default=None)
 
     sub.add_parser('due-slice', help='what is stale, to be reviewed INSIDE a build')
+
+    # v3 circle
+    t = sub.add_parser('target', help='the anchor as data (INTAKE writes it)')
+    tsub = t.add_subparsers(dest='target_cmd')
+    ts = tsub.add_parser('set')
+    ts.add_argument('--learner', required=True)
+    ts.add_argument('--name', required=True)
+    ts.add_argument('--codebase', default=None)
+    ts.add_argument('--inputs', default=None)
+    ts.add_argument('--outputs', default=None)
+    ts.add_argument('--size', default=None)
+    ts.add_argument('--scripts', default=None)
+    ts.add_argument('--additional', action='store_true',
+                    help='keep prior targets (several scripts under one goal)')
+    tsub.add_parser('show')
+    ug = sub.add_parser('unlock-gate',
+                        help='open BIG BUILD only when the ladder is fully unlocked')
+    ug.add_argument('target_id', type=int)
     return p
 
 
@@ -2362,13 +2452,15 @@ DISPATCH = {
     'assume': assume,
     'due-slice': lambda a: due_slice(),
     'ask': ask,
+    'target': target,
+    'unlock-gate': unlock_gate,
 }
 
 # Commands that change state. After each one PROGRESS.md is rewritten.
 WRITES = ('probe', 'floor', 'promote', 'demote', 'revise', 'phase', 'assume', 'ask',
           'gate', 'attempt', 'spine-load', 'concepts-load', 'teach-open',
           'teach-close', 'session', 'learner', 'review', 'capstone', 'lookup',
-          'push')
+          'push', 'target', 'unlock-gate')
 
 
 def main():
