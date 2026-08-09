@@ -148,7 +148,7 @@ phase and points you at the governing file every turn; `phase-gate` enforces the
 read. Follow the pointer; do not assume a mapping. The phase file you are pointed
 at tells you when to call the reused machinery (concept teaching, the blank-page
 gate, review rounds, the metered push) that lives under
-`.claude/skills/tutor/phases/`.
+`.claude/skills/tutor_v3/phases/machinery/`.
 
 ## STANDING RULES
 
