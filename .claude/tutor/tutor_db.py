@@ -109,6 +109,17 @@ AWAY_AFTER = 600
 REVIEW = {'CANT': 1, 'CAN': 30}
 REVIEW_TRANSFERRED = 90
 
+def review_interval(state, depth, evidence):
+    """Spaced repetition: decay curves by depth + evidence."""
+    base = REVIEW.get(state, 1)
+    if evidence == 'unaided':
+        decay = 1 + (depth * 0.3)  # Deeper = longer intervals
+    elif evidence == 'transferred':
+        return REVIEW_TRANSFERRED
+    else:
+        decay = 1  # Default for guided/assisted
+    return int(base * decay)
+
 
 def die(msg):
     """A refusal. Non-zero exit, reason on stderr, nothing written."""
@@ -253,6 +264,12 @@ def brief():
         "SELECT slug FROM concepts WHERE next_review <= date('now')"
         " ORDER BY next_review").fetchall()
     print(f"DUE {len(due)}: {', '.join(r['slug'] for r in due[:8]) or '-'}")
+    nxt = con.execute(
+        "SELECT slug, name, depth FROM concepts WHERE state='CANT' AND parked=0"
+        " ORDER BY CASE WHEN next_review <= date('now') THEN 0 ELSE 1 END,"
+        " depth LIMIT 1").fetchone()
+    if nxt:
+        print(f"SUGGEST: [{nxt['depth']}] {nxt['slug']} — {nxt['name']}")
     open_gates = con.execute(
         "SELECT g.id, g.kind, g.spec_path, g.target, c.slug FROM gates g"
         " JOIN concepts c ON c.id = g.concept_id WHERE g.closed_at IS NULL").fetchall()
@@ -493,6 +510,52 @@ def _fatigue_check(con, sid):
               file=sys.stderr)
 
 
+def route_next(args=None):
+    """Auto-route: smart next concept based on verb coverage + due + sweep order."""
+    con = connect()
+
+    # Step 1: Check verb coverage (which verbs need work)
+    verbs_covered = con.execute(
+        "SELECT DISTINCT verb FROM concepts WHERE state='CAN' AND verb IS NOT NULL AND parked=0"
+    ).fetchall()
+    covered = {v['verb'] for v in verbs_covered} if verbs_covered else set()
+    all_verbs = set(FACULTIES[6:])  # Circle verbs: understand through improve
+    starved = all_verbs - covered
+
+    # Step 2: Prefer due/stale concepts
+    due = con.execute(
+        "SELECT id FROM concepts WHERE state='CANT' AND parked=0"
+        " AND next_review IS NOT NULL AND next_review <= date('now')"
+        " ORDER BY next_review LIMIT 1"
+    ).fetchone()
+
+    # Step 3: Route to starved verb first, then unswept
+    if starved:
+        nxt = con.execute(
+            "SELECT slug, name, depth, verb FROM concepts"
+            " WHERE state='CANT' AND parked=0 AND verb IN ("
+            + ','.join('?' * len(starved)) + ") AND swept_in IS NOT NULL"
+            " ORDER BY depth LIMIT 1",
+            tuple(starved)
+        ).fetchone()
+    else:
+        nxt = None
+
+    if not nxt:
+        nxt = con.execute(
+            "SELECT slug, name, depth, verb FROM concepts"
+            " WHERE state='CANT' AND parked=0 AND swept_in IS NULL"
+            " ORDER BY depth LIMIT 1"
+        ).fetchone()
+
+    if nxt:
+        verb_note = f" [{nxt['verb']}]" if nxt['verb'] else ""
+        due_note = " (stale)" if due and due['id'] == nxt['id'] else ""
+        print(f"[{nxt['depth']}] {nxt['slug']:<28} {nxt['name']}{verb_note}{due_note}")
+    else:
+        print("all CANT concepts are parked or all are owned. Gate is ready to unlock.")
+
+
 def floor(args):
     con = connect()
     c = concept(con, args.slug)
@@ -699,6 +762,17 @@ def promote(args):
                     f"measured the push. Open a twin: same idea, different "
                     f"instance, no push above L2, and promote on that one.")
 
+        # Force transfer: CAN requires 2 different instances, not just one proof
+        hit_probes = con.execute(
+            "SELECT DISTINCT phase FROM probes WHERE concept_id = ? AND result = 'HIT'"
+            " AND phase IN (SELECT DISTINCT phase FROM probes WHERE concept_id = ?)",
+            (c['id'], c['id'])).fetchall()
+        distinct_phases = len(set(p['phase'] for p in hit_probes))
+        if distinct_phases < 2 and c['state'] != 'CAN':
+            die(f"promote '{args.slug}' to CAN requires 2 HIT probes on different "
+                f"instances/phases. Currently {distinct_phases} phase(s). "
+                f"Test again in a different context first.")
+
         # v2: the copy check that fired once by luck in v1 (E16) is now mechanical.
         if not args.copy_checked:
             die(f"promote '{args.slug}' needs --copy-checked. Before crediting, compare "
@@ -717,8 +791,7 @@ def promote(args):
             die(f"'{args.slug}' has no HIT probe from a TRANSFER phase. Re-test it in "
                 f"a different context or language first.")
 
-    days = REVIEW_TRANSFERRED if args.evidence == 'transferred' \
-        else REVIEW.get(args.state)
+    days = review_interval(args.state, c['depth'], args.evidence)
     nxt = (date.today() + timedelta(days=days)).isoformat() if days else None
     con.execute(
         "UPDATE concepts SET state = ?, evidence = ?, next_review = ?, updated_at = ?"
@@ -2217,6 +2290,8 @@ def build_parser():
     s = sub.add_parser('sweep-next')
     s.add_argument('n', nargs='?', default=12)
 
+    sub.add_parser('route-next', help='smart next concept: verb coverage + due + sweep')
+
     s = sub.add_parser('probe')
     s.add_argument('slug')
     s.add_argument('phase')
@@ -2421,6 +2496,7 @@ DISPATCH = {
     'brief': lambda a: brief(),
     'status': lambda a: status(),
     'sweep-next': lambda a: sweep_next(a.n),
+    'route-next': lambda a: route_next(),
     'probe': probe,
     'floor': floor,
     'teach-open': teach_open,

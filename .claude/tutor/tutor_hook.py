@@ -76,6 +76,9 @@ PHASE_FILE = {
     'BUILD':  'phases/circle.md',
 }
 
+# Phase sequence for auto-advancement when unlock_gate opens
+PHASE_SEQUENCE = ['SCAN', 'UNLOCK', 'BUILD']
+
 # tutor_db.py subcommands that DO tutoring — blocked until the phase file is read.
 # Read-only / meta commands (brief, status, statusline, tree, target, ...) are not.
 GATED_CMDS = {'probe', 'gate', 'attempt', 'promote', 'demote', 'teach-open',
@@ -91,11 +94,27 @@ def active_target(con):
         return None                 # v2 db without the targets table: no v3 routing
 
 
+def next_phase(phase):
+    """Return the next phase in the sequence, or current if at end."""
+    try:
+        idx = PHASE_SEQUENCE.index(phase)
+        return PHASE_SEQUENCE[idx + 1]
+    except (ValueError, IndexError):
+        return phase  # Not in sequence or already at end
+
+
 def current_phase(con):
     t = active_target(con)
     if t is None:
         return 'INTAKE'             # no anchor yet -> intake is the only legal move
-    return t['phase'] if t['phase'] in PHASE_FILE else 'INTAKE'
+
+    phase = t['phase'] if t['phase'] in PHASE_FILE else 'INTAKE'
+
+    # If this phase's unlock_gate is open, advance to next phase
+    if t['unlock_gate'] == 'open' and phase in PHASE_SEQUENCE:
+        phase = next_phase(phase)
+
+    return phase
 
 
 def load_state():
