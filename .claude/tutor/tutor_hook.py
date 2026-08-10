@@ -72,12 +72,13 @@ STATE = HERE / '.phase_gate.json'      # shared between the two hook processes
 PHASE_FILE = {
     'INTAKE': 'phases/00-intake.md',
     'SCAN':   'phases/01-scan.md',
+    'READ':   'phases/03-read.md',
     'UNLOCK': 'phases/02-unlock.md',
     'BUILD':  'phases/circle.md',
 }
 
 # Phase sequence for auto-advancement when unlock_gate opens
-PHASE_SEQUENCE = ['SCAN', 'UNLOCK', 'BUILD']
+PHASE_SEQUENCE = ['SCAN', 'READ', 'UNLOCK', 'BUILD']
 
 # tutor_db.py subcommands that DO tutoring — blocked until the phase file is read.
 # Read-only / meta commands (brief, status, statusline, tree, target, ...) are not.

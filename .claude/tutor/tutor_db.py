@@ -472,6 +472,12 @@ def probe(args):
              'batch': f"{secs}s for the whole batch -- do not divide it",
              'away': f"{secs}s: he left the desk, not slow recall",
              'unmeasured': "clock UNMEASURED"}[clock]
+    verdict = "✓ PASS" if args.result == 'HIT' else "✗ FAIL"
+    print(f"\n[HYPOTHESIS-VERIFY]")
+    print(f"  Concept: {args.slug} — {c['name']}")
+    print(f"  Tested:  {args.phase}/{args.faculty}")
+    print(f"  Verdict: {verdict}{tail}")
+    print(f"  Time:    {stamp}\n")
     print(f"probe recorded: {args.slug} {args.phase}/{args.faculty}"
           f" -> {args.result}{tail} ({stamp}){free}")
     if clock == 'unmeasured':
@@ -480,6 +486,24 @@ def probe(args):
               " question on screen and the clock records itself.", file=sys.stderr)
 
     _fatigue_check(con, sid)
+    _suggest_teach(con, c, args.result, args.error_class)
+
+
+def _suggest_teach(con, concept, result, error_class):
+    """Auto-suggest teaching when MISS with real gap detected."""
+    if result != 'MISS' or error_class in NO_PENALTY:
+        return  # Only teach on real gaps, not typos/fatigue
+
+    fail_count = con.execute(
+        "SELECT COUNT(*) FROM probes WHERE concept_id = ? AND result = 'MISS'",
+        (concept['id'],)).fetchone()[0]
+
+    if fail_count == 1:
+        print(f"\n⚠️  SUGGESTION: '{concept['slug']}' failed. Run teach-open to explain "
+              f"the gap, then re-test.", file=sys.stderr)
+    elif fail_count >= 2:
+        print(f"\n🔴 PATTERN: '{concept['slug']}' failed {fail_count}x. Teaching needed "
+              f"before next probe.", file=sys.stderr)
 
 
 def _fatigue_check(con, sid):
@@ -508,6 +532,30 @@ def _fatigue_check(con, sid):
         print("FATIGUE: " + "; ".join(warn) +
               "\n  -> land the session. A rung lost while tired is a rung re-taught.",
               file=sys.stderr)
+
+
+def teach_suggest(args=None):
+    """Show concepts that need teaching based on failure patterns."""
+    con = connect()
+
+    # Find concepts with MISS probes that lack teaching
+    needs_teach = con.execute("""
+        SELECT c.slug, c.name, COUNT(p.id) fails, c.depth
+        FROM concepts c
+        JOIN probes p ON p.concept_id = c.id AND p.result = 'MISS'
+        WHERE c.parked = 0 AND c.state = 'CANT'
+        GROUP BY c.id
+        ORDER BY fails DESC, c.depth
+    """).fetchall()
+
+    if not needs_teach:
+        print("no concepts with confirmed gaps (all MISS probes have teaching or no gaps detected)")
+        return
+
+    print(f"CONCEPTS NEEDING TEACHING ({len(needs_teach)}):")
+    for n in needs_teach[:10]:
+        print(f"  [{n['depth']}] {n['slug']:<28} {n['name']:<34} ({n['fails']}x failed)")
+        print(f"       → Run: teach-open {n['slug']}")
 
 
 def route_next(args=None):
@@ -2323,6 +2371,8 @@ def build_parser():
     s.add_argument('slug')
     s.add_argument('--explanation-file', required=True)
 
+    sub.add_parser('teach-suggest', help='show concepts that need teaching (gap detection)')
+
     g = sub.add_parser('gate').add_subparsers(dest='gate_cmd')
     go = g.add_parser('open')
     go.add_argument('slug')
@@ -2501,6 +2551,7 @@ DISPATCH = {
     'floor': floor,
     'teach-open': teach_open,
     'teach-close': teach_close,
+    'teach-suggest': lambda a: teach_suggest(),
     'gate': lambda a: {'open': gate_open, 'close': gate_close,
                        'list': gate_list}[a.gate_cmd](a),
     'promote': promote,
