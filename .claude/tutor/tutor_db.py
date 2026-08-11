@@ -1039,12 +1039,40 @@ def promote(args):
         "UPDATE concepts SET state = ?, evidence = ?, next_review = ?, updated_at = ?"
         " WHERE id = ?", (args.state, args.evidence, nxt, now(), c['id']))
     con.commit()
+
+    # Track in bucket if promoted to CAN
+    if args.state == 'CAN':
+        _update_bucket_on_promote(args.slug)
+
     if c['state'] == args.state and c['evidence'] == args.evidence:
         print(f"{args.slug}: NO CHANGE — already {args.state}/{args.evidence}."
               f" Owned count did not move. (review reset to {nxt})")
     else:
         print(f"{args.slug}: {c['state']}/{c['evidence']} ->"
               f" {args.state}/{args.evidence} (NEW, review {nxt})")
+
+
+def _update_bucket_on_promote(slug):
+    """Update bucket status when concept is promoted to CAN."""
+    project_id = detect_project_id()
+    bucket = read_bucket(project_id)
+
+    if not bucket or bucket.get('status') == 'empty':
+        return  # No active bucket
+
+    # Mark this concept as resolved in chain
+    for entry in bucket.get('chain', []):
+        if entry['concept'] == slug:
+            entry['status'] = 'resolved'
+            break
+
+    # Check if all are resolved
+    all_resolved = all(e['status'] == 'resolved' for e in bucket.get('chain', []))
+
+    if all_resolved:
+        bucket['status'] = 'ready_archive'
+
+    write_bucket(bucket, project_id)
 
 
 def demote(args):

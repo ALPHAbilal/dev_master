@@ -54,6 +54,38 @@ def get_bucket(project_id=None):
     return {}
 
 
+def bucket_status_message(bucket):
+    """Return hook message based on bucket state."""
+    status = bucket.get('status', 'empty')
+
+    if status == 'empty':
+        return None  # No message for empty
+
+    primary = bucket.get('primary_concept')
+    chain = bucket.get('chain', [])
+    remaining = sum(1 for c in chain if c.get('status') != 'resolved')
+
+    if status == 'in_progress':
+        if remaining <= 2:
+            return (f"🎯 BUCKET ALMOST DONE: {primary}\n"
+                   f"   Remaining: {remaining} concepts\n"
+                   f"   Run: bucket-show")
+        else:
+            return (f"📌 BUCKET ACTIVE: {primary} chain\n"
+                   f"   Run: bucket-show")
+
+    elif status == 'ready_archive':
+        return (f"✓ BUCKET COMPLETE: {primary} chain\n"
+               f"   All concepts verified\n"
+               f"   Archiving...")
+
+    elif status == 'archived':
+        return (f"✓ ARCHIVED: {primary} chain\n"
+               f"   Bucket cleared for next discovery")
+
+    return None
+
+
 def payload():
     try:
         return json.load(sys.stdin)
@@ -285,17 +317,38 @@ def cmd_phase_guard(data):
         gate_note = (f"\nOPEN GATE #{g['id']} ({g['slug']}): he writes {g['target']}, "
                      f"you do not.")
 
-    # Check bucket for active discoveries
+    # Check bucket and show minimal status message
     project_id = detect_project_id()
     bucket = get_bucket(project_id)
     bucket_note = ''
-    if bucket and bucket.get('status') == 'in_progress':
-        primary = bucket.get('primary_concept')
-        plan = bucket.get('resolution_plan', [])
-        if plan:
-            plan_str = ' → '.join(plan)
-            bucket_note = (f"\nACTIVE BUCKET: {primary} discovery chain\n"
-                          f"  Resolution order: {plan_str}")
+    msg = bucket_status_message(bucket)
+    if msg:
+        bucket_note = f"\n{msg}"
+        # Auto-archive if ready
+        if bucket.get('status') == 'ready_archive':
+            try:
+                con = connect()
+                for entry in bucket.get('chain', []):
+                    c = con.execute("SELECT state FROM concepts WHERE slug=?",
+                                   (entry['concept'],)).fetchone()
+                    if c and c['state'] != 'CAN':
+                        return  # Not all ready yet
+                # All ready → archive
+                con.execute(
+                    "INSERT INTO discovery_chains (project_id, primary_concept, chain_json, status, archived_at) "
+                    "VALUES (?,?,?,?,?)",
+                    (project_id, bucket.get('primary_concept'), json.dumps(bucket['chain']),
+                     'archived', now())
+                )
+                con.commit()
+                # Mark bucket as archived
+                bucket['status'] = 'archived'
+                bucket['archived_at'] = now()
+                path = PROJECTS_DIR / project_id / 'tutor_state.json'
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(json.dumps(bucket, indent=2))
+            except:
+                pass  # Silently fail if archive doesn't work
 
     already = " (already read this phase)" if st.get('read') else ""
     print(
