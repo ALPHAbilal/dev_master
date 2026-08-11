@@ -102,6 +102,17 @@ def write_bucket(data, project_id=None):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2))
 
+
+def init_bucket():
+    """Create new empty bucket structure."""
+    return {
+        'primary_concept': None,
+        'chain': [],  # [{concept, name, blocked_by, status}, ...]
+        'resolution_plan': [],  # order to solve
+        'status': 'empty',
+        'started_at': None
+    }
+
 # v2: two states, not four. v1's four-state value is preserved in concepts.state_v1
 # and is never written again. "Only APPLIED counts" was already the doctrine;
 # SEEN and EXPLAINED triggered no decision in 12 sessions, so they are gone.
@@ -536,27 +547,109 @@ def probe(args):
 
 
 def _log_to_bucket(concept, result, error_class):
-    """Log probe result to project bucket for discovery tracking."""
+    """Log probe result with chain tracking."""
     if result != 'MISS' or error_class in NO_PENALTY:
         return  # Only log real gaps
 
     project_id = detect_project_id()
     bucket = read_bucket(project_id)
 
-    # Initialize bucket structure if needed
-    if 'discoveries' not in bucket:
-        bucket['discoveries'] = []
+    # Initialize if empty
+    if not bucket or bucket.get('status') == 'empty':
+        bucket = init_bucket()
+        bucket['primary_concept'] = concept['slug']
+        bucket['started_at'] = now()
+        bucket['status'] = 'in_progress'
 
-    # Add discovery entry
-    bucket['discoveries'].append({
-        'concept': concept['slug'],
-        'name': concept['name'],
-        'timestamp': now(),
-        'error_class': error_class,
-        'status': 'needs_teaching'
-    })
+    # Add or update chain entry
+    existing = next((c for c in bucket['chain'] if c['concept'] == concept['slug']), None)
+    if not existing:
+        bucket['chain'].append({
+            'concept': concept['slug'],
+            'name': concept['name'],
+            'blocked_by': None,
+            'status': 'needs_teaching',
+            'discovered_at': now()
+        })
+
+    # Recompute plan whenever chain changes
+    bucket['resolution_plan'] = compute_resolution_plan(bucket['chain'])
+    bucket['status'] = 'in_progress'
 
     write_bucket(bucket, project_id)
+
+
+def compute_resolution_plan(chain):
+    """Topological sort: resolve dependencies first (no blockers first)."""
+    if not chain:
+        return []
+
+    plan = []
+    remaining = {c['concept']: c for c in chain}
+    visited = set()
+
+    while remaining:
+        # Find concepts with no blockers in remaining set
+        ready = [c for c in remaining.values()
+                if not c['blocked_by'] or c['blocked_by'] not in remaining]
+
+        if not ready:
+            # Circular dependency fallback: just add remaining
+            plan.extend(list(remaining.keys()))
+            break
+
+        # Add ready concepts to plan
+        for c in ready:
+            if c['concept'] not in visited:
+                plan.append(c['concept'])
+                visited.add(c['concept'])
+                del remaining[c['concept']]
+
+    return plan
+
+
+def detect_blockers(con, chain, primary_concept):
+    """Identify which gaps block the primary concept."""
+    # For each concept in chain, check if it's required by primary
+    for entry in chain:
+        concept_slug = entry['concept']
+
+        # Check if this concept appears in requires field of primary
+        primary = concept(con, primary_concept)
+        requires = (primary.get('requires') or '').split(',')
+
+        if concept_slug in requires:
+            entry['blocks_primary'] = True
+        else:
+            # Check if it indirectly blocks (blocks something that blocks primary)
+            entry['blocks_primary'] = False
+
+    return chain
+
+
+def archive_bucket(project_id=None):
+    """Archive completed bucket to db, then empty it."""
+    if project_id is None:
+        project_id = detect_project_id()
+
+    bucket = read_bucket(project_id)
+
+    if bucket.get('status') != 'in_progress' or not bucket.get('chain'):
+        return  # Nothing to archive
+
+    con = connect()
+
+    # Store in db as history
+    con.execute(
+        "INSERT INTO discovery_chains (project_id, primary_concept, chain_json, status, archived_at) "
+        "VALUES (?,?,?,?,?)",
+        (project_id, bucket.get('primary_concept'), json.dumps(bucket['chain']),
+         'archived', now())
+    )
+    con.commit()
+
+    # Empty the bucket
+    write_bucket(init_bucket(), project_id)
 
 
 def _suggest_teach(con, concept, result, error_class):
@@ -612,12 +705,27 @@ def bucket_show(args=None):
     print(f"PROJECT: {project_id}")
     print(f"BUCKET PATH: {bucket_path(project_id)}")
 
-    if not bucket:
+    if not bucket or bucket.get('status') == 'empty':
         print("BUCKET: empty (no active discovery chains)")
         return
 
     print("BUCKET (active discovery chains):")
-    print(json.dumps(bucket, indent=2))
+    print(f"  Primary: {bucket.get('primary_concept')}")
+    print(f"  Status: {bucket.get('status')}")
+    print(f"  Chain ({len(bucket.get('chain', []))} concepts):")
+    for entry in bucket.get('chain', []):
+        blocks = " [blocks primary]" if entry.get('blocks_primary') else ""
+        print(f"    - {entry['concept']:<20} status={entry['status']}{blocks}")
+
+    if bucket.get('resolution_plan'):
+        print(f"\n  Resolution order: {' → '.join(bucket['resolution_plan'])}")
+
+
+def bucket_archive(args=None):
+    """Archive completed bucket to database."""
+    project_id = detect_project_id()
+    archive_bucket(project_id)
+    print(f"Bucket archived for {project_id}")
 
 
 def teach_suggest(args=None):
@@ -2422,6 +2530,7 @@ def build_parser():
     sub.add_parser('brief')
     sub.add_parser('status')
     sub.add_parser('bucket-show', help='show active discovery chains (project-scoped)')
+    sub.add_parser('bucket-archive', help='archive completed bucket to database')
     s = sub.add_parser('sweep-next')
     s.add_argument('n', nargs='?', default=12)
 
@@ -2633,6 +2742,7 @@ DISPATCH = {
     'brief': lambda a: brief(),
     'status': lambda a: status(),
     'bucket-show': lambda a: bucket_show(),
+    'bucket-archive': lambda a: bucket_archive(),
     'sweep-next': lambda a: sweep_next(a.n),
     'route-next': lambda a: route_next(),
     'probe': probe,

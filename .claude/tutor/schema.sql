@@ -349,6 +349,19 @@ CREATE TABLE IF NOT EXISTS stalls (
 CREATE INDEX IF NOT EXISTS idx_stalls_gate ON stalls(gate_id);
 CREATE INDEX IF NOT EXISTS idx_stalls_hyp ON stalls(hyp_state);
 
+-- ---- discovery chains: logged when bucket resolves ------
+-- Permanent record of discovery chains (fstring -> str-methods -> json-dumps)
+CREATE TABLE IF NOT EXISTS discovery_chains (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id  TEXT NOT NULL,
+    primary_concept TEXT NOT NULL,
+    chain_json  TEXT NOT NULL,       -- JSON array of discovery chain
+    status      TEXT NOT NULL,       -- in_progress|archived
+    started_at  TEXT,
+    archived_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_discovery_chains_project ON discovery_chains(project_id);
+
 -- ---- v2: the phase pointer -------------------------------------------------
 -- FLOOR -> READ -> BUILD_V1 -> BUILD_V2 -> CAPSTONE. The learner's ONLY choice.
 INSERT OR IGNORE INTO meta(key, value) VALUES ('phase', 'FLOOR');

@@ -289,10 +289,13 @@ def cmd_phase_guard(data):
     project_id = detect_project_id()
     bucket = get_bucket(project_id)
     bucket_note = ''
-    if bucket.get('discoveries'):
-        n = len(bucket['discoveries'])
-        bucket_note = (f"\nACTIVE BUCKET: {n} discovery/ies being tracked "
-                      f"({project_id})")
+    if bucket and bucket.get('status') == 'in_progress':
+        primary = bucket.get('primary_concept')
+        plan = bucket.get('resolution_plan', [])
+        if plan:
+            plan_str = ' → '.join(plan)
+            bucket_note = (f"\nACTIVE BUCKET: {primary} discovery chain\n"
+                          f"  Resolution order: {plan_str}")
 
     already = " (already read this phase)" if st.get('read') else ""
     print(
