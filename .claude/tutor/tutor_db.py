@@ -56,6 +56,51 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 DB = HERE / 'tutor.db'
 SCHEMA = HERE / 'schema.sql'
+PROJECTS_DIR = HERE / 'projects'
+
+
+def detect_project_id():
+    """Detect current project from git remote or directory name."""
+    try:
+        import subprocess
+        remote_url = subprocess.check_output(
+            ["git", "config", "--get", "remote.origin.url"],
+            stderr=subprocess.DEVNULL, text=True
+        ).strip()
+        if remote_url:
+            name = Path(remote_url).stem
+            return name.replace(".git", "")
+    except:
+        pass
+    # Fallback: use directory name
+    return Path.cwd().name
+
+
+def bucket_path(project_id=None):
+    """Return path to bucket file for given project."""
+    if project_id is None:
+        project_id = detect_project_id()
+    path = PROJECTS_DIR / project_id / 'tutor_state.json'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def read_bucket(project_id=None):
+    """Read bucket state for project (empty dict if not exists)."""
+    path = bucket_path(project_id)
+    if path.exists():
+        try:
+            return json.loads(path.read_text())
+        except:
+            return {}
+    return {}
+
+
+def write_bucket(data, project_id=None):
+    """Write bucket state for project."""
+    path = bucket_path(project_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2))
 
 # v2: two states, not four. v1's four-state value is preserved in concepts.state_v1
 # and is never written again. "Only APPLIED counts" was already the doctrine;
@@ -487,6 +532,31 @@ def probe(args):
 
     _fatigue_check(con, sid)
     _suggest_teach(con, c, args.result, args.error_class)
+    _log_to_bucket(c, args.result, args.error_class)
+
+
+def _log_to_bucket(concept, result, error_class):
+    """Log probe result to project bucket for discovery tracking."""
+    if result != 'MISS' or error_class in NO_PENALTY:
+        return  # Only log real gaps
+
+    project_id = detect_project_id()
+    bucket = read_bucket(project_id)
+
+    # Initialize bucket structure if needed
+    if 'discoveries' not in bucket:
+        bucket['discoveries'] = []
+
+    # Add discovery entry
+    bucket['discoveries'].append({
+        'concept': concept['slug'],
+        'name': concept['name'],
+        'timestamp': now(),
+        'error_class': error_class,
+        'status': 'needs_teaching'
+    })
+
+    write_bucket(bucket, project_id)
 
 
 def _suggest_teach(con, concept, result, error_class):
@@ -532,6 +602,22 @@ def _fatigue_check(con, sid):
         print("FATIGUE: " + "; ".join(warn) +
               "\n  -> land the session. A rung lost while tired is a rung re-taught.",
               file=sys.stderr)
+
+
+def bucket_show(args=None):
+    """Show current bucket state for this project."""
+    project_id = detect_project_id()
+    bucket = read_bucket(project_id)
+
+    print(f"PROJECT: {project_id}")
+    print(f"BUCKET PATH: {bucket_path(project_id)}")
+
+    if not bucket:
+        print("BUCKET: empty (no active discovery chains)")
+        return
+
+    print("BUCKET (active discovery chains):")
+    print(json.dumps(bucket, indent=2))
 
 
 def teach_suggest(args=None):
@@ -2335,6 +2421,7 @@ def build_parser():
     s.add_argument('note', nargs='?', default='')
     sub.add_parser('brief')
     sub.add_parser('status')
+    sub.add_parser('bucket-show', help='show active discovery chains (project-scoped)')
     s = sub.add_parser('sweep-next')
     s.add_argument('n', nargs='?', default=12)
 
@@ -2545,6 +2632,7 @@ DISPATCH = {
     'session': lambda a: session(a.agent, a.note),
     'brief': lambda a: brief(),
     'status': lambda a: status(),
+    'bucket-show': lambda a: bucket_show(),
     'sweep-next': lambda a: sweep_next(a.n),
     'route-next': lambda a: route_next(),
     'probe': probe,

@@ -22,6 +22,36 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 DB = HERE / 'tutor.db'
 PROJECT = HERE.parent.parent          # .claude/tutor -> .claude -> project root
+PROJECTS_DIR = HERE / 'projects'
+
+
+def detect_project_id():
+    """Detect current project from git remote or directory name."""
+    try:
+        import subprocess
+        remote_url = subprocess.check_output(
+            ["git", "config", "--get", "remote.origin.url"],
+            stderr=subprocess.DEVNULL, text=True
+        ).strip()
+        if remote_url:
+            name = Path(remote_url).stem
+            return name.replace(".git", "")
+    except:
+        pass
+    return Path.cwd().name
+
+
+def get_bucket(project_id=None):
+    """Load bucket for project."""
+    if project_id is None:
+        project_id = detect_project_id()
+    path = PROJECTS_DIR / project_id / 'tutor_state.json'
+    if path.exists():
+        try:
+            return json.loads(path.read_text())
+        except:
+            return {}
+    return {}
 
 
 def payload():
@@ -254,6 +284,16 @@ def cmd_phase_guard(data):
         g = gates[0]
         gate_note = (f"\nOPEN GATE #{g['id']} ({g['slug']}): he writes {g['target']}, "
                      f"you do not.")
+
+    # Check bucket for active discoveries
+    project_id = detect_project_id()
+    bucket = get_bucket(project_id)
+    bucket_note = ''
+    if bucket.get('discoveries'):
+        n = len(bucket['discoveries'])
+        bucket_note = (f"\nACTIVE BUCKET: {n} discovery/ies being tracked "
+                      f"({project_id})")
+
     already = " (already read this phase)" if st.get('read') else ""
     print(
         f"## TUTOR PHASE GUARD (deterministic router)\n"
@@ -262,7 +302,7 @@ def cmd_phase_guard(data):
         f"Read it now and follow it{already}. Do not rely on SKILL.md to tell you "
         f"which phase file to use — SKILL.md no longer routes; this hook does.\n"
         f"The PreToolUse gate BLOCKS {sorted(GATED_CMDS)} until you have read that "
-        f"file this phase. LAW 0 always applies.{gate_note}")
+        f"file this phase. LAW 0 always applies.{gate_note}{bucket_note}")
 
 
 def cmd_phase_gate(data):
