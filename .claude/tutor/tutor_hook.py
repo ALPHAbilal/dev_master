@@ -7,6 +7,10 @@ Wired into .claude/settings.json. Reads the hook payload on stdin.
     read-guard    PreToolUse(Read)        -> blocks the spec file of an open gate
     write-guard   PreToolUse(Write|Edit)  -> blocks the agent writing his target
     stop-check    Stop                    -> warns when a session recorded nothing
+    phase-guard   UserPromptSubmit        -> points at the one governing file
+    phase-gate    PreToolUse(Bash)        -> blocks tutoring until it is read
+    ship-check    PreToolUse(Bash)        -> blocks an outgoing question that
+                                             uses unknown terms or too many hops
 
 Exit codes: 0 allow, 2 block (stderr is shown to the agent).
 
@@ -15,73 +19,26 @@ stop the user working. It fails CLOSED only on a positive match against an open
 gate, which is the one case where being wrong is expensive.
 """
 import json
+import os
 import sqlite3
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-DB = HERE / 'tutor.db'
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
+
+import tutor_db                  # noqa: E402  the single source for DB + rules
+import stack                     # noqa: E402
+import router                    # noqa: E402
+
 PROJECT = HERE.parent.parent          # .claude/tutor -> .claude -> project root
 PROJECTS_DIR = HERE / 'projects'
 
-
-def detect_project_id():
-    """Detect current project from git remote or directory name."""
-    try:
-        import subprocess
-        remote_url = subprocess.check_output(
-            ["git", "config", "--get", "remote.origin.url"],
-            stderr=subprocess.DEVNULL, text=True
-        ).strip()
-        if remote_url:
-            name = Path(remote_url).stem
-            return name.replace(".git", "")
-    except:
-        pass
-    return Path.cwd().name
-
-
-def get_bucket(project_id=None):
-    """Load bucket for project."""
-    if project_id is None:
-        project_id = detect_project_id()
-    path = PROJECTS_DIR / project_id / 'tutor_state.json'
-    if path.exists():
-        try:
-            return json.loads(path.read_text())
-        except:
-            return {}
-    return {}
-
-
-def bucket_status_message(bucket):
-    """Return hook message based on bucket state."""
-    status = bucket.get('status', 'empty')
-
-    if status == 'empty':
-        return None  # No message for empty
-
-    primary = bucket.get('primary_concept')
-    chain = bucket.get('chain', [])
-    remaining = sum(1 for c in chain if c.get('status') != 'resolved')
-
-    if status == 'in_progress':
-        # Detail lives in command output by design -- the hook only points.
-        return ("📌 BUCKET ACTIVE — before tutoring this turn run:\n"
-                "   python3 .claude/tutor/tutor_db.py turn-brief\n"
-                "   (computed brief: the form to answer, the keys that exist "
-                "for you, and the next move)")
-
-    elif status == 'ready_archive':
-        return (f"✓ BUCKET COMPLETE: {primary} chain\n"
-               f"   All concepts verified\n"
-               f"   Archiving...")
-
-    elif status == 'archived':
-        return (f"✓ ARCHIVED: {primary} chain\n"
-               f"   Bucket cleared for next discovery")
-
-    return None
+# The hook owns no rules of its own. `detect_project_id` and the ship-check both
+# live in tutor_db; v3 kept a second copy of detect_project_id here and the two
+# disagreed the moment the repo was cloned under a different directory name.
+detect_project_id = tutor_db.detect_project_id
 
 
 def payload():
@@ -92,7 +49,8 @@ def payload():
 
 
 def connect():
-    con = sqlite3.connect(f'file:{DB}?mode=ro', uri=True, timeout=2.0)
+    con = sqlite3.connect(f'file:{tutor_db._db_path()}?mode=ro', uri=True,
+                          timeout=2.0)
     con.row_factory = sqlite3.Row
     return con
 
@@ -126,7 +84,10 @@ def block(msg):
 # read is enforced (phase-gate) so it cannot be skipped.
 
 SKILL = PROJECT / '.claude' / 'skills' / 'tutor_v3'
-STATE = HERE / '.phase_gate.json'      # shared between the two hook processes
+
+
+def _state_path():
+    return Path(os.environ.get('TUTOR_PHASE_STATE', HERE / '.phase_gate.json'))
 
 # phase -> the one file that governs it. ONE variable, `meta.phase`, decides
 # this. v3 kept a second copy on targets.phase and a third in .phase_gate.json,
@@ -166,14 +127,14 @@ def current_phase(con):
 
 def load_state():
     try:
-        return json.loads(STATE.read_text())
+        return json.loads(_state_path().read_text())
     except Exception:
         return {}
 
 
 def save_state(d):
     try:
-        STATE.write_text(json.dumps(d))
+        _state_path().write_text(json.dumps(d))
     except Exception:
         pass                        # never let a state write break the turn
 
@@ -208,9 +169,13 @@ def cmd_brief(_data):
         lines.append("Position: the bank is EMPTY."
                      " Nothing can be routed until `/tutor concepts <dir>` has run.")
     ph = con.execute("SELECT value FROM meta WHERE key = 'phase'").fetchone()
-    lines.append(f"Phase: {ph['value'] if ph else 'FLOOR'}"
-                 " (FLOOR -> READ -> BUILD_V1 -> BUILD_V2)."
-                 " He chooses the phase; you choose every rung inside it.")
+    phase = current_phase(con)
+    lines.append(f"Phase: {phase} ({' -> '.join(PHASE_FILE)}) — mode "
+                 f"{MODE[phase]}. He chooses the phase; you choose every rung "
+                 f"inside it.")
+    path = stack.path(con, detect_project_id())
+    lines.append("Stack: " + (' > '.join(path) if path else
+                              "empty — nothing is being taught."))
     due = con.execute(
         "SELECT COUNT(*) FROM concepts WHERE next_review <= date('now')").fetchone()[0]
     lines.append(f"Due for review: {due}")
@@ -276,7 +241,11 @@ def cmd_stop_check(data):
 
 def cmd_phase_guard(data):
     """UserPromptSubmit: point the agent at the ONE file that governs this turn.
-    stdout is injected as context, deterministically, before the agent answers."""
+
+    Ten lines, hard. v3's pointer grew a bucket status block, an auto-archive
+    side effect and a gate note, ran to twenty-odd lines every single turn, and
+    became something to scroll past.
+    """
     con = connect()
     if not guard_enabled(con):
         return
@@ -295,55 +264,16 @@ def cmd_phase_guard(data):
         st = {'session_id': sid, 'expected': expected, 'read': False}
         save_state(st)
 
-    gates = open_gates(con)
-    gate_note = ''
-    if gates:
-        g = gates[0]
-        gate_note = (f"\nOPEN GATE #{g['id']} ({g['slug']}): he writes {g['target']}, "
-                     f"you do not.")
-
-    # Check bucket and show minimal status message
-    project_id = detect_project_id()
-    bucket = get_bucket(project_id)
-    bucket_note = ''
-    msg = bucket_status_message(bucket)
-    if msg:
-        bucket_note = f"\n{msg}"
-        # Auto-archive if ready
-        if bucket.get('status') == 'ready_archive':
-            try:
-                con = connect()
-                for entry in bucket.get('chain', []):
-                    c = con.execute("SELECT state FROM concepts WHERE slug=?",
-                                   (entry['concept'],)).fetchone()
-                    if c and c['state'] != 'CAN':
-                        return  # Not all ready yet
-                # All ready → archive
-                con.execute(
-                    "INSERT INTO discovery_chains (project_id, primary_concept, chain_json, status, archived_at) "
-                    "VALUES (?,?,?,?,?)",
-                    (project_id, bucket.get('primary_concept'), json.dumps(bucket['chain']),
-                     'archived', now())
-                )
-                con.commit()
-                # Mark bucket as archived
-                bucket['status'] = 'archived'
-                bucket['archived_at'] = now()
-                path = PROJECTS_DIR / project_id / 'tutor_state.json'
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(json.dumps(bucket, indent=2))
-            except:
-                pass  # Silently fail if archive doesn't work
-
-    already = " (already read this phase)" if st.get('read') else ""
+    path = stack.path(con, detect_project_id())
+    already = "  (already read this phase)" if st.get('read') else ""
     print(
-        f"## TUTOR PHASE GUARD (deterministic router)\n"
-        f"ACTIVE PHASE = {phase}. The file that governs THIS turn is:\n"
-        f"  {SKILL.name}/{rel}\n"
-        f"Read it now and follow it{already}. Do not rely on SKILL.md to tell you "
-        f"which phase file to use — SKILL.md no longer routes; this hook does.\n"
-        f"The PreToolUse gate BLOCKS {sorted(GATED_CMDS)} until you have read that "
-        f"file this phase. LAW 0 always applies.{gate_note}{bucket_note}")
+        f"## TUTOR — PHASE {phase} / MODE {MODE[phase]}\n"
+        f"GOVERNING FILE: {expected}{already}\n"
+        f"{router.DOCTRINE[MODE[phase]]}\n"
+        f"STACK: {' > '.join(path) if path else 'empty — open the anchor frame'}"
+        f"{'   (only the last one is teachable)' if len(path) > 1 else ''}\n"
+        f"`classify` and `draft` are BLOCKED until that file is read. "
+        f"Every outgoing question goes through `draft` first.")
 
 
 def cmd_phase_gate(data):
@@ -378,6 +308,37 @@ def cmd_phase_gate(data):
           f"before {sub}.)")
 
 
+def cmd_ship_check(data):
+    """PreToolUse(Bash): a `draft` that would fail the gate never runs.
+
+    The command refuses it too — this is the same check, one call earlier, so
+    the agent gets the reason instead of a non-zero exit it has to interpret.
+    """
+    cmd = (data.get('tool_input') or {}).get('command') or ''
+    if 'tutor_db.py' not in cmd or ' draft' not in cmd:
+        return
+    try:
+        args = cmd.split('tutor_db.py', 1)[1].split()
+        if 'draft' not in args:
+            return
+
+        def opt(name, default=None):
+            return args[args.index(name) + 1] if name in args else default
+
+        about = opt('--about')
+        hops = int(opt('--hops', '1'))
+        terms = [t.strip() for t in (opt('--terms', '') or '').split(',')
+                 if t.strip()]
+    except (ValueError, IndexError):
+        return                      # unparseable: let the command refuse it
+    if not about:
+        return
+    con = connect()
+    ok, reason = tutor_db.ship_check(con, detect_project_id(), terms, hops, about)
+    if not ok:
+        block(f"BLOCKED by ship-check — this question does not go out.\n{reason}")
+
+
 def _mark_phase_read(data):
     """Called from read-guard: if the agent reads the expected phase file, the
     gate opens for this phase+session."""
@@ -398,6 +359,7 @@ COMMANDS = {
     'stop-check': cmd_stop_check,
     'phase-guard': cmd_phase_guard,
     'phase-gate': cmd_phase_gate,
+    'ship-check': cmd_ship_check,
 }
 
 

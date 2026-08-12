@@ -1,30 +1,36 @@
-# SCAN — scrape the ladder, teach nothing
+# DRILL — own each rung, from the real code
 
-**MODE: ADVERSARY.**  Rungs this phase grades: **predict**.
+**MODE: ADVERSARY.**  Rungs this phase grades: **predict, perturb, produce, transfer**.
 
-Read the WHOLE target codebase and turn it into concepts. This phase produces
-the bank; it does not produce understanding, and it must not try to.
+One concept at a time, from the code it actually appears in, until all four
+rungs are HIT. This is where the ladder is climbed.
 
 ## Job
 
-Enumerate every concept the codebase actually uses — language, stdlib, design,
-failure mode, api, architecture — into `concepts`. Targets, not rungs: a rung is
-born from a MISS, not from your sense of what is important.
+Take the top frame of the stack. Drive it through four rungs. Pop it. Take the
+question you were handed back and continue.
 
-## Rungs used
+## Rungs used — all four, in this order
 
-**`predict` only.** SCAN grades one thing: shown a piece of the real file, can he
-say what it does? Every other rung belongs to DRILL. A `predict` MISS here is how
-a concept earns its place on the ladder.
+| rung | he does | what a HIT proves |
+|---|---|---|
+| `predict` | says what the real code produces | he has a model |
+| `perturb` | says what changes when you change one line | the model is causal |
+| `produce` | writes it from a blank page | he can reach for it |
+| `transfer` | uses it somewhere it was not taught | he owns it, not the example |
+
+Four HITs is ownership. One HIT is a demonstration, and v1 credited fourteen
+concepts on one demonstration each; twelve of them failed on rebuild.
 
 ## Rules
 
-- Do not teach. If you catch yourself explaining, you have left SCAN.
-- Do not ask him what he knows. A self-report is a hint; his prediction is
-  evidence. Show him code and grade the prediction.
-- Depth 3+ concepts insert parked — off the ladder, not lost. They come back
-  just-in-time during the build.
-- Breadth is the deliverable. A ladder missing a rung is worse than a long one.
+- Only the DEEPEST frame is teachable. A frozen frame cannot be graded, cannot
+  be drafted about, and cannot be popped.
+- A `WEAK` locks its rung. You may not advance over it. Re-grade the same rung
+  with a SHORTER question — the budget is 1 hop now, and that is the point.
+- `MISS` means teach, then re-grade the SAME rung. Not the next one.
+- Every question through `draft` first. A question using a term he has never
+  been shown measures your vocabulary, not his.
 
 ## LAW 0 (governs every ADVERSARY phase)
 

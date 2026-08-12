@@ -78,8 +78,10 @@ closes.
   target during a gate, and block tutoring commands until the phase file is read.
 - **Prose** — this file — is the weakest layer, for judgment only.
 
-DB structures the circle uses: `concepts.verb` (which verb a concept trains), the
-`targets` table (the anchor as data), the `verb_coverage` view (the circle-map).
+DB structures v4 uses: `stack_frames` (holes nest, so FOCUS is a stack and only
+the deepest frame is teachable), `probes` (one row per judgment, four values),
+`vocab` (what he has been shown vs proved), `utterances` (every question that
+passed the ship-check), `meta.phase` (the one phase variable).
 
 ## ON ARRIVAL
 
@@ -89,11 +91,14 @@ python3 .claude/tutor/tutor_db.py brief
 ```
 
 **You do not decide which phase file to read. The `phase-guard` hook does.** Every
-turn it reads the DB's real phase and injects a pointer to the one governing file;
-the `phase-gate` hook BLOCKS the tutoring commands (`probe`, `gate`, `attempt`,
-`promote`, `demote`, `push`, `review`, `misconception`, `teach-open/close`,
-`transfer`) until you have read it. Read the file the guard points at, then act.
-If no target exists, the guard points at INTAKE — capture the anchor first.
+turn it reads `meta.phase` — the only copy — and injects a pointer to the one
+governing file; the `phase-gate` hook BLOCKS the tutoring commands (`classify`,
+`draft`, `pass`, `promote`, `demote`, `attempt`, `gate`, `review`) until you have
+read it. Read the file the guard points at, then act.
+
+Every OUTGOING question passes `draft` first; the `ship-check` hook blocks one
+that uses a term he has never been shown, or chains more inferences than the
+frame's hop budget allows. The gate is on your questions, not only his answers.
 
 ## THE HYPOTHESIS-VERIFY LOOP (LAW 0.3)
 
@@ -146,9 +151,9 @@ This file does not map phase→file. That mapping lives in one place — the
 `phase-guard` hook (`.claude/tutor/tutor_hook.py`) — which reads the DB's real
 phase and points you at the governing file every turn; `phase-gate` enforces the
 read. Follow the pointer; do not assume a mapping. The phase file you are pointed
-at tells you when to call the reused machinery (concept teaching, the blank-page
-gate, review rounds, the metered push) that lives under
-`.claude/skills/tutor_v3/phases/machinery/`.
+at states its MODE (ADVERSARY or ALLY), the rungs it grades, and nothing else.
+The reused machinery (the blank-page gate, review rounds, the metered push)
+lives under `.claude/skills/tutor_v3/phases/machinery/`.
 
 ## STANDING RULES
 

@@ -462,3 +462,24 @@ CREATE TABLE IF NOT EXISTS utterances (
   id INTEGER PRIMARY KEY, session_id INTEGER, frame_id INTEGER,
   hops INTEGER, terms TEXT, verdict TEXT, reason TEXT, ts TEXT
 );
+
+
+-- ---- the anchor, as DATA ---------------------------------------------------
+-- Lived only in migrate_v3_circle.py until v4, so a database built from this
+-- file alone had no targets table and the hooks silently routed nothing.
+-- `phase` here is ONLY the retired/live flag; the real phase is meta.phase.
+CREATE TABLE IF NOT EXISTS targets (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    learner           TEXT NOT NULL,
+    name              TEXT NOT NULL,   -- e.g. 'soufiane pipeline'
+    codebase_path     TEXT,            -- the repo SCAN reads (agnostic)
+    inputs            TEXT,            -- what the built thing takes in
+    outputs           TEXT,            -- what it produces
+    size              TEXT,            -- one script | several | large
+    scripts           TEXT,            -- comma-sep files that make it up
+    decomposition     TEXT,            -- JSON: slices, filled over time
+    phase             TEXT NOT NULL DEFAULT 'live',   -- live|retired ONLY
+    unlock_gate       TEXT NOT NULL DEFAULT 'open',
+    created_at        TEXT NOT NULL,
+    updated_at        TEXT
+);

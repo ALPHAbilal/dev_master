@@ -57,6 +57,11 @@
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/tutor/tutor_hook.py\" phase-gate",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/tutor/tutor_hook.py\" ship-check",
+            "timeout": 10
           }
         ]
       }

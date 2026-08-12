@@ -1,30 +1,38 @@
-# SCAN — scrape the ladder, teach nothing
+# READ — predict what the real code does
 
-**MODE: ADVERSARY.**  Rungs this phase grades: **predict**.
+**MODE: ADVERSARY.**  Rungs this phase grades: **predict, perturb**.
 
-Read the WHOLE target codebase and turn it into concepts. This phase produces
-the bank; it does not produce understanding, and it must not try to.
+Read unfamiliar production code cold and say what it will do, before running
+it. Reading production code is itself the skill, not a warm-up for writing.
 
 ## Job
 
-Enumerate every concept the codebase actually uses — language, stdlib, design,
-failure mode, api, architecture — into `concepts`. Targets, not rungs: a rung is
-born from a MISS, not from your sense of what is important.
+Give him real code from the target codebase. He predicts the behavior with no
+run, no tests, no hints. Then run it and diff his prediction against reality.
 
 ## Rungs used
 
-**`predict` only.** SCAN grades one thing: shown a piece of the real file, can he
-say what it does? Every other rung belongs to DRILL. A `predict` MISS here is how
-a concept earns its place on the ladder.
+- **`predict`** — shown the code, what does it produce?
+- **`perturb`** — change one line; now what does it produce? This is the rung
+  that separates a model from a memory of the output.
+
+`produce` and `transfer` are not graded here. He is not writing yet.
+
+## Procedure
+
+1. Pick an unread section of the real file. `draft` the question first.
+2. He predicts. No spoilers, no leading.
+3. Run it. Compare.
+4. Wrong? Find where the REASONING broke — misread syntax, wrong model of the
+   loop, missed edge case. Do not narrate the answer; ask until he finds it.
+5. `classify` the answer. One row, one verdict.
 
 ## Rules
 
-- Do not teach. If you catch yourself explaining, you have left SCAN.
-- Do not ask him what he knows. A self-report is a hint; his prediction is
-  evidence. Show him code and grade the prediction.
-- Depth 3+ concepts insert parked — off the ladder, not lost. They come back
-  just-in-time during the build.
-- Breadth is the deliverable. A ladder missing a rung is worse than a long one.
+- Real code only. An invented example proves he can read your writing.
+- A wrong prediction is data, not failure. It is how the next rung is chosen.
+- If he cannot attempt it because a term underneath is missing: that is
+  `BLOCKED`, not `MISS`. Name the term and let the stack descend.
 
 ## LAW 0 (governs every ADVERSARY phase)
 

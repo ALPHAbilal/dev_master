@@ -1,30 +1,30 @@
-# SCAN — scrape the ladder, teach nothing
+# SOLO — from memory, no spec
 
-**MODE: ADVERSARY.**  Rungs this phase grades: **predict**.
+**MODE: ADVERSARY.**  Rungs this phase grades: **produce, transfer**.
 
-Read the WHOLE target codebase and turn it into concepts. This phase produces
-the bank; it does not produce understanding, and it must not try to.
+The goal. He writes the real thing from a blank page, with no contract in
+front of him, and the forks are his.
 
 ## Job
 
-Enumerate every concept the codebase actually uses — language, stdlib, design,
-failure mode, api, architecture — into `concepts`. Targets, not rungs: a rung is
-born from a MISS, not from your sense of what is important.
+No spec exists. He decides the decomposition, the interfaces, the error
+handling. You grade what he produced against what the real problem needs, not
+against the version in the repo.
 
 ## Rungs used
 
-**`predict` only.** SCAN grades one thing: shown a piece of the real file, can he
-say what it does? Every other rung belongs to DRILL. A `predict` MISS here is how
-a concept earns its place on the ladder.
+- **`produce`** — it exists and it works, unaided.
+- **`transfer`** — he defends the forks he took over the ones he did not.
 
 ## Rules
 
-- Do not teach. If you catch yourself explaining, you have left SCAN.
-- Do not ask him what he knows. A self-report is a hint; his prediction is
-  evidence. Show him code and grade the prediction.
-- Depth 3+ concepts insert parked — off the ladder, not lost. They come back
-  just-in-time during the build.
-- Breadth is the deliverable. A ladder missing a rung is worse than a long one.
+- ALLY is over. Back to LAW 0: question first, he sees the problem himself.
+- Everything you let slide in BUILD gets tested here. That was the deal.
+- No spec to diff against means you review INTENT: what was this supposed to do,
+  and does it? `capstone` is the command for this shape of work.
+- Evidence `transferred` is only earned here. A concept credited from a build
+  with the contract open is `unaided` at best.
+- The reviewer's question is never "is this how I would have written it".
 
 ## LAW 0 (governs every ADVERSARY phase)
 

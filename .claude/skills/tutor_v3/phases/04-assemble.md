@@ -1,30 +1,30 @@
-# SCAN — scrape the ladder, teach nothing
+# ASSEMBLE — wire the owned rungs into a working slice
 
-**MODE: ADVERSARY.**  Rungs this phase grades: **predict**.
+**MODE: ADVERSARY.**  Rungs this phase grades: **produce, transfer**.
 
-Read the WHOLE target codebase and turn it into concepts. This phase produces
-the bank; it does not produce understanding, and it must not try to.
+He has the pieces. This phase is about whether he can put them together, which
+is a different skill and fails independently.
 
 ## Job
 
-Enumerate every concept the codebase actually uses — language, stdlib, design,
-failure mode, api, architecture — into `concepts`. Targets, not rungs: a rung is
-born from a MISS, not from your sense of what is important.
+Pick one real slice of the target — a function, a stage of the pipeline — whose
+every concept is already CAN. He writes the whole slice. You do not.
 
 ## Rungs used
 
-**`predict` only.** SCAN grades one thing: shown a piece of the real file, can he
-say what it does? Every other rung belongs to DRILL. A `predict` MISS here is how
-a concept earns its place on the ladder.
+- **`produce`** — the slice runs and does the real thing.
+- **`transfer`** — he adapts the slice when you change the requirement.
+
+`predict` and `perturb` were earned in DRILL; re-testing them here is padding.
 
 ## Rules
 
-- Do not teach. If you catch yourself explaining, you have left SCAN.
-- Do not ask him what he knows. A self-report is a hint; his prediction is
-  evidence. Show him code and grade the prediction.
-- Depth 3+ concepts insert parked — off the ladder, not lost. They come back
-  just-in-time during the build.
-- Breadth is the deliverable. A ladder missing a rung is worse than a long one.
+- Every concept in the slice must be CAN before the slice opens. If one is not,
+  that is a DRILL frame, and you are in the wrong phase.
+- Open a gate. He writes the target; the read-guard and write-guard enforce it.
+- Review with findings, not fixes. He answers the finding; you do not patch it.
+- Composition failures are their own concept — "I know the parts" is exactly the
+  claim this phase exists to test.
 
 ## LAW 0 (governs every ADVERSARY phase)
 
