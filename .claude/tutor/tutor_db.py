@@ -54,6 +54,12 @@ from datetime import datetime, date, timedelta
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
+
+import context_store            # noqa: E402  (sits beside this file)
+import router                   # noqa: E402
+
 DB = HERE / 'tutor.db'
 SCHEMA = HERE / 'schema.sql'
 PROJECTS_DIR = HERE / 'projects'
@@ -748,6 +754,117 @@ def bucket_archive(args=None):
     project_id = detect_project_id()
     archive_bucket(project_id)
     print(f"Bucket archived for {project_id}")
+
+
+# ---- context router: computed per-turn slice -----------------------------
+
+def _project_base():
+    return PROJECTS_DIR / detect_project_id()
+
+
+def _assemble_state(con, slug=None):
+    """Everything the router needs, gathered from ALL system variables."""
+    bucket = read_bucket()
+    slug = slug or bucket.get('primary_concept')
+    row = con.execute("SELECT value FROM meta WHERE key='phase'").fetchone()
+    phase = row[0] if row else 'FLOOR'
+    base = _project_base()
+    ctx = context_store.read_context(base, slug) if (
+        slug and context_store.has_context(base, slug)) else {}
+    open_mis = con.execute(
+        "SELECT COUNT(*) FROM misconceptions WHERE state='OPEN'").fetchone()[0]
+    angles = context_store.angle_results(ctx) if ctx else {}
+    current = None
+    if ctx:
+        rows = ctx.get('angles', [])
+        if rows and rows[-1]['result'] in ('partial', 'fail'):
+            current = rows[-1]['angle']       # still working that angle
+    return {'phase': phase, 'slug': slug,
+            'has_context': bool(ctx),
+            'open_gaps': context_store.open_gaps(ctx) if ctx else [],
+            'angle_results': angles, 'current_angle': current,
+            'open_misconceptions': open_mis}
+
+
+def registry_seed(args=None):
+    con = connect()
+    con.executescript(SCHEMA.read_text(encoding='utf-8'))
+    router.seed_registry(con)
+    print("registry seeded: gap_types, angles, form_questions, bucket_keys")
+
+
+def turn_brief(args=None):
+    con = connect()
+    state = _assemble_state(con, getattr(args, 'slug', None))
+    print(router.render_slice(router.compute_slice(state, router.load_registry(con))))
+
+
+def assess(args):
+    con = connect()
+    reg = router.load_registry(con)
+    if args.hole not in ('none', 'explicit', 'implicit'):
+        die(f"--hole must be none|explicit|implicit, got '{args.hole}'")
+    if args.hole != 'none' and not args.gap:
+        die("a hole needs a gap type. Add --gap "
+            f"{{{'|'.join(reg['gap_types'])}}} -- which KIND of hole is it?")
+    if args.gap and args.gap not in reg['gap_types']:
+        die(f"unknown gap '{args.gap}'. Valid: {', '.join(reg['gap_types'])}")
+    if args.hole == 'none' and args.demonstrated is None and not args.close_gap:
+        die("no hole claimed -- was it --demonstrated or --claimed? "
+            "A claim is a hint; only demonstration is evidence.")
+    if args.angle and args.angle not in dict(reg['angles']):
+        die(f"unknown angle '{args.angle}'. "
+            f"Valid: {', '.join(a for a, _ in reg['angles'])}")
+    if args.angle and args.angle_result not in ('pass', 'partial', 'fail'):
+        die("--angle needs --angle-result pass|partial|fail")
+
+    base = _project_base()
+    context_store.init_context(base, args.slug)
+    sid = current_session(con)
+    con.execute(
+        "INSERT INTO assessments(session_id, slug, hole, gap_type, demonstrated, "
+        "angle, angle_result, evidence, ts) VALUES (?,?,?,?,?,?,?,?,?)",
+        (sid, args.slug, args.hole, args.gap,
+         args.demonstrated, args.angle, args.angle_result, args.evidence, now()))
+    con.commit()
+
+    if args.hole != 'none':
+        context_store.open_gap(base, args.slug, args.gap, args.evidence)
+    if args.close_gap:
+        if not context_store.close_gap(base, args.slug, args.close_gap, args.evidence):
+            die(f"no open gap '{args.close_gap}' on '{args.slug}'")
+    if args.angle:
+        context_store.log_angle(base, args.slug, args.angle, args.angle_result)
+    context_store.append_log(base, args.slug, 'assess',
+                             f"hole={args.hole} gap={args.gap} "
+                             f"angle={args.angle}:{args.angle_result} | {args.evidence}")
+    print(f"assessed '{args.slug}'.\n")
+    turn_brief(argparse.Namespace(slug=args.slug))     # the updated slice IS the reply
+
+
+def concept_pass(args):
+    con = connect()
+    base = _project_base()
+    state = _assemble_state(con, args.slug)
+    reg = router.load_registry(con)
+    unexplored = [a for a, _ in reg['angles'] if a not in state['angle_results']]
+    failed = [a for a, r in state['angle_results'].items() if r != 'pass']
+    if state['open_gaps']:
+        die(f"open gaps on '{args.slug}': {', '.join(state['open_gaps'])}")
+    if unexplored:
+        die(f"angles never explored on '{args.slug}': {', '.join(unexplored)}")
+    if failed:
+        die(f"angles not at pass on '{args.slug}': {', '.join(failed)}")
+    dest = context_store.pass_concept(base, args.slug)
+    bucket = read_bucket()
+    for entry in bucket.get('chain', []):
+        if entry['concept'] == args.slug:
+            entry['status'] = 'passed'
+    if all(e.get('status') == 'passed' for e in bucket.get('chain', [])):
+        bucket['status'] = 'ready_archive'   # existing hook archives + wipes it
+    write_bucket(bucket)
+    print(f"'{args.slug}' PASSED. context -> {dest}")
+    print(f"bucket: {bucket.get('status')}")
 
 
 def teach_suggest(args=None):
@@ -2581,6 +2698,21 @@ def build_parser():
     sub.add_parser('status')
     sub.add_parser('bucket-show', help='show active discovery chains (project-scoped)')
     sub.add_parser('bucket-archive', help='archive completed bucket to database')
+    sub.add_parser('registry-seed', help='create + seed the context-router registry')
+    s = sub.add_parser('turn-brief', help='computed context slice for THIS turn')
+    s.add_argument('slug', nargs='?', default=None)
+    s = sub.add_parser('assess', help='answer the computed form about his latest answer')
+    s.add_argument('slug')
+    s.add_argument('--hole', required=True)
+    s.add_argument('--gap', default=None)
+    s.add_argument('--demonstrated', dest='demonstrated', action='store_const', const=1)
+    s.add_argument('--claimed', dest='demonstrated', action='store_const', const=0)
+    s.add_argument('--angle', default=None)
+    s.add_argument('--angle-result', dest='angle_result', default=None)
+    s.add_argument('--close-gap', dest='close_gap', default=None)
+    s.add_argument('--evidence', required=True)
+    s = sub.add_parser('concept-pass', help='close a concept: relocate context, advance chain')
+    s.add_argument('slug')
     s = sub.add_parser('sweep-next')
     s.add_argument('n', nargs='?', default=12)
 
@@ -2793,6 +2925,10 @@ DISPATCH = {
     'status': lambda a: status(),
     'bucket-show': lambda a: bucket_show(),
     'bucket-archive': lambda a: bucket_archive(),
+    'registry-seed': registry_seed,
+    'turn-brief': turn_brief,
+    'assess': assess,
+    'concept-pass': concept_pass,
     'sweep-next': lambda a: sweep_next(a.n),
     'route-next': lambda a: route_next(),
     'probe': probe,
@@ -2835,7 +2971,8 @@ DISPATCH = {
 WRITES = ('probe', 'floor', 'promote', 'demote', 'revise', 'phase', 'assume', 'ask',
           'gate', 'attempt', 'spine-load', 'concepts-load', 'teach-open',
           'teach-close', 'session', 'learner', 'review', 'capstone', 'lookup',
-          'push', 'target', 'unlock-gate')
+          'push', 'target', 'unlock-gate', 'assess', 'concept-pass',
+          'registry-seed')
 
 
 def main():

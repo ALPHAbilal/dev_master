@@ -66,13 +66,11 @@ def bucket_status_message(bucket):
     remaining = sum(1 for c in chain if c.get('status') != 'resolved')
 
     if status == 'in_progress':
-        if remaining <= 2:
-            return (f"🎯 BUCKET ALMOST DONE: {primary}\n"
-                   f"   Remaining: {remaining} concepts\n"
-                   f"   Run: bucket-show")
-        else:
-            return (f"📌 BUCKET ACTIVE: {primary} chain\n"
-                   f"   Run: bucket-show")
+        # Detail lives in command output by design -- the hook only points.
+        return ("📌 BUCKET ACTIVE — before tutoring this turn run:\n"
+                "   python3 .claude/tutor/tutor_db.py turn-brief\n"
+                "   (computed brief: the form to answer, the keys that exist "
+                "for you, and the next move)")
 
     elif status == 'ready_archive':
         return (f"✓ BUCKET COMPLETE: {primary} chain\n"

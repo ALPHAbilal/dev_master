@@ -366,3 +366,54 @@ CREATE INDEX IF NOT EXISTS idx_discovery_chains_project ON discovery_chains(proj
 -- FLOOR -> READ -> BUILD_V1 -> BUILD_V2 -> CAPSTONE. The learner's ONLY choice.
 INSERT OR IGNORE INTO meta(key, value) VALUES ('phase', 'FLOOR');
 INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '2');
+
+-- ---- v3: context router registry -------------------------------------------
+-- The master mind lives HERE, in data, never fully in the AI's context.
+-- Adding a gap type / angle / key / question is a row, not a prompt edit.
+-- `applies_when` is a JSON condition evaluated by router.py (pure code):
+--   {"always": true} | {"phase_in": [...]} | {"has_context": true}
+--   {"open_gaps_min": 1} | {"open_misconceptions_min": 1}
+--   {"current_angle": true} | {"angles_unexplored_min": 1}
+-- Every present field must match (AND semantics).
+
+CREATE TABLE IF NOT EXISTS gap_types (
+    slug        TEXT PRIMARY KEY,   -- model|reason|application|tradeoff (+ future rows)
+    description TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS angles (
+    slug        TEXT PRIMARY KEY,   -- mechanical|practical|reasoning (+ future rows)
+    description TEXT NOT NULL,
+    ord         INTEGER NOT NULL    -- default teaching order
+);
+
+CREATE TABLE IF NOT EXISTS bucket_keys (
+    name         TEXT PRIMARY KEY,  -- dotted path inside bucket / context files
+    description  TEXT NOT NULL,     -- one line: what it is, when to write it
+    value_type   TEXT NOT NULL,     -- string|array|object|timestamp
+    applies_when TEXT NOT NULL DEFAULT '{"always": true}'
+);
+
+CREATE TABLE IF NOT EXISTS form_questions (
+    slug         TEXT PRIMARY KEY,
+    question     TEXT NOT NULL,     -- what the AGENT must answer about the learner's answer
+    answers      TEXT,              -- comma-separated valid answers; NULL = free text
+    applies_when TEXT NOT NULL DEFAULT '{"always": true}',
+    ord          INTEGER NOT NULL DEFAULT 0
+);
+
+-- Every answered form. This is the gap-detection audit trail: what the agent
+-- concluded from each learner answer, with the evidence quoted.
+CREATE TABLE IF NOT EXISTS assessments (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id   INTEGER REFERENCES sessions(id),
+    slug         TEXT NOT NULL,     -- concept under teaching
+    hole         TEXT NOT NULL,     -- none|explicit|implicit
+    gap_type     TEXT,              -- REQUIRED when hole != none; FK-checked in code
+    demonstrated INTEGER,           -- REQUIRED when hole == none: 1 demonstrated, 0 claimed
+    angle        TEXT,              -- angle being taught when this answer happened
+    angle_result TEXT,              -- pass|partial|fail
+    evidence     TEXT NOT NULL,     -- the learner's words, verbatim-ish
+    ts           TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_assessments_slug ON assessments(slug);
