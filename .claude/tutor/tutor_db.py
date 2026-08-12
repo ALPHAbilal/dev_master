@@ -14,8 +14,10 @@ non-zero and says why. An agent that forgets a rule cannot write past it.
     probe <slug> <phase> <faculty> <result> [-q] [-a] [--error-class] [--below]
     floor <slug> --explains a,b,c --descents N
 
-    teach-open <slug>            refused with no prior attempt on that concept
-    teach-close <slug> --explanation-file F   refused without a gate
+  v4 — the stack and the one verdict:
+    classify <slug> --result HIT|WEAK|MISS|BLOCKED --rung predict|perturb|
+             produce|transfer --answer TEXT [--terms a,b]
+    pass <slug>                  pop the top frame; prints the question to replay
     gate open <slug> --kind K [--spec P] [--target T]
     gate close <id> --result PASS|FAIL|ABANDONED
     gate list
@@ -57,16 +59,27 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
-import context_store            # noqa: E402  (sits beside this file)
+import stack                    # noqa: E402  (sits beside this file)
 import router                   # noqa: E402
 
-DB = HERE / 'tutor.db'
 SCHEMA = HERE / 'schema.sql'
 PROJECTS_DIR = HERE / 'projects'
 
 
+def _db_path():
+    """Overridable so tests never touch the real database. Read per call, not
+    at import, so a test can point it at a tempdir after the module is loaded."""
+    return Path(os.environ.get('TUTOR_DB', HERE / 'tutor.db'))
+
+
+DB = HERE / 'tutor.db'
+
+
 def detect_project_id():
     """Detect current project from git remote or directory name."""
+    override = os.environ.get('TUTOR_PROJECT_ID')
+    if override:
+        return override
     try:
         import subprocess
         remote_url = subprocess.check_output(
@@ -193,7 +206,7 @@ def die(msg):
 
 
 def connect():
-    con = sqlite3.connect(DB)
+    con = sqlite3.connect(str(_db_path()))
     con.row_factory = sqlite3.Row
     return con
 
@@ -222,7 +235,7 @@ def init():
     con = connect()
     con.executescript(SCHEMA.read_text(encoding='utf-8'))
     con.commit()
-    print(f"initialised {DB}")
+    print(f"initialised {_db_path()}")
 
 
 def session(agent='unknown', note=''):
@@ -299,7 +312,7 @@ def _density(con):
               " logs it); do not just re-gate. 0% explain is not a badge.")
 
 
-def brief():
+def brief(args=None):
     """Injected at SessionStart, so no agent has to remember to ask."""
     con = connect()
     learner_row = con.execute("SELECT * FROM learners WHERE active = 1").fetchone()
@@ -759,115 +772,180 @@ def bucket_archive(args=None):
     print(f"Bucket archived for {project_id}")
 
 
-# ---- context router: computed per-turn slice -----------------------------
+# ---- v4: the stack, and the one verdict ----------------------------------
 
 def _project_base():
-    return PROJECTS_DIR / detect_project_id()
+    override = os.environ.get('TUTOR_PROJECT_BASE')
+    return Path(override) if override else PROJECTS_DIR / detect_project_id()
 
 
-def _assemble_state(con, slug=None):
-    """Everything the router needs, gathered from ALL system variables."""
-    bucket = read_bucket()
-    slug = slug or bucket.get('primary_concept')
-    row = con.execute("SELECT value FROM meta WHERE key='phase'").fetchone()
-    phase = row[0] if row else 'SCAN'
-    base = _project_base()
-    ctx = context_store.read_context(base, slug) if (
-        slug and context_store.has_context(base, slug)) else {}
-    open_mis = con.execute(
-        "SELECT COUNT(*) FROM misconceptions WHERE state='OPEN'").fetchone()[0]
-    angles = context_store.angle_results(ctx) if ctx else {}
-    current = None
-    if ctx:
-        rows = ctx.get('angles', [])
-        if rows and rows[-1]['result'] in ('partial', 'fail'):
-            current = rows[-1]['angle']       # still working that angle
-    return {'phase': phase, 'slug': slug,
-            'has_context': bool(ctx),
-            'open_gaps': context_store.open_gaps(ctx) if ctx else [],
-            'angle_results': angles, 'current_angle': current,
-            'open_misconceptions': open_mis}
+
+def _anchor_text(frame):
+    """The frame's anchor lines, read off disk. Never cached: the file is the
+    truth and a remembered copy of it is how a tutor starts teaching fiction."""
+    if not frame or not frame['anchor_file']:
+        return ''
+    try:
+        lines = Path(frame['anchor_file']).read_text(
+            encoding='utf-8', errors='replace').splitlines()
+    except OSError:
+        return ''
+    lo = max(1, frame['anchor_lo'] or 1)
+    hi = min(len(lines), frame['anchor_hi'] or len(lines))
+    return '\n'.join(lines[lo - 1:hi])
 
 
-def registry_seed(args=None):
+def _order_terms(con, terms, frame):
+    """Which hole to descend into first.
+
+    Shallowest known concept wins — you cannot teach depth 4 over a depth 1
+    hole. Ties go to the term that actually appears in the code in front of
+    him, earliest occurrence first: proximity, not completeness (LAW 0.6).
+    """
+    text = _anchor_text(frame)
+
+    def key(item):
+        i, term = item
+        row = con.execute("SELECT depth FROM concepts WHERE slug=?",
+                          (term,)).fetchone()
+        depth = row[0] if row else (frame['depth'] if frame else 0)
+        at = text.find(term)
+        return (depth, 0 if at >= 0 else 1, at if at >= 0 else i, i)
+
+    return [t for _, t in sorted(enumerate(terms), key=key)]
+
+
+def _see_term(con, term, status=None):
+    """Record a term. Status only ever ratchets up: unknown -> shown -> proved."""
+    RANK = {'unknown': 0, 'shown': 1, 'proved': 2}
+    row = con.execute("SELECT status FROM vocab WHERE term=?", (term,)).fetchone()
+    if row is None:
+        con.execute("INSERT INTO vocab(term, status, first_seen) VALUES (?,?,?)",
+                    (term, status or 'unknown', now()))
+        return
+    if status and RANK[status] > RANK[row[0]]:
+        con.execute("UPDATE vocab SET status=? WHERE term=?", (status, term))
+
+
+def classify(args):
+    """The ONE verdict. Every judgment about every answer is this command.
+
+    v3 had `assess`, `probe`, `concept-pass` and `teach-close` all recording
+    overlapping opinions in different tables. Four ways to say "he got it" is
+    four ways to disagree with yourself. There is one now, it takes one of four
+    values, and it writes exactly one `probes` row whichever value it takes.
+
+      HIT      he produced it. The rung is owned.
+      WEAK     shaky. Budget drops to one hop; twice WEAK is a MISS.
+      MISS     he does not have it. Teach, then re-grade the SAME rung.
+      BLOCKED  he cannot even attempt it — a term underneath is missing.
+               That is a nested hole: push a frame, park the siblings.
+    """
     con = connect()
-    con.executescript(SCHEMA.read_text(encoding='utf-8'))
-    router.seed_registry(con)
-    print("registry seeded: gap_types, angles, form_questions, bucket_keys")
+    pid = detect_project_id()
+    top = stack.top(con, pid)
+    if top is None:
+        die("the stack is empty. Nothing is being taught, so nothing can be "
+            "classified. Open the anchor first: `push`-equivalent is the root "
+            "frame — see `brief`.")
+    if args.slug != top['slug']:
+        die(f"'{args.slug}' is not the top of the stack. The top is "
+            f"'{top['slug']}' (stack: {' > '.join(stack.path(con, pid))}). "
+            f"Only the deepest frame is teachable.")
+    if args.result not in stack.RESULTS:
+        die(f"--result must be one of {', '.join(stack.RESULTS)}")
+    if args.rung not in stack.RUNGS:
+        die(f"--rung must be one of {', '.join(stack.RUNGS)}")
 
+    terms = [t.strip() for t in (args.terms or '').split(',') if t.strip()]
+    if args.result == 'BLOCKED' and not terms:
+        die("BLOCKED means a term underneath is missing. Name it: "
+            "--terms a,b. A block with no named term is an opinion, not a hole.")
 
-def turn_brief(args=None):
-    con = connect()
-    state = _assemble_state(con, getattr(args, 'slug', None))
-    print(router.render_slice(router.compute_slice(state, router.load_registry(con))))
+    # A WEAK rung is not finished with. Moving on from it is how v3 turned four
+    # shaky answers into a credited concept.
+    got = stack.rungs(con, top['id'])
+    stuck = [r for r in stack.RUNGS if got.get(r) in ('WEAK', 'MISS')]
+    if stuck and args.rung not in stuck:
+        die(f"rung '{stuck[0]}' is {got[stuck[0]]} on '{top['slug']}' and locks "
+            f"the ladder. Re-grade '{stuck[0]}' — you may not advance to "
+            f"'{args.rung}' over it.")
 
-
-def assess(args):
-    con = connect()
-    reg = router.load_registry(con)
-    if args.hole not in ('none', 'explicit', 'implicit'):
-        die(f"--hole must be none|explicit|implicit, got '{args.hole}'")
-    if args.hole != 'none' and not args.gap:
-        die("a hole needs a gap type. Add --gap "
-            f"{{{'|'.join(reg['gap_types'])}}} -- which KIND of hole is it?")
-    if args.gap and args.gap not in reg['gap_types']:
-        die(f"unknown gap '{args.gap}'. Valid: {', '.join(reg['gap_types'])}")
-    if args.hole == 'none' and args.demonstrated is None and not args.close_gap:
-        die("no hole claimed -- was it --demonstrated or --claimed? "
-            "A claim is a hint; only demonstration is evidence.")
-    if args.angle and args.angle not in dict(reg['angles']):
-        die(f"unknown angle '{args.angle}'. "
-            f"Valid: {', '.join(a for a, _ in reg['angles'])}")
-    if args.angle and args.angle_result not in ('pass', 'partial', 'fail'):
-        die("--angle needs --angle-result pass|partial|fail")
-
-    base = _project_base()
-    context_store.init_context(base, args.slug)
     sid = current_session(con)
+    cid = con.execute("SELECT id FROM concepts WHERE slug=?",
+                      (top['slug'],)).fetchone()
+    phase_row = con.execute("SELECT value FROM meta WHERE key='phase'").fetchone()
     con.execute(
-        "INSERT INTO assessments(session_id, slug, hole, gap_type, demonstrated, "
-        "angle, angle_result, evidence, ts) VALUES (?,?,?,?,?,?,?,?,?)",
-        (sid, args.slug, args.hole, args.gap,
-         args.demonstrated, args.angle, args.angle_result, args.evidence, now()))
+        "INSERT INTO probes(session_id, concept_id, phase, faculty, depth_below,"
+        " question, answer, result, asked_at, rung, terms)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        (sid, cid[0] if cid else None, phase_row[0] if phase_row else 'SCAN',
+         args.rung, top['depth'], top['resume_q'] or '', args.answer,
+         args.result, now(), args.rung, ','.join(terms) or None))
+
+    for t in terms:
+        _see_term(con, t, 'proved' if args.result == 'HIT' else None)
     con.commit()
 
-    if args.hole != 'none':
-        context_store.open_gap(base, args.slug, args.gap, args.evidence)
-    if args.close_gap:
-        if not context_store.close_gap(base, args.slug, args.close_gap, args.evidence):
-            die(f"no open gap '{args.close_gap}' on '{args.slug}'")
-    if args.angle:
-        context_store.log_angle(base, args.slug, args.angle, args.angle_result)
-    context_store.append_log(base, args.slug, 'assess',
-                             f"hole={args.hole} gap={args.gap} "
-                             f"angle={args.angle}:{args.angle_result} | {args.evidence}")
-    print(f"assessed '{args.slug}'.\n")
-    turn_brief(argparse.Namespace(slug=args.slug))     # the updated slice IS the reply
+    if args.result == 'BLOCKED':
+        # Unknown terms become real concepts so they are on the map, not just in
+        # a frame. They sit at the frame's depth: a hole found here is a rung
+        # here, not a new tier of the ladder.
+        for t in terms:
+            con.execute(
+                "INSERT OR IGNORE INTO concepts(slug, name, definition, category,"
+                " depth, state, source, updated_at) VALUES (?,?,?,?,?,?,?,?)",
+                (t, t, f"hole found while teaching '{top['slug']}'", 'language',
+                 top['depth'], 'CANT', 'hole', now()))
+        con.commit()
+        ordered = _order_terms(con, terms, top)
+        first, rest = ordered[0], ordered[1:]
+        if rest:
+            stack.queue_pending(con, top['id'], rest)
+        stack.push(con, pid, first,
+                   why=f"blocked '{top['slug']}' on '{first}'",
+                   resume_q=top['resume_q'] or args.answer)
+    else:
+        stack.set_rung(con, top['id'], args.rung, args.result)
+
+    brief(argparse.Namespace(full=False))
 
 
-def concept_pass(args):
+def frame_pass(args):
+    """Pop the top frame. Prints the parent's question, to be replayed verbatim."""
     con = connect()
-    base = _project_base()
-    state = _assemble_state(con, args.slug)
-    reg = router.load_registry(con)
-    unexplored = [a for a, _ in reg['angles'] if a not in state['angle_results']]
-    failed = [a for a, r in state['angle_results'].items() if r != 'pass']
-    if state['open_gaps']:
-        die(f"open gaps on '{args.slug}': {', '.join(state['open_gaps'])}")
-    if unexplored:
-        die(f"angles never explored on '{args.slug}': {', '.join(unexplored)}")
-    if failed:
-        die(f"angles not at pass on '{args.slug}': {', '.join(failed)}")
-    dest = context_store.pass_concept(base, args.slug)
-    bucket = read_bucket()
-    for entry in bucket.get('chain', []):
-        if entry['concept'] == args.slug:
-            entry['status'] = 'passed'
-    if all(e.get('status') == 'passed' for e in bucket.get('chain', [])):
-        bucket['status'] = 'ready_archive'   # existing hook archives + wipes it
-    write_bucket(bucket)
-    print(f"'{args.slug}' PASSED. context -> {dest}")
-    print(f"bucket: {bucket.get('status')}")
+    pid = detect_project_id()
+    top = stack.top(con, pid)
+    if top is None:
+        die("the stack is empty; there is nothing to pop.")
+    if args.slug != top['slug']:
+        die(f"'{args.slug}' is not the top of the stack. The top is "
+            f"'{top['slug']}'.")
+    parent_id = top['parent_id']
+    try:
+        resume_q = stack.pop(con, top['id'], base=str(_project_base()))
+    except stack.StackRefusal as e:
+        die(str(e))
+        return
+    con.execute(
+        "UPDATE concepts SET state='CAN', updated_at=? WHERE slug=?",
+        (now(), top['slug']))
+    con.commit()
+    print(f"POPPED '{top['slug']}'. It is CAN — four rungs, not one.")
+    if parent_id is None:
+        print("The stack is empty. Nothing is being taught.")
+        return
+    parent = stack.frame(con, parent_id)
+    print(f"BACK IN: {parent['slug']}")
+    if resume_q:
+        print(f"REPLAY THIS, verbatim — it is the question you interrupted:\n"
+              f"  {resume_q}")
+    else:
+        print("No stored question. Re-open the rung from the anchor lines.")
+    left = stack.pending(con, parent_id)
+    if left:
+        print(f"STILL PENDING on {parent['slug']}: {', '.join(left)} — "
+              f"these must clear before it can pop.")
 
 
 def teach_suggest(args=None):
@@ -954,75 +1032,6 @@ def floor(args):
 
 
 # ---- teaching ------------------------------------------------------------
-
-def teach_open(args):
-    """Teaching is legal only after an attempt. No attempt, no explanation."""
-    con = connect()
-    c = concept(con, args.slug)
-    attempts = con.execute(
-        "SELECT COUNT(*) FROM probes WHERE concept_id = ?", (c['id'],)).fetchone()[0]
-    if attempts == 0:
-        die(f"'{args.slug}' has never been probed. Explaining before an attempt is "
-            f"the failure that killed every previous attempt. Probe it first.")
-    # v2.4: SKIP-ON-HIT. Teaching what he just got right is where the hours went --
-    # 4 of 5 concepts in one 2026-08-08 session were already owned and re-drilled.
-    # The signal for "he owns it, nothing to teach" is: latest probe HIT AND no
-    # diagnosed floor. A floor means a real failure was found -- teach into that
-    # even if a later confirmation probe hit. No floor + a HIT = he just produced
-    # it; re-probe a different instance if you doubt the HIT, do not explain.
-    latest = con.execute(
-        "SELECT result FROM probes WHERE concept_id = ? ORDER BY asked_at DESC,"
-        " id DESC LIMIT 1", (c['id'],)).fetchone()
-    has_floor = con.execute(
-        "SELECT COUNT(*) FROM floors WHERE concept_id = ?", (c['id'],)).fetchone()[0]
-    if latest and latest['result'] == 'HIT' and not has_floor:
-        die(f"'{args.slug}' latest probe is a HIT and no floor is recorded -- he just "
-            f"produced it, there is no failure to teach into. Move on, or if you "
-            f"suspect the HIT was shallow, re-probe a DIFFERENT instance and teach "
-            f"only if that misses.")
-    if c['explanation']:
-        print(f"ALREADY TAUGHT (session {c['taught_in']}). Reuse this text, do not "
-              f"reword it — two agents teaching it two ways is the drift:\n")
-        print(c['explanation'])
-        return
-    is_floor = con.execute(
-        "SELECT COUNT(*) FROM floors WHERE concept_id = ?", (c['id'],)).fetchone()[0]
-    if not is_floor:
-        print(f"WARNING: '{args.slug}' is not a recorded floor. Teaching above the "
-              f"floor patches a symptom. Descend first unless you know why not.")
-    # v2.4: record that teaching HAPPENED, cheaply, at open -- so the density
-    # meter stops reading 0% while prose explanation goes untracked. teach-close
-    # still writes the canonical cached text; this only stamps the event.
-    con.execute("UPDATE concepts SET taught_in = ?, updated_at = ? WHERE id = ?",
-                (current_session(con), now(), c['id']))
-    con.commit()
-    print(f"teach-open {args.slug}: {attempts} prior attempts, {c['fails']} fails."
-          f" (logged as an explain event this session)")
-    print("Name the thing he already does but cannot say. Vocabulary first.")
-    print("You must `gate open` before teach-close will succeed.")
-
-
-def teach_close(args):
-    con = connect()
-    c = concept(con, args.slug)
-    text = Path(args.explanation_file).read_text(encoding='utf-8').strip()
-    if not text:
-        die("empty explanation. teach-close writes the canonical text or nothing.")
-    gate = con.execute(
-        "SELECT id FROM gates WHERE concept_id = ? ORDER BY id DESC LIMIT 1",
-        (c['id'],)).fetchone()
-    if gate is None:
-        die(f"no gate for '{args.slug}'. Teaching that does not end in blank-page "
-            f"production is a lecture. Run `gate open` first.")
-    con.execute(
-        "UPDATE concepts SET explanation = ?, taught_in = ?, updated_at = ?"
-        " WHERE id = ?", (text, current_session(con), now(), c['id']))
-    con.commit()
-    print(f"taught: {args.slug} (cached; every later agent reuses this text)")
-    print(f"gate #{gate['id']} decides whether it counts.")
-
-
-# ---- gates ---------------------------------------------------------------
 
 def gate_open(args):
     con = connect()
@@ -2652,7 +2661,7 @@ def statusline(args=None):
     nothing rather than breaking his prompt.
     """
     try:
-        con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+        con = sqlite3.connect(f"file:{_db_path()}?mode=ro", uri=True)
         con.row_factory = sqlite3.Row
         ph = con.execute("SELECT value FROM meta WHERE key='phase'").fetchone()
         ph = ph['value'] if ph else 'SCAN'
@@ -2707,20 +2716,16 @@ def build_parser():
     sub.add_parser('status')
     sub.add_parser('bucket-show', help='show active discovery chains (project-scoped)')
     sub.add_parser('bucket-archive', help='archive completed bucket to database')
-    sub.add_parser('registry-seed', help='create + seed the context-router registry')
-    s = sub.add_parser('turn-brief', help='computed context slice for THIS turn')
-    s.add_argument('slug', nargs='?', default=None)
-    s = sub.add_parser('assess', help='answer the computed form about his latest answer')
-    s.add_argument('slug')
-    s.add_argument('--hole', required=True)
-    s.add_argument('--gap', default=None)
-    s.add_argument('--demonstrated', dest='demonstrated', action='store_const', const=1)
-    s.add_argument('--claimed', dest='demonstrated', action='store_const', const=0)
-    s.add_argument('--angle', default=None)
-    s.add_argument('--angle-result', dest='angle_result', default=None)
-    s.add_argument('--close-gap', dest='close_gap', default=None)
-    s.add_argument('--evidence', required=True)
-    s = sub.add_parser('concept-pass', help='close a concept: relocate context, advance chain')
+    s = sub.add_parser(
+        'classify', help='THE verdict: one judgment about one answer, one row')
+    s.add_argument('slug', help='must be the top frame of the stack')
+    s.add_argument('--result', required=True, choices=stack.RESULTS)
+    s.add_argument('--rung', required=True, choices=stack.RUNGS)
+    s.add_argument('--answer', required=True, help='his words, verbatim-ish')
+    s.add_argument('--terms', default=None,
+                   help='comma-sep vocabulary this answer touched; '
+                        'REQUIRED with --result BLOCKED')
+    s = sub.add_parser('pass', help='pop the top frame; prints the question to replay')
     s.add_argument('slug')
     s = sub.add_parser('sweep-next')
     s.add_argument('n', nargs='?', default=12)
@@ -2751,12 +2756,6 @@ def build_parser():
     s.add_argument('slug')
     s.add_argument('--explains', default='')
     s.add_argument('--descents', type=int, default=1)
-
-    s = sub.add_parser('teach-open')
-    s.add_argument('slug')
-    s = sub.add_parser('teach-close')
-    s.add_argument('slug')
-    s.add_argument('--explanation-file', required=True)
 
     sub.add_parser('teach-suggest', help='show concepts that need teaching (gap detection)')
 
@@ -2934,16 +2933,12 @@ DISPATCH = {
     'status': lambda a: status(),
     'bucket-show': lambda a: bucket_show(),
     'bucket-archive': lambda a: bucket_archive(),
-    'registry-seed': registry_seed,
-    'turn-brief': turn_brief,
-    'assess': assess,
-    'concept-pass': concept_pass,
+    'classify': classify,
+    'pass': frame_pass,
     'sweep-next': lambda a: sweep_next(a.n),
     'route-next': lambda a: route_next(),
     'probe': probe,
     'floor': floor,
-    'teach-open': teach_open,
-    'teach-close': teach_close,
     'teach-suggest': lambda a: teach_suggest(),
     'gate': lambda a: {'open': gate_open, 'close': gate_close,
                        'list': gate_list}[a.gate_cmd](a),
@@ -2977,11 +2972,10 @@ DISPATCH = {
 }
 
 # Commands that change state. After each one PROGRESS.md is rewritten.
-WRITES = ('probe', 'floor', 'promote', 'demote', 'revise', 'phase', 'assume', 'ask',
-          'gate', 'attempt', 'spine-load', 'concepts-load', 'teach-open',
-          'teach-close', 'session', 'learner', 'review', 'capstone', 'lookup',
-          'push', 'target', 'unlock-gate', 'assess', 'concept-pass',
-          'registry-seed')
+WRITES = ('classify', 'pass', 'probe', 'floor', 'promote', 'demote', 'revise',
+          'phase', 'assume', 'ask', 'gate', 'attempt', 'spine-load',
+          'concepts-load', 'session', 'learner', 'review', 'capstone', 'lookup',
+          'push', 'target', 'unlock-gate')
 
 
 def main():
