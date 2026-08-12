@@ -74,6 +74,11 @@ CREATE TABLE IF NOT EXISTS probes (
                                    -- non-HIT: a typo and a missing concept are not
                                    -- the same event and must not demote alike.
     seconds     INTEGER,           -- elapsed. MEANING DEPENDS ON `clock`, below.
+    rung        TEXT,              -- v4: predict|perturb|produce|transfer.
+                                   -- Replaces `faculty` as the axis under test.
+    hole_kind   TEXT,              -- v4: model|reason|application|tradeoff.
+                                   -- Absorbed from the dropped `assessments`.
+    terms       TEXT,              -- v4: comma-sep vocabulary this judgment touched
     clock       TEXT NOT NULL DEFAULT 'unmeasured',
                                    -- HOW seconds was obtained. The clock is a
                                    -- SUBTRACTION, never a question put to him.
@@ -365,7 +370,7 @@ CREATE INDEX IF NOT EXISTS idx_discovery_chains_project ON discovery_chains(proj
 -- ---- v2: the phase pointer -------------------------------------------------
 -- FLOOR -> READ -> BUILD_V1 -> BUILD_V2 -> CAPSTONE. The learner's ONLY choice.
 INSERT OR IGNORE INTO meta(key, value) VALUES ('phase', 'FLOOR');
-INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '2');
+INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '4');
 
 -- ---- v3: context router registry -------------------------------------------
 -- The master mind lives HERE, in data, never fully in the AI's context.
@@ -417,3 +422,43 @@ CREATE TABLE IF NOT EXISTS assessments (
     ts           TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_assessments_slug ON assessments(slug);
+
+
+-- ==== v4: the STACK ========================================================
+-- Holes nest. A hole found while teaching a hole is not a sibling, it is a
+-- child, and only the deepest frame is teachable. FOCUS is therefore a stack,
+-- not a pointer: pushing freezes the parent, popping replays the question the
+-- parent was in the middle of asking. v3 kept a flat "chain" and lost two holes
+-- in one session because nothing remembered where to return to.
+CREATE TABLE IF NOT EXISTS stack_frames (
+  id INTEGER PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  slug TEXT NOT NULL,
+  depth INTEGER NOT NULL,
+  parent_id INTEGER REFERENCES stack_frames(id),
+  why TEXT,
+  anchor_file TEXT, anchor_lo INTEGER, anchor_hi INTEGER,
+  resume_q TEXT,                      -- parent's question, replayed on pop
+  rungs TEXT NOT NULL DEFAULT '{}',   -- {predict:HIT, perturb:WEAK, ...}
+  pending TEXT NOT NULL DEFAULT '[]', -- queued sibling holes
+  state TEXT NOT NULL DEFAULT 'ACTIVE',  -- ACTIVE|FROZEN|PASSED
+  hop_budget INTEGER NOT NULL DEFAULT 2,
+  opened_at TEXT, closed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_stack_live
+    ON stack_frames(project_id, state, depth);
+
+-- Every term the tutor has ever put in front of the learner. `unknown` means it
+-- has never been shown or proved: an outgoing question may not use it.
+CREATE TABLE IF NOT EXISTS vocab (
+  term TEXT PRIMARY KEY,
+  status TEXT NOT NULL DEFAULT 'unknown',  -- unknown|shown|proved
+  first_seen TEXT, proved_by INTEGER
+);
+
+-- Every outgoing question that passed the ship-check. The audit trail for
+-- "how many inferences did we ask him to make in one breath".
+CREATE TABLE IF NOT EXISTS utterances (
+  id INTEGER PRIMARY KEY, session_id INTEGER, frame_id INTEGER,
+  hops INTEGER, terms TEXT, verdict TEXT, reason TEXT, ts TEXT
+);
