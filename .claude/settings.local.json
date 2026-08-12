@@ -85,7 +85,22 @@
       "Bash(python3 .claude/tutor/tutor_db.py teach-open type-casting)",
       "Bash(python3 .claude/tutor/tutor_db.py session \"claude-opus-4-8\" \"BUILD_V1: continue word_count.py, open gate #15 dict-items\")",
       "Bash(python3 .claude/tutor/tutor_db.py patterns)",
-      "Bash(python3 .claude/tutor/tutor_db.py due-slice)"
+      "Bash(python3 .claude/tutor/tutor_db.py due-slice)",
+      "Bash(python3 .claude/tutor/tutor_db.py session \"claude-opus-4-8\" \"continue READ phase\")",
+      "Bash(python3 .claude/tutor/tutor_db.py)",
+      "Bash(python3 .claude/tutor/tutor_db.py phase)",
+      "Bash(python3 .claude/tutor/tutor_db.py suggest)",
+      "Bash(python3 .claude/tutor/tutor_db.py target)",
+      "Bash(python3 .claude/tutor/tutor_db.py target show)",
+      "Bash(python3 .claude/tutor/tutor_db.py probe)",
+      "Bash(python3 .claude/tutor/tutor_db.py probe fstring READ read HIT --question \"read f'question_{i}' in _qa_group, predict keys\" --answer \"correctly predicted question_1..question_5 interpolation\")",
+      "Bash(python3 .claude/tutor/tutor_db.py probe counter READ read PARTIAL --error-class gap --question \"how many keys does range\\(1,6\\) loop produce?\" --answer \"initially said 6 pairs \\(question_6\\); self-corrected to 5 when asked to enumerate range\")",
+      "Bash(python3 .claude/tutor/tutor_db.py ask str-methods)",
+      "Bash(echo \"---exit:$?---\")",
+      "Bash(python3 .claude/tutor/tutor_db.py session \"claude-opus-4-8\" \"READ phase continuation\")",
+      "Bash(python3 -c \"import sqlite3;c=sqlite3.connect\\('.claude/tutor/tutor.db'\\);[print\\(r\\) for r in c.execute\\('select * from targets'\\)]\")",
+      "Bash(python3 -c \"import sqlite3;c=sqlite3.connect\\('.claude/tutor/tutor.db'\\);[print\\(r[0]\\) for r in c.execute\\(\\\\\"select name from sqlite_master where type='table'\\\\\"\\)]\")",
+      "Bash(python3 .claude/tutor/tutor_db.py probe merge-replace --result HIT --note \"read-predict on merger loop: gave exact merged dict, response inserted in-place at prompt's position, order preserved\")"
     ]
   }
 }

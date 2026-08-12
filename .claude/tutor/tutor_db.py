@@ -546,10 +546,32 @@ def probe(args):
     _log_to_bucket(c, args.result, args.error_class)
 
 
+PARTIAL_STREAK = 3  # this-many PARTIALs in a row on one concept = a soft gap
+
+
+def _partial_streak(concept, n):
+    """True if the last n probes for this concept are ALL PARTIAL.
+
+    The current probe is already inserted by the time this runs, so it is
+    counted. A one-off PARTIAL is a slip; n in a row is a gap in disguise."""
+    con = connect()
+    rows = con.execute(
+        "SELECT result FROM probes WHERE concept_id = ?"
+        " ORDER BY asked_at DESC LIMIT ?",
+        (concept['id'], n)).fetchall()
+    return len(rows) == n and all(r['result'] == 'PARTIAL' for r in rows)
+
+
 def _log_to_bucket(concept, result, error_class):
-    """Log probe result with chain tracking."""
-    if result != 'MISS' or error_class in NO_PENALTY:
-        return  # Only log real gaps
+    """Log probe result with chain tracking.
+
+    A gap-class MISS always enters the bucket. A concept that comes back
+    PARTIAL PARTIAL_STREAK times in a row is promoted too: a slip that keeps
+    recurring is a soft gap that still needs teaching."""
+    gap_miss = result == 'MISS' and error_class not in NO_PENALTY
+    partial_streak = result == 'PARTIAL' and _partial_streak(concept, PARTIAL_STREAK)
+    if not (gap_miss or partial_streak):
+        return  # Only real gaps (or a recurring PARTIAL) enter the bucket
 
     project_id = detect_project_id()
     bucket = read_bucket(project_id)

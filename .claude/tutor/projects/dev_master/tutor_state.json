@@ -1,0 +1,17 @@
+{
+  "primary_concept": "uuid",
+  "chain": [
+    {
+      "concept": "uuid",
+      "name": "uuid run tag",
+      "blocked_by": null,
+      "status": "needs_teaching",
+      "discovered_at": "2026-08-12T00:31:57"
+    }
+  ],
+  "resolution_plan": [
+    "uuid"
+  ],
+  "status": "in_progress",
+  "started_at": "2026-08-12T00:31:57"
+}
