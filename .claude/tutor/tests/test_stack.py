@@ -41,11 +41,22 @@ class TestPush(unittest.TestCase):
         parent = stack.frame(con, a)
         self.assertEqual(parent['state'], 'FROZEN')
 
-    def test_child_inherits_the_parent_anchor_file(self):
+    def test_child_inherits_the_parent_anchor_file_and_lines(self):
+        """A hole found in those lines is taught FROM those lines. Inheriting
+        the file without the range printed `file:None-None` and no code."""
         con = fresh()
         stack.push(con, PID, 'uuid', anchor=('run_prompts.py', 469, 486))
-        b = stack.push(con, PID, 'ledger')
-        self.assertEqual(stack.frame(con, b)['anchor_file'], 'run_prompts.py')
+        b = stack.frame(con, stack.push(con, PID, 'ledger'))
+        self.assertEqual(b['anchor_file'], 'run_prompts.py')
+        self.assertEqual((b['anchor_lo'], b['anchor_hi']), (469, 486))
+
+    def test_an_explicit_child_anchor_wins_over_inheritance(self):
+        con = fresh()
+        stack.push(con, PID, 'uuid', anchor=('run_prompts.py', 469, 486))
+        b = stack.frame(con, stack.push(con, PID, 'ledger',
+                                        anchor=('other.py', 1, 5)))
+        self.assertEqual((b['anchor_file'], b['anchor_lo'], b['anchor_hi']),
+                         ('other.py', 1, 5))
 
     def test_push_stores_the_interrupted_question_as_resume_q(self):
         con = fresh()

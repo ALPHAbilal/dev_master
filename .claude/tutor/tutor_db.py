@@ -839,9 +839,14 @@ def _anchor_text(frame):
     truth and a remembered copy of it is how a tutor starts teaching fiction."""
     if not frame or not frame['anchor_file']:
         return ''
+    # A relative anchor is relative to the PROJECT, not to whatever cwd the
+    # hook or the command happened to be launched from. Resolving it against
+    # cwd made the brief print nothing at all, silently, from .claude/tutor.
+    path = Path(frame['anchor_file'])
+    if not path.is_absolute():
+        path = PROJECT / path
     try:
-        lines = Path(frame['anchor_file']).read_text(
-            encoding='utf-8', errors='replace').splitlines()
+        lines = path.read_text(encoding='utf-8', errors='replace').splitlines()
     except OSError:
         return ''
     lo = max(1, frame['anchor_lo'] or 1)

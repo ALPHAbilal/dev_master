@@ -79,6 +79,23 @@ class TestBriefContent(BriefCase):
         self.assertIn('CHANGED = 1', out)
         self.assertNotIn('ledger = {}', out)
 
+    def test_a_relative_anchor_resolves_against_the_project_root(self):
+        """Hooks and commands run from different cwds. A path that only works
+        from one of them silently prints no code from the other."""
+        rel = Path('.claude/tutor/relanchor.py')
+        real = TUTOR.parent.parent / rel
+        real.write_text("alpha = 1\nbeta = 2\n")
+        try:
+            con = self.db.connect()
+            con.execute("UPDATE stack_frames SET anchor_file=?, anchor_lo=1,"
+                        " anchor_hi=2 WHERE id=?", (str(rel), self.root))
+            con.commit()
+            con.close()
+            out = self.brief(full=True)
+            self.assertIn('alpha = 1', out)
+        finally:
+            real.unlink()
+
     def test_build_phase_prints_the_ally_doctrine(self):
         con = self.db.connect()
         con.execute("UPDATE meta SET value='BUILD' WHERE key='phase'")

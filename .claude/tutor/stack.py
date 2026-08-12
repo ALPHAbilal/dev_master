@@ -81,7 +81,9 @@ def push(con, project_id, slug, why=None, anchor=None, resume_q=None):
     """Open a frame under the current top and freeze the parent.
 
     `anchor` is (file, lo, hi). A child with no anchor of its own inherits the
-    parent's FILE — the hole was found in that code and is taught from it.
+    parent's file AND ITS LINE RANGE — the hole was found in that code and is
+    taught from it. Inheriting the file alone left lo/hi NULL, so the brief
+    printed `file:None-None` and no code at all.
     `resume_q` is the question the parent was mid-way through asking; it is the
     only thing that makes the descent reversible.
     """
@@ -89,7 +91,8 @@ def push(con, project_id, slug, why=None, anchor=None, resume_q=None):
     afile, alo, ahi = anchor if anchor else (None, None, None)
     if parent is not None:
         if afile is None:
-            afile = parent['anchor_file']
+            afile, alo, ahi = (parent['anchor_file'], parent['anchor_lo'],
+                               parent['anchor_hi'])
         con.execute("UPDATE stack_frames SET state='FROZEN' WHERE id=?",
                     (parent['id'],))
     cur = con.execute(
