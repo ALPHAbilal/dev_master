@@ -130,11 +130,13 @@ FACULTIES = ('write', 'read', 'debug', 'recall', 'design', 'vocabulary',
              'understand', 'decompose', 'reason', 'implement',
              'evaluate', 'communicate', 'improve')
 
-# v2 phases are the learner's four, plus the diagnostics that feed them.
-# The v1 names stay legal so 73 historical probes keep their meaning.
-LEARNER_PHASES = ('FLOOR', 'READ', 'BUILD_V1', 'BUILD_V2', 'CAPSTONE')
-PHASES = LEARNER_PHASES + ('SWEEP', 'DESCEND', 'DRILL', 'TEACH',
-                           'REBUILD', 'BUILD', 'BREAK', 'TRANSFER')
+# v4: six phases, one variable (meta.phase), one file each. The v1/v2 names
+# stay legal in PHASES so the historical probes keep their meaning, but nothing
+# may be SET to them any more.
+LEARNER_PHASES = ('SCAN', 'READ', 'DRILL', 'ASSEMBLE', 'BUILD', 'SOLO')
+LEGACY_PHASES = ('FLOOR', 'BUILD_V1', 'BUILD_V2', 'CAPSTONE', 'INTAKE', 'UNLOCK')
+PHASES = LEARNER_PHASES + LEGACY_PHASES + ('SWEEP', 'DESCEND', 'TEACH',
+                                           'REBUILD', 'BREAK', 'TRANSFER')
 RESULTS = ('HIT', 'MISS', 'PARTIAL')
 
 # Review severities, worst first. The first two BLOCK promotion: a review whose
@@ -144,9 +146,10 @@ BLOCKING = ('blocker', 'correctness')
 # FLOOR counts: the wide depth-1 gates ARE blank-page production (he writes the
 # loop, not a prediction about one). READ is deliberately absent -- predicting
 # what a file does is not producing it.
-PRODUCTION_PHASES = ('FLOOR', 'BUILD_V1', 'BUILD_V2', 'CAPSTONE', 'REBUILD', 'BUILD')
+PRODUCTION_PHASES = ('SCAN', 'DRILL', 'ASSEMBLE', 'BUILD', 'SOLO',
+                     'FLOOR', 'BUILD_V1', 'BUILD_V2', 'CAPSTONE', 'REBUILD')
 # Phases where he edits a real file, so an archived attempt must exist first.
-ARTIFACT_PHASES = ('BUILD_V1', 'BUILD_V2', 'CAPSTONE')
+ARTIFACT_PHASES = ('ASSEMBLE', 'BUILD', 'SOLO', 'BUILD_V1', 'BUILD_V2', 'CAPSTONE')
 
 # A MISS is not one thing. v1 collapsed all five into MISS and rediscovered the
 # difference in prose every session; two typos cost three exchanges.
@@ -313,7 +316,7 @@ def brief():
               " measured — do not infer what he knows from any code in this repo)")
     ph = con.execute("SELECT value FROM meta WHERE key='phase'").fetchone()
     parked = con.execute("SELECT COUNT(*) FROM concepts WHERE parked=1").fetchone()[0]
-    print(f"PHASE {ph['value'] if ph else 'FLOOR'}"
+    print(f"PHASE {ph['value'] if ph else 'SCAN'}"
           f"   ({' -> '.join(LEARNER_PHASES)})")
     print("  YOU pick every rung inside a phase. Never ask him 'which concept next?'."
           " He chooses the PHASE only.")
@@ -767,7 +770,7 @@ def _assemble_state(con, slug=None):
     bucket = read_bucket()
     slug = slug or bucket.get('primary_concept')
     row = con.execute("SELECT value FROM meta WHERE key='phase'").fetchone()
-    phase = row[0] if row else 'FLOOR'
+    phase = row[0] if row else 'SCAN'
     base = _project_base()
     ctx = context_store.read_context(base, slug) if (
         slug and context_store.has_context(base, slug)) else {}
@@ -2197,7 +2200,7 @@ def target(args):
     con = connect()
     if args.target_cmd == 'show':
         rows = con.execute(
-            "SELECT id, learner, name, codebase_path, phase, unlock_gate, size "
+            "SELECT id, learner, name, codebase_path, size "
             "FROM targets WHERE phase != 'retired' ORDER BY id").fetchall()
         if not rows:
             print("no target yet. run INTAKE: `target set ...`")
@@ -2205,7 +2208,10 @@ def target(args):
         for r in rows:
             print(f"#{r['id']} [{r['learner']}] {r['name']}  ({r['size']})")
             print(f"    codebase: {r['codebase_path']}")
-            print(f"    phase: {r['phase']}   unlock-gate: {r['unlock_gate']}")
+        # targets.phase survives only as the retired/live flag. The PHASE is
+        # meta.phase and lives in exactly one place.
+        ph = con.execute("SELECT value FROM meta WHERE key='phase'").fetchone()
+        print(f"    phase: {ph['value'] if ph else 'SCAN'}  (meta.phase — the only copy)")
         return
     if args.target_cmd == 'set':
         if not args.name or not args.learner:
@@ -2249,8 +2255,9 @@ def unlock_gate(args):
         print("  unlock these first (parked depth-3+ concepts do NOT block; "
               "they return JIT during the build).")
         return
-    con.execute("UPDATE targets SET phase='BUILD', unlock_gate='closed', "
-                "updated_at=? WHERE id=?", (now(), args.target_id))
+    con.execute("UPDATE targets SET unlock_gate='closed', updated_at=? WHERE id=?",
+                (now(), args.target_id))
+    con.execute("INSERT OR REPLACE INTO meta(key, value) VALUES ('phase','BUILD')")
     con.commit()
     print(f"GATE OPEN: #{args.target_id} ({row['name']}) -> BIG BUILD.")
     print("  the ladder is unlocked. now the real scripts, by hand, through the "
@@ -2264,8 +2271,8 @@ def unlock_gate(args):
 PROJECT = HERE.parent.parent            # .claude/tutor -> .claude -> project
 # Overridable so the test harness never writes into a real project tree.
 ATTEMPTS = Path(os.environ.get('TUTOR_ATTEMPTS_DIR', PROJECT / 'attempts'))
-PHASE_DIR = {'FLOOR': '01_floor', 'READ': '02_read',
-             'BUILD_V1': '03_build_v1', 'BUILD_V2': '04_build_v2'}
+PHASE_DIR = {'SCAN': '01_scan', 'READ': '02_read', 'DRILL': '03_drill',
+             'ASSEMBLE': '04_assemble', 'BUILD': '05_build', 'SOLO': '06_solo'}
 
 
 def _sha(b):
@@ -2430,15 +2437,16 @@ def phase(args):
     con = connect()
     cur = con.execute("SELECT value FROM meta WHERE key = 'phase'").fetchone()
     if not args.set:
-        print(f"phase {cur['value'] if cur else 'FLOOR'}")
+        print(f"phase {cur['value'] if cur else 'SCAN'}")
         print(f"  order: {' -> '.join(LEARNER_PHASES)}")
         print("  inside a phase the agent picks every rung. He is never asked "
               "'which concept next?'")
         return
     if args.set not in LEARNER_PHASES:
         die(f"phase must be one of {LEARNER_PHASES}")
-    old = cur['value'] if cur else 'FLOOR'
-    con.execute("UPDATE meta SET value = ? WHERE key = 'phase'", (args.set,))
+    old = cur['value'] if cur else 'SCAN'
+    con.execute("INSERT OR REPLACE INTO meta(key, value) VALUES ('phase', ?)",
+                (args.set,))
     con.execute(
         "INSERT INTO ladder_log (ts, trigger, evidence, change) VALUES (?,?,?,?)",
         (now(), 'LADDER', args.why or 'learner chose the phase transition',
@@ -2532,7 +2540,7 @@ def _tree_lines(con):
     """The live map, as text. Same body for the file and the terminal."""
     L = []
     ph = con.execute("SELECT value FROM meta WHERE key='phase'").fetchone()
-    ph = ph['value'] if ph else 'FLOOR'
+    ph = ph['value'] if ph else 'SCAN'
     rows = con.execute(
         "SELECT slug, name, state, depth, attempts, fails, swept_in, next_review"
         " FROM concepts WHERE parked = 0 ORDER BY depth, slug").fetchall()
@@ -2553,11 +2561,12 @@ def _tree_lines(con):
     L.append("")
     for p in LEARNER_PHASES:
         mark = '>>' if p == ph else '  '
-        note = {'FLOOR': 'own the language (toys ok)',
+        note = {'SCAN': 'scrape the ladder from the real codebase',
                 'READ': 'predict what the real file does',
-                'BUILD_V1': 'write it with the contract in front of you',
-                'BUILD_V2': 'write it from memory  <-- THE GOAL',
-                'CAPSTONE': 'no spec exists; the forks are yours'}[p]
+                'DRILL': 'own each rung, from the real code',
+                'ASSEMBLE': 'wire the owned rungs into a working slice',
+                'BUILD': 'write it by hand  <-- ALLY mode, finishing is the product',
+                'SOLO': 'write it from memory, no spec  <-- THE GOAL'}[p]
         L.append(f" {mark} {p:<9} {note}")
     L.append("")
     L.append(f"    owned   [{_bar(can, total)}] {can}/{total}")
@@ -2646,7 +2655,7 @@ def statusline(args=None):
         con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
         con.row_factory = sqlite3.Row
         ph = con.execute("SELECT value FROM meta WHERE key='phase'").fetchone()
-        ph = ph['value'] if ph else 'FLOOR'
+        ph = ph['value'] if ph else 'SCAN'
         tot = con.execute("SELECT COUNT(*) FROM concepts WHERE parked=0").fetchone()[0]
         can = con.execute(
             "SELECT COUNT(*) FROM concepts WHERE parked=0 AND state='CAN'").fetchone()[0]

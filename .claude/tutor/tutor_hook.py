@@ -128,54 +128,40 @@ def block(msg):
 SKILL = PROJECT / '.claude' / 'skills' / 'tutor_v3'
 STATE = HERE / '.phase_gate.json'      # shared between the two hook processes
 
-# phase (from targets table) -> the one file that governs it
-PHASE_FILE = {
-    'INTAKE': 'phases/00-intake.md',
-    'SCAN':   'phases/01-scan.md',
-    'READ':   'phases/03-read.md',
-    'UNLOCK': 'phases/02-unlock.md',
-    'BUILD':  'phases/circle.md',
-}
+# phase -> the one file that governs it. ONE variable, `meta.phase`, decides
+# this. v3 kept a second copy on targets.phase and a third in .phase_gate.json,
+# so "which phase am I in" had three answers and they disagreed.
+PHASE_FILE = {'SCAN': 'phases/01-scan.md',    'READ': 'phases/02-read.md',
+              'DRILL': 'phases/03-drill.md',  'ASSEMBLE': 'phases/04-assemble.md',
+              'BUILD': 'phases/05-build.md',  'SOLO': 'phases/06-solo.md'}
 
-# Phase sequence for auto-advancement when unlock_gate opens
-PHASE_SEQUENCE = ['SCAN', 'READ', 'UNLOCK', 'BUILD']
+# The doctrine that governs the phase. ADVERSARY: question first, never hand the
+# answer. ALLY: he is building — answer directly, pair, unblock fast.
+MODE = {'SCAN': 'ADVERSARY', 'READ': 'ADVERSARY', 'DRILL': 'ADVERSARY',
+        'ASSEMBLE': 'ADVERSARY', 'BUILD': 'ALLY', 'SOLO': 'ADVERSARY'}
 
 # tutor_db.py subcommands that DO tutoring — blocked until the phase file is read.
 # Read-only / meta commands (brief, status, statusline, tree, target, ...) are not.
-GATED_CMDS = {'probe', 'gate', 'attempt', 'promote', 'demote', 'teach-open',
-              'teach-close', 'push', 'review', 'misconception', 'transfer'}
+# `classify` and `draft` are the whole v4 verdict path and were ungated in v3's
+# equivalents, which is why the phase file went unread for an entire session.
+GATED_CMDS = {'classify', 'draft', 'pass', 'promote', 'demote', 'attempt',
+              'gate', 'review'}
 
 
 def active_target(con):
+    """Is this a live tutoring engagement at all? (No longer a phase source.)"""
     try:
         return con.execute(
             "SELECT * FROM targets WHERE phase != 'retired' ORDER BY id DESC LIMIT 1"
         ).fetchone()
     except sqlite3.Error:
-        return None                 # v2 db without the targets table: no v3 routing
-
-
-def next_phase(phase):
-    """Return the next phase in the sequence, or current if at end."""
-    try:
-        idx = PHASE_SEQUENCE.index(phase)
-        return PHASE_SEQUENCE[idx + 1]
-    except (ValueError, IndexError):
-        return phase  # Not in sequence or already at end
+        return None                 # v2 db without the targets table: no routing
 
 
 def current_phase(con):
-    t = active_target(con)
-    if t is None:
-        return 'INTAKE'             # no anchor yet -> intake is the only legal move
-
-    phase = t['phase'] if t['phase'] in PHASE_FILE else 'INTAKE'
-
-    # If this phase's unlock_gate is open, advance to next phase
-    if t['unlock_gate'] == 'open' and phase in PHASE_SEQUENCE:
-        phase = next_phase(phase)
-
-    return phase
+    row = con.execute("SELECT value FROM meta WHERE key='phase'").fetchone()
+    p = row[0] if row else 'SCAN'
+    return p if p in PHASE_FILE else 'SCAN'
 
 
 def load_state():
@@ -303,9 +289,10 @@ def cmd_phase_guard(data):
 
     st = load_state()
     # reset the read-requirement only when the session or the phase changes;
-    # within one phase in one session the agent reads the file once.
-    if st.get('session_id') != sid or st.get('phase') != phase:
-        st = {'session_id': sid, 'phase': phase, 'expected': expected, 'read': False}
+    # within one phase in one session the agent reads the file once. The phase
+    # is not stored — `expected` already encodes it, and one copy cannot drift.
+    if st.get('session_id') != sid or st.get('expected') != expected:
+        st = {'session_id': sid, 'expected': expected, 'read': False}
         save_state(st)
 
     gates = open_gates(con)
@@ -384,7 +371,7 @@ def cmd_phase_gate(data):
         return
     if st.get('read'):
         return
-    phase = st.get('phase', '?')
+    phase = current_phase(con)
     block(f"BLOCKED by phase-gate: you are in phase {phase} and have not read the "
           f"file that governs it.\nRead this first, then retry:\n  {st['expected']}\n"
           f"(the phase router points here every turn; reading it is mandatory "
