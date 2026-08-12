@@ -1,0 +1,22 @@
+[
+  {
+    "ts": "2026-08-12T14:14:54",
+    "event": "assess",
+    "detail": "hole=explicit gap=model angle=None:None | Q1 correct cold: '8 characters no hyphens because hex removes them, before the slice was 32'. Q2 (does uuid4() return a different value on each call): 'I didn't get it' — explicit hole on whether uuid4 is a generator of fresh values per call vs a fixed value."
+  },
+  {
+    "ts": "2026-08-12T14:20:14",
+    "event": "assess",
+    "detail": "hole=none gap=None angle=mechanical:pass | Predicted cold: 'it's probabilistic so it's unlikely to be the same, we have 8^16' — correct that uuid4() produces a fresh value per call. Size of the space stated inverted (8^16 instead of 16^8); probing that next."
+  },
+  {
+    "ts": "2026-08-12T14:22:44",
+    "event": "assess",
+    "detail": "hole=explicit gap=application angle=None:None | Q3: self-corrected to 16^8 unprompted. Q4 (what breaks if run_tag were removed from batch run_names): 'I don't know' — explicit application hole; cannot yet trace the identity/collision consequence through the real script."
+  },
+  {
+    "ts": "2026-08-12T14:31:04",
+    "event": "assess",
+    "detail": "hole=explicit gap=application angle=None:None | Q6 correct: predicted 2 files, sidecar_c0.json holds run B's data — owns the silent-overwrite mechanism in the abstract. Q7 blocked: 'what you mean the ledger, you keep assuming i know something' — correct callout, 'ledger' was an unstated prerequisite. Discovery chain: uuid blocked_by ledger (what the ledger file is / that deleting it is what triggers a fresh run_tag)."
+  }
+]
