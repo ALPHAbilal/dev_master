@@ -18,6 +18,8 @@ non-zero and says why. An agent that forgets a rule cannot write past it.
     classify <slug> --result HIT|WEAK|MISS|BLOCKED --rung predict|perturb|
              produce|transfer --answer TEXT [--terms a,b]
     pass <slug>                  pop the top frame; prints the question to replay
+    draft --terms a,b --hops N --about <slug>   clear an OUTGOING question
+    brief [--full]               the delta brief; --full prints all of it
     gate open <slug> --kind K [--spec P] [--target T]
     gate close <id> --result PASS|FAIL|ABANDONED
     gate list
@@ -312,9 +314,61 @@ def _density(con):
               " logs it); do not just re-gate. 0% explain is not a badge.")
 
 
+def _stack_state(con, pid=None):
+    """Everything the brief renders, gathered fresh. The anchor lines are read
+    off DISK here, every single time — the file is the truth, and a remembered
+    copy of it is how a tutor starts teaching fiction about his own code."""
+    pid = pid or detect_project_id()
+    row = con.execute("SELECT value FROM meta WHERE key='phase'").fetchone()
+    phase = row[0] if row and row[0] in tutor_hook_phases() else 'SCAN'
+    top = stack.top(con, pid)
+    last = con.execute("SELECT value FROM meta WHERE key='brief_sig'").fetchone()
+    st = {'phase': phase, 'mode': PHASE_MODE.get(phase, 'ADVERSARY'),
+          'path': stack.path(con, pid), 'last_sig': last[0] if last else None}
+    if top is None:
+        return st
+    st.update({
+        'slug': top['slug'], 'depth': top['depth'], 'why': top['why'],
+        'anchor_file': top['anchor_file'], 'anchor_lo': top['anchor_lo'],
+        'anchor_hi': top['anchor_hi'], 'anchor_text': _anchor_text(top),
+        'rungs': stack.rungs(con, top['id']),
+        'pending': stack.pending(con, top['id']),
+        'hop_budget': top['hop_budget'], 'resume_q': top['resume_q'],
+    })
+    return st
+
+
 def brief(args=None):
-    """Injected at SessionStart, so no agent has to remember to ask."""
+    """The delta brief. Injected at SessionStart and printed after every write.
+
+    Reprinting eleven identical lines every turn is how a brief becomes
+    wallpaper, and the one turn it changes is the turn nobody reads it. So this
+    prints what CHANGED, and `--full` prints all of it on demand.
+    """
     con = connect()
+    state = _stack_state(con)
+    state['full'] = bool(getattr(args, 'full', False))
+    out = router.render(state)
+    print(out)
+    if out.strip() == 'Δ none':
+        return
+    con.execute("INSERT OR REPLACE INTO meta(key, value) VALUES ('brief_sig', ?)",
+                (router.signature(state),))
+    con.commit()
+    print()
+    _standing_brief(con)
+
+
+def tutor_hook_phases():
+    return ('SCAN', 'READ', 'DRILL', 'ASSEMBLE', 'BUILD', 'SOLO')
+
+
+PHASE_MODE = {'SCAN': 'ADVERSARY', 'READ': 'ADVERSARY', 'DRILL': 'ADVERSARY',
+              'ASSEMBLE': 'ADVERSARY', 'BUILD': 'ALLY', 'SOLO': 'ADVERSARY'}
+
+
+def _standing_brief(con):
+    """The things that are true regardless of where the stack is."""
     learner_row = con.execute("SELECT * FROM learners WHERE active = 1").fetchone()
     if learner_row:
         print(f"LEARNER {learner_row['name']}")
@@ -909,6 +963,65 @@ def classify(args):
         stack.set_rung(con, top['id'], args.rung, args.result)
 
     brief(argparse.Namespace(full=False))
+
+
+
+# ---- the outgoing-question gate ------------------------------------------
+# Every question the tutor asks passes through here first. v3 checked the
+# learner's answers and never checked its own questions, so it asked him about
+# `idempotent` and `ledger` in the same breath, having defined neither, and
+# then recorded the resulting silence as a gap in HIM.
+
+def ship_check(con, project_id, terms, hops, about):
+    """(ok, reason). Pure enough to be called by the hook AND the command, so
+    the wall and the command cannot drift apart."""
+    frames = {r['slug']: r for r in stack.live(con, project_id)}
+    top = stack.top(con, project_id)
+    if about not in frames:
+        return False, (f"'{about}' is not a live frame. Live: "
+                       f"{', '.join(frames) or 'none'}.")
+    if top is None or about != top['slug']:
+        return False, (f"'{about}' is FROZEN — it is not the top of the stack. "
+                       f"The top is '{top['slug'] if top else 'none'}'. You may "
+                       f"only ask about the frame you are actually in.")
+    budget = top['hop_budget']
+    if hops > budget:
+        return False, (f"{hops} hops, budget is {budget}. Every hop is an "
+                       f"inference you are asking him to make without checking "
+                       f"the one before it. Ask the first hop, get an answer, "
+                       f"then ask the next.")
+    for t in terms:
+        row = con.execute("SELECT status FROM vocab WHERE term=?", (t,)).fetchone()
+        status = row[0] if row else 'unknown'
+        if status == 'unknown':
+            return False, (f"term '{t}' is unknown — it has never been shown to "
+                           f"him or proved by him. Asking a question in terms he "
+                           f"does not have measures your vocabulary, not his. "
+                           f"Define it first, or ask without it.")
+    return True, 'SHIP'
+
+
+def draft(args):
+    """Clear a question for takeoff. Refused questions are never asked."""
+    con = connect()
+    pid = detect_project_id()
+    terms = [t.strip() for t in (args.terms or '').split(',') if t.strip()]
+    hops = int(args.hops)
+    ok, reason = ship_check(con, pid, terms, hops, args.about)
+    if not ok:
+        die(reason)
+    top = stack.top(con, pid)
+    con.execute(
+        "INSERT INTO utterances(session_id, frame_id, hops, terms, verdict,"
+        " reason, ts) VALUES (?,?,?,?,?,?,?)",
+        (current_session(con), top['id'], hops, ','.join(terms) or None,
+         'SHIP', reason, now()))
+    for t in terms:
+        _see_term(con, t, 'shown')
+    con.commit()
+    print(f"SHIP — {hops} hop(s) about '{args.about}'"
+          f"{', terms: ' + ', '.join(terms) if terms else ', no new terms'}.")
+    print("Ask it now, then classify his answer.")
 
 
 def frame_pass(args):
@@ -2712,7 +2825,9 @@ def build_parser():
     s = sub.add_parser('session')
     s.add_argument('agent')
     s.add_argument('note', nargs='?', default='')
-    sub.add_parser('brief')
+    s = sub.add_parser('brief')
+    s.add_argument('--full', action='store_true',
+                   help='print the whole brief, not just the delta')
     sub.add_parser('status')
     sub.add_parser('bucket-show', help='show active discovery chains (project-scoped)')
     sub.add_parser('bucket-archive', help='archive completed bucket to database')
@@ -2727,6 +2842,12 @@ def build_parser():
                         'REQUIRED with --result BLOCKED')
     s = sub.add_parser('pass', help='pop the top frame; prints the question to replay')
     s.add_argument('slug')
+    s = sub.add_parser(
+        'draft', help='clear an outgoing question: vocabulary + inference count')
+    s.add_argument('--terms', default='', help='comma-sep terms the question uses')
+    s.add_argument('--hops', type=int, required=True,
+                   help='inferences you are asking him to chain in one breath')
+    s.add_argument('--about', required=True, help='the frame the question is in')
     s = sub.add_parser('sweep-next')
     s.add_argument('n', nargs='?', default=12)
 
@@ -2929,12 +3050,13 @@ def build_parser():
 DISPATCH = {
     'init': lambda a: init(),
     'session': lambda a: session(a.agent, a.note),
-    'brief': lambda a: brief(),
+    'brief': brief,
     'status': lambda a: status(),
     'bucket-show': lambda a: bucket_show(),
     'bucket-archive': lambda a: bucket_archive(),
     'classify': classify,
     'pass': frame_pass,
+    'draft': draft,
     'sweep-next': lambda a: sweep_next(a.n),
     'route-next': lambda a: route_next(),
     'probe': probe,
@@ -2972,7 +3094,7 @@ DISPATCH = {
 }
 
 # Commands that change state. After each one PROGRESS.md is rewritten.
-WRITES = ('classify', 'pass', 'probe', 'floor', 'promote', 'demote', 'revise',
+WRITES = ('classify', 'pass', 'draft', 'probe', 'floor', 'promote', 'demote', 'revise',
           'phase', 'assume', 'ask', 'gate', 'attempt', 'spine-load',
           'concepts-load', 'session', 'learner', 'review', 'capstone', 'lookup',
           'push', 'target', 'unlock-gate')
