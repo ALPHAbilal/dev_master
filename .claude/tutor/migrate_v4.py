@@ -98,7 +98,7 @@ def fold_assessments(con):
 
 def drop_dead(con):
     dropped = []
-    for t in ('angles',):
+    for t in ('angles', 'gap_types', 'bucket_keys', 'form_questions'):
         if has_table(con, t):
             con.execute(f"DROP TABLE {t}")
             dropped.append(t)

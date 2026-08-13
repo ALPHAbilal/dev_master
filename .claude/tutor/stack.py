@@ -25,6 +25,18 @@ from pathlib import Path
 RUNGS = ('predict', 'perturb', 'produce', 'transfer')
 RESULTS = ('HIT', 'WEAK', 'MISS', 'BLOCKED')
 
+# v4.1 — two frame kinds, two exit prices. The descent is NEVER capped by kind:
+# a learner may go as deep as his real gap requires. What changes is the price of
+# climbing back. A TARGET (the destination) is owned only at four rungs. A TRANSIT
+# (a stepping stone opened to unblock the frame above) pops at predict+perturb --
+# "unblocked enough to continue" -- and is logged for later mastery, not owned now.
+KINDS = ('TARGET', 'TRANSIT')
+REQUIRED_RUNGS = {'TARGET': RUNGS, 'TRANSIT': ('predict', 'perturb')}
+
+
+def required_rungs(kind):
+    return REQUIRED_RUNGS.get(kind, RUNGS)
+
 
 class StackRefusal(Exception):
     """A refusal, with the exact missing items named. Never a bare False."""
@@ -70,15 +82,25 @@ def pending(con, frame_id):
 
 
 def missing(con, frame_id):
-    """What stands between this frame and a clean pop."""
+    """What stands between this frame and a clean pop. A TRANSIT frame needs only
+    predict+perturb; a TARGET needs all four. The descent below it is untouched by
+    this — kind sets the EXIT price, never how deep you may go."""
+    f = frame(con, frame_id)
     got = rungs(con, frame_id)
-    return ([r for r in RUNGS if got.get(r) != 'HIT'], pending(con, frame_id))
+    need = required_rungs(f['kind'] if 'kind' in f.keys() else 'TARGET')
+    return ([r for r in need if got.get(r) != 'HIT'], pending(con, frame_id))
 
 
 # ---- writes --------------------------------------------------------------
 
-def push(con, project_id, slug, why=None, anchor=None, resume_q=None):
+def push(con, project_id, slug, why=None, anchor=None, resume_q=None,
+         kind='TARGET', done_def=None):
     """Open a frame under the current top and freeze the parent.
+
+    `kind` is TARGET (the destination, four rungs to pop) or TRANSIT (a stepping
+    stone, predict+perturb to pop then logged for later mastery). `done_def` is
+    the one sentence stating what closing this frame means — a hole found in the
+    learner gets the same finish line as a hole found in the code.
 
     `anchor` is (file, lo, hi). A child with no anchor of its own inherits the
     parent's file AND ITS LINE RANGE — the hole was found in that code and is
@@ -95,13 +117,15 @@ def push(con, project_id, slug, why=None, anchor=None, resume_q=None):
                                parent['anchor_hi'])
         con.execute("UPDATE stack_frames SET state='FROZEN' WHERE id=?",
                     (parent['id'],))
+    if kind not in KINDS:
+        raise StackRefusal(f"unknown frame kind '{kind}'. Valid: {', '.join(KINDS)}")
     cur = con.execute(
         "INSERT INTO stack_frames(project_id, slug, depth, parent_id, why,"
-        " anchor_file, anchor_lo, anchor_hi, resume_q, opened_at)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?)",
+        " anchor_file, anchor_lo, anchor_hi, resume_q, kind, done_def, opened_at)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         (project_id, slug, 0 if parent is None else parent['depth'] + 1,
          None if parent is None else parent['id'], why, afile, alo, ahi,
-         resume_q, now()))
+         resume_q, kind, done_def, now()))
     con.commit()
     return cur.lastrowid
 

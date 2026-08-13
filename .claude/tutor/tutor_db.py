@@ -210,7 +210,26 @@ def die(msg):
 def connect():
     con = sqlite3.connect(str(_db_path()))
     con.row_factory = sqlite3.Row
+    _migrate(con)
     return con
+
+
+def _migrate(con):
+    """Idempotent column adds for a live DB built before v4.1. schema.sql covers a
+    fresh DB; this covers the one already on disk. Cheap: one PRAGMA per connect."""
+    try:
+        cols = {r['name'] for r in con.execute("PRAGMA table_info(stack_frames)")}
+    except sqlite3.Error:
+        return
+    if not cols:
+        return                       # table not created yet (fresh init): schema.sql
+                                     # will build it WITH these columns
+    if 'kind' not in cols:
+        con.execute("ALTER TABLE stack_frames ADD COLUMN kind TEXT NOT NULL"
+                    " DEFAULT 'TARGET'")
+    if 'done_def' not in cols:
+        con.execute("ALTER TABLE stack_frames ADD COLUMN done_def TEXT")
+    con.commit()
 
 
 def now():
@@ -947,6 +966,23 @@ def classify(args):
     con.commit()
 
     if args.result == 'BLOCKED':
+        # A hole found while teaching is a STEPPING STONE by default: TRANSIT,
+        # cheap to climb back out of. The tutor may override to TARGET when the
+        # discovered thing is itself a destination worth full mastery now. Either
+        # way it needs a finish line -- `--done` -- so both parties know when the
+        # descent has served its purpose. The descent is not capped; only its
+        # exit price is set here.
+        kind = (getattr(args, 'kind', None) or 'TRANSIT').upper()
+        if kind not in stack.KINDS:
+            die(f"--kind must be one of {', '.join(stack.KINDS)}")
+        done = (getattr(args, 'done', None) or '').strip()
+        if hasattr(args, 'done') and not done:
+            die("--done is required on a descent. One sentence: what must he be "
+                "able to DO for this frame to close? A hole with no finish line "
+                "is the wandering that §6 of the audit named — the tutor taught "
+                "from three unrelated places because nothing said when it was "
+                "over. Holes found IN THE LEARNER get the same rigor as holes "
+                "found in the code.")
         # Unknown terms become real concepts so they are on the map, not just in
         # a frame. They sit at the frame's depth: a hole found here is a rung
         # here, not a new tier of the ladder.
@@ -963,7 +999,8 @@ def classify(args):
             stack.queue_pending(con, top['id'], rest)
         stack.push(con, pid, first,
                    why=f"blocked '{top['slug']}' on '{first}'",
-                   resume_q=top['resume_q'] or args.answer)
+                   resume_q=top['resume_q'] or args.answer,
+                   kind=kind, done_def=done or None)
     else:
         stack.set_rung(con, top['id'], args.rung, args.result)
 
@@ -1006,6 +1043,30 @@ def ship_check(con, project_id, terms, hops, about):
     return True, 'SHIP'
 
 
+def show_term(args):
+    """Mark a term SHOWN. The bootstrap the vocab gate never had.
+
+    Audit §1: `_see_term` was only ever called from `classify` (inserts 'unknown')
+    and `draft` (inserts 'shown' — but only AFTER ship_check already rejected the
+    'unknown' term). So a term could never reach 'shown', ship_check rejected
+    everything, and the tutor learned to drop --terms to escape. That bypass is
+    what talked the learner over in words he did not have.
+
+    This command is the missing door: you TEACH a word, then you may ASK in it.
+    Teaching is the event that makes a term shown — asking never was.
+    """
+    con = connect()
+    for t in [t.strip() for t in args.terms if t.strip()]:
+        _see_term(con, t, 'shown')
+    con.commit()
+    shown = ', '.join(t.strip() for t in args.terms if t.strip())
+    print(f"SHOWN: {shown}. A question may now use "
+          f"{'these' if len(args.terms) > 1 else 'it'} — ship_check will pass "
+          f"{'them' if len(args.terms) > 1 else 'it'}.")
+    print("Teach the meaning first; do not ask in a term the same breath you "
+          "introduce it.")
+
+
 def draft(args):
     """Clear a question for takeoff. Refused questions are never asked."""
     con = connect()
@@ -1040,16 +1101,30 @@ def frame_pass(args):
         die(f"'{args.slug}' is not the top of the stack. The top is "
             f"'{top['slug']}'.")
     parent_id = top['parent_id']
+    kind = top['kind'] if 'kind' in top.keys() else 'TARGET'
     try:
         resume_q = stack.pop(con, top['id'], base=str(_project_base()))
     except stack.StackRefusal as e:
         die(str(e))
         return
-    con.execute(
-        "UPDATE concepts SET state='CAN', updated_at=? WHERE slug=?",
-        (now(), top['slug']))
-    con.commit()
-    print(f"POPPED '{top['slug']}'. It is CAN — four rungs, not one.")
+    if kind == 'TARGET':
+        # The destination. Four rungs HIT — owned.
+        con.execute(
+            "UPDATE concepts SET state='CAN', evidence='unaided', updated_at=?"
+            " WHERE slug=?", (now(), top['slug']))
+        con.commit()
+        print(f"POPPED '{top['slug']}' (TARGET). It is CAN — four rungs, not one.")
+    else:
+        # A stepping stone. Unblocked enough to continue, NOT mastered. It stays
+        # CANT and is queued for review in 2 days: mastery is deferred, not
+        # skipped. This is the "logged after done to master it" you asked for.
+        due = (datetime.now() + timedelta(days=2)).date().isoformat()
+        con.execute(
+            "UPDATE concepts SET evidence='assisted', next_review=?, updated_at=?"
+            " WHERE slug=?", (due, now(), top['slug']))
+        con.commit()
+        print(f"POPPED '{top['slug']}' (TRANSIT). Unblocked enough to continue — "
+              f"NOT owned. Logged for mastery review, due {due}.")
     if parent_id is None:
         print("The stack is empty. Nothing is being taught.")
         return
@@ -2870,6 +2945,17 @@ def build_parser():
     s.add_argument('--terms', default=None,
                    help='comma-sep vocabulary this answer touched; '
                         'REQUIRED with --result BLOCKED')
+    s.add_argument('--kind', default=None, choices=[k.lower() for k in stack.KINDS],
+                   help='on BLOCKED: frame kind for the descent. default transit '
+                        '(a stepping stone, cheap to climb back). target = a '
+                        'destination worth full mastery now.')
+    s.add_argument('--done', default=None,
+                   help='on BLOCKED: one sentence — what he must be able to DO for '
+                        'this frame to close. Required on a descent.')
+    s = sub.add_parser(
+        'show', help='mark a term SHOWN so a question may use it (breaks the '
+                     'vocab deadlock: teach the word before you ask in it)')
+    s.add_argument('terms', nargs='+', help='one or more terms you just taught')
     s = sub.add_parser('pass', help='pop the top frame; prints the question to replay')
     s.add_argument('slug')
     s = sub.add_parser(
@@ -3087,6 +3173,7 @@ DISPATCH = {
     'classify': classify,
     'pass': frame_pass,
     'draft': draft,
+    'show': show_term,
     'sweep-next': lambda a: sweep_next(a.n),
     'route-next': lambda a: route_next(),
     'probe': probe,

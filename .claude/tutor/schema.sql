@@ -372,56 +372,14 @@ CREATE INDEX IF NOT EXISTS idx_discovery_chains_project ON discovery_chains(proj
 INSERT OR IGNORE INTO meta(key, value) VALUES ('phase', 'FLOOR');
 INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '4');
 
--- ---- v3: context router registry -------------------------------------------
--- The master mind lives HERE, in data, never fully in the AI's context.
--- Adding a gap type / angle / key / question is a row, not a prompt edit.
--- `applies_when` is a JSON condition evaluated by router.py (pure code):
---   {"always": true} | {"phase_in": [...]} | {"has_context": true}
---   {"open_gaps_min": 1} | {"open_misconceptions_min": 1}
---   {"current_angle": true} | {"angles_unexplored_min": 1}
--- Every present field must match (AND semantics).
-
-CREATE TABLE IF NOT EXISTS gap_types (
-    slug        TEXT PRIMARY KEY,   -- model|reason|application|tradeoff (+ future rows)
-    description TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS angles (
-    slug        TEXT PRIMARY KEY,   -- mechanical|practical|reasoning (+ future rows)
-    description TEXT NOT NULL,
-    ord         INTEGER NOT NULL    -- default teaching order
-);
-
-CREATE TABLE IF NOT EXISTS bucket_keys (
-    name         TEXT PRIMARY KEY,  -- dotted path inside bucket / context files
-    description  TEXT NOT NULL,     -- one line: what it is, when to write it
-    value_type   TEXT NOT NULL,     -- string|array|object|timestamp
-    applies_when TEXT NOT NULL DEFAULT '{"always": true}'
-);
-
-CREATE TABLE IF NOT EXISTS form_questions (
-    slug         TEXT PRIMARY KEY,
-    question     TEXT NOT NULL,     -- what the AGENT must answer about the learner's answer
-    answers      TEXT,              -- comma-separated valid answers; NULL = free text
-    applies_when TEXT NOT NULL DEFAULT '{"always": true}',
-    ord          INTEGER NOT NULL DEFAULT 0
-);
-
--- Every answered form. This is the gap-detection audit trail: what the agent
--- concluded from each learner answer, with the evidence quoted.
-CREATE TABLE IF NOT EXISTS assessments (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id   INTEGER REFERENCES sessions(id),
-    slug         TEXT NOT NULL,     -- concept under teaching
-    hole         TEXT NOT NULL,     -- none|explicit|implicit
-    gap_type     TEXT,              -- REQUIRED when hole != none; FK-checked in code
-    demonstrated INTEGER,           -- REQUIRED when hole == none: 1 demonstrated, 0 claimed
-    angle        TEXT,              -- angle being taught when this answer happened
-    angle_result TEXT,              -- pass|partial|fail
-    evidence     TEXT NOT NULL,     -- the learner's words, verbatim-ish
-    ts           TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_assessments_slug ON assessments(slug);
+-- ---- v3 registry + assessments: REMOVED in v4.1 ----------------------------
+-- The v3 "context router registry" (gap_types, angles, bucket_keys,
+-- form_questions) and the `assessments` audit table were dead: router.py renders
+-- from the live tables, not from a registry, and the STACK replaced the angle
+-- carousel. migrate_v4 already folds `assessments` into `probes` and drops
+-- `angles` on any real database; schema.sql was still recreating all five on a
+-- fresh install, so "which tables exist" had two answers. They are gone from
+-- both paths now. Zero code referenced them (grep across *.py, 2026-08-13).
 
 
 -- ==== v4: the STACK ========================================================
@@ -443,6 +401,17 @@ CREATE TABLE IF NOT EXISTS stack_frames (
   pending TEXT NOT NULL DEFAULT '[]', -- queued sibling holes
   state TEXT NOT NULL DEFAULT 'ACTIVE',  -- ACTIVE|FROZEN|PASSED
   hop_budget INTEGER NOT NULL DEFAULT 2,
+  -- v4.1: two frame kinds, two exit prices. The DESCENT itself is never capped
+  -- -- go as deep as the learner's real gap requires. What differs is the price
+  -- of climbing back:
+  --   TARGET  the thing he came for. Needs all four rungs HIT to pop, and pops
+  --           to CAN -- mastered.
+  --   TRANSIT a stepping stone, opened only to unblock the frame above. Pops on
+  --           predict+perturb ("unblocked enough to continue"), and does NOT go
+  --           to CAN -- it is logged for later mastery review, not owned.
+  kind TEXT NOT NULL DEFAULT 'TARGET',
+  done_def TEXT,                      -- one sentence: what he must be able to do
+                                      -- for this frame to close. Required on push.
   opened_at TEXT, closed_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_stack_live
