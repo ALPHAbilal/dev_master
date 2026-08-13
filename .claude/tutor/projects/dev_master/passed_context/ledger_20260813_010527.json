@@ -1,0 +1,23 @@
+{
+  "id": 2,
+  "project_id": "dev_master",
+  "slug": "ledger",
+  "depth": 1,
+  "parent_id": 1,
+  "why": "found while teaching uuid — he could not say what a ledger IS",
+  "anchor_file": "soufiane_prompts/prompts/run_prompts.py",
+  "anchor_lo": 469,
+  "anchor_hi": 486,
+  "resume_q": "What does uuid.uuid4().hex[:8] give you, and why is it on the ledger rather than on each chunk?",
+  "rungs": {
+    "predict": "HIT",
+    "perturb": "HIT",
+    "produce": "HIT",
+    "transfer": "HIT"
+  },
+  "pending": [],
+  "state": "PASSED",
+  "hop_budget": 2,
+  "opened_at": "2026-08-12T15:59:54",
+  "closed_at": "2026-08-13T01:05:27"
+}

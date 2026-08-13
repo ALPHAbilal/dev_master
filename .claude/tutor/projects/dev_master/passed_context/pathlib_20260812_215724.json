@@ -1,0 +1,23 @@
+{
+  "id": 3,
+  "project_id": "dev_master",
+  "slug": "pathlib",
+  "depth": 2,
+  "parent_id": 2,
+  "why": "found while teaching ledger — p.exists() / read_text()",
+  "anchor_file": "soufiane_prompts/prompts/run_prompts.py",
+  "anchor_lo": 469,
+  "anchor_hi": 486,
+  "resume_q": "What is this ledger for — what does the code do differently the second time it runs?",
+  "rungs": {
+    "predict": "HIT",
+    "perturb": "HIT",
+    "produce": "HIT",
+    "transfer": "HIT"
+  },
+  "pending": [],
+  "state": "PASSED",
+  "hop_budget": 1,
+  "opened_at": "2026-08-12T15:59:54",
+  "closed_at": "2026-08-12T21:57:24"
+}
