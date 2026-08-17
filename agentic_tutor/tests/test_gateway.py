@@ -105,7 +105,7 @@ def test_full_slice_trace_reaches_built():
     dispatch(db, "L", "record_probe",
              {"concept_slug": "enumerate-index", "kind": "produce",
               "result": "HIT", "pushes": 1, "self_corrected": True})
-    dispatch(db, "L", "promote_vocab", {"term": "enumerate", "status": "proved"})
+    dispatch(db, "L", "promote_vocab", {"term": "enumerate", "state": "proved"})
     dispatch(db, "L", "store_mapping",
              {"concept_slug": "enumerate-index",
               "trigger": "looping and I also need the position",
@@ -212,3 +212,63 @@ def test_check_false_still_commits():
                  {"slug": "s1", "title": "t", "target_file": "app.py"})
     assert d.committed is True
     assert db.one("SELECT 1 FROM slices WHERE slug='s1'")
+
+
+# --------------------------------------------------------------------------
+# Protocol disclosure. A live M/SURVEY made ZERO describe calls and ZERO menu
+# calls: it tried db(op="help"/"menu"/"describe"), got "no such operation", then
+# guessed argument names for 77 calls (36% refused). Discovery is not disclosure.
+# --------------------------------------------------------------------------
+def test_the_tool_description_states_all_three_steps():
+    import inspect
+    from tutor import gateway
+    src = inspect.getsource(gateway.make_db_tool)
+    for must in ("STEP 1", "STEP 2", "STEP 3", "completely empty call",
+                 "never guess argument names"):
+        assert must in src, f"the tool description must say: {must}"
+
+
+def test_a_refusal_hands_back_the_schema():
+    """One refusal must teach everything — batched calls never see the second one."""
+    db = DB()
+    dispatch(db, "M", "upsert_slice", {"slug": "s1", "title": "t", "target_file": "a.py"})
+    d = dispatch(db, "M", "upsert_concept", {"name": "x"})      # missing slug
+    assert "REFUSED" in d.text
+    assert "args:" in d.text and "slug: str (required)" in d.text
+    assert "nothing was written" in d.text
+    assert d.committed is False
+
+
+def test_a_wrong_arg_name_is_corrected_by_name():
+    db = DB()
+    d = dispatch(db, "M", "upsert_concept",
+                 {"slug": "c1", "name": "c", "status": "LOCKED"})   # status != state
+    assert "unknown arg: status" in d.text
+    assert "did you mean 'state'" in d.text
+    assert "state: str" in d.text
+
+
+def test_vocab_uses_state_like_every_other_table():
+    """The status/state split was ours; it cost 12 refusals in one run."""
+    db = DB()
+    cols = {r["name"] for r in db.query("PRAGMA table_info(vocab)")}
+    assert "state" in cols and "status" not in cols
+    d = dispatch(db, "L", "promote_vocab", {"term": "enumerate", "state": "hold"})
+    assert d.committed
+    assert db.one("SELECT state FROM vocab WHERE term='enumerate'")["state"] == "hold"
+
+
+def test_an_old_database_is_migrated_not_broken():
+    import sqlite3, tempfile
+    from pathlib import Path
+    p = Path(tempfile.mkdtemp()) / "old.db"
+    con = sqlite3.connect(p)
+    con.execute("CREATE TABLE vocab (term TEXT PRIMARY KEY, status TEXT NOT NULL "
+                "DEFAULT 'unknown', updated_at TEXT NOT NULL DEFAULT (datetime('now')))")
+    con.execute("INSERT INTO vocab(term,status) VALUES('enumerate','hold')")
+    con.commit(); con.close()
+
+    db = DB(str(p))                                   # opening must migrate it
+    cols = {r["name"] for r in db.query("PRAGMA table_info(vocab)")}
+    assert "state" in cols and "status" not in cols
+    assert db.one("SELECT state FROM vocab WHERE term='enumerate'")["state"] == "hold"

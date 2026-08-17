@@ -28,7 +28,20 @@ class DB:
 
     def _init_schema(self) -> None:
         self.conn.executescript(SCHEMA_PATH.read_text())
+        self._migrate()
         self.conn.commit()
+
+    def _migrate(self) -> None:
+        """In-place fixes for databases created by an older schema.
+
+        vocab.status -> vocab.state: the mismatch between `vocab.status` and
+        `concepts.state`/`slices.state` made an agent guess wrong twelve times in one
+        run. CREATE TABLE IF NOT EXISTS leaves an existing table alone, so a DB from
+        before the rename still has the old column and must be carried over.
+        """
+        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(vocab)")}
+        if "status" in cols and "state" not in cols:
+            self.conn.execute("ALTER TABLE vocab RENAME COLUMN status TO state")
 
     # --- tiny query helpers -------------------------------------------------
     def query(self, sql: str, params: tuple = ()) -> list[dict]:

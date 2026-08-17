@@ -87,8 +87,8 @@ CREATE TABLE IF NOT EXISTS mappings (
 -- The door: every term shown. A question may not use an unshown/held term.
 CREATE TABLE IF NOT EXISTS vocab (
     term       TEXT PRIMARY KEY,
-    status     TEXT NOT NULL DEFAULT 'unknown'
-                   CHECK (status IN ('unknown','hold','shown','proved')),
+    state      TEXT NOT NULL DEFAULT 'unknown'
+                   CHECK (state IN ('unknown','hold','shown','proved')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

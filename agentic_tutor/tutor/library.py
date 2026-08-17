@@ -32,12 +32,12 @@ def seed_vocab(db: DB, frontier: Frontier) -> list[str]:
     seeded: list[str] = []
     for term, status in ([(t, "shown") for t in gap.get("vocab_ok", [])]
                          + [(t, "hold") for t in gap.get("vocab_hold", [])]):
-        row = db.one("SELECT status FROM vocab WHERE term=?", (term,))
-        if row and _RANK[row["status"]] >= _RANK[status]:
+        row = db.one("SELECT state FROM vocab WHERE term=?", (term,))
+        if row and _RANK[row["state"]] >= _RANK[status]:
             continue
         db.execute(
-            "INSERT INTO vocab(term,status) VALUES(?,?) "
-            "ON CONFLICT(term) DO UPDATE SET status=excluded.status, "
+            "INSERT INTO vocab(term,state) VALUES(?,?) "
+            "ON CONFLICT(term) DO UPDATE SET state=excluded.state, "
             "updated_at=datetime('now')",
             (term, status))
         seeded.append(term)

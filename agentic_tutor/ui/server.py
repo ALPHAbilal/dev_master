@@ -52,11 +52,21 @@ class App:
         return Path(self.db.meta_get("library_root", "library"))
 
     def frontier_empty(self) -> bool:
-        """The wakeup signal (Part C): no frontier file = M/PLAN owes a turn.
+        """The wakeup signal (Part C): no usable frontier = M/PLAN owes a turn.
 
-        The FILE is the fact, not a flag we keep — the same rule the design gives.
+        The FILE is the fact, not a flag we keep — the same rule the design gives. But a
+        frontier naming a slice that no longer exists is not a lesson, it is debris: it
+        once made the interface announce "L waiting for you" over a spine that had never
+        been planned. A frontier counts only if its slice is still on the spine.
         """
-        return not (self.library / "frontier.json").exists()
+        f = self.library / "frontier.json"
+        if not f.exists():
+            return True
+        try:
+            slug = json.loads(f.read_text())["slice"]["slug"]
+        except (ValueError, KeyError, TypeError, OSError):
+            return True
+        return self.db.one("SELECT 1 FROM slices WHERE slug=?", (slug,)) is None
 
     def snapshot(self) -> dict:
         snap = state.snapshot(self.db, self.frontier_empty(), self.running)
@@ -173,7 +183,8 @@ def _survey(app: App) -> Response:
         cleared = runs.reset_spine(app.db)
         app.emit(Event("handoff",
                        f"Previous spine archived to runs/{saved.name} "
-                       f"({cleared['slices']} slices, {cleared['concepts']} concepts) "
+                       f"({cleared['slices']} slices, {cleared['concepts']} concepts, "
+                       f"{cleared['specs']} specs, {cleared['frontier']} frontier) "
                        f"and cleared. Starting a fresh survey.", "system"))
 
     from .survey import run_survey_sync

@@ -67,8 +67,16 @@ def dispatch(db: DB, role: str, op: str | None = None, args: dict | None = None,
                      f"accepted: {clean}\nCall again without check to commit.")
         result = operation.run(db, clean)
     except OpError as e:
-        # refusal: nothing committed, no receipt persists
-        return Disclosure(text=f"REFUSED: {e}")
+        # Refusal: nothing committed, no receipt persists.
+        #
+        # Hand back the schema WITH the complaint. An agent that batches calls fires all
+        # of them before the first answer returns, so a bare "unknown arg: status" gets
+        # repeated once per call in flight — a live run hit the same two mistakes 12
+        # times each. A refusal that carries step 2's schema is self-correcting: the
+        # first answer to arrive is already complete.
+        return Disclosure(text=f"REFUSED: {e}\n\n{operation.describe()}"
+                               f"\n(nothing was written; fix the arguments and retry, "
+                               f"or add check=true to validate without writing)")
     return Disclosure(text=result.text, receipt=result.receipt, committed=True)
 
 
@@ -89,8 +97,23 @@ def make_db_tool(db: DB, role: str, on_commit=None):
             "make_db_tool() needs the SDK. `pip install claude-agent-sdk`."
         ) from e
 
-    @tool("db", "Interact with tutor state. Call with no args to see what you can do. "
-                "Pass check=true to validate a call without writing anything.",
+    # The description IS the protocol disclosure. It must be here, not in an agent's
+    # prompt: it travels with the tool to every agent automatically, and G3 says a rule
+    # an agent needs every turn belongs to a tool constraint, never to prose.
+    #
+    # The old wording — "call with no args to see what you can do" — was read as "omit
+    # the `args` field", so a live run sent {"op":"help"}, {"op":"menu"} and
+    # {"op":"describe"}, got "no such operation" three times, then gave up and guessed
+    # argument names for 77 calls (36% refused). Discovery is not disclosure. Spell it out.
+    @tool("db",
+          "The ONLY way to read or change tutor state. Use it in three steps.\n"
+          "STEP 1 — send a completely empty call, no fields at all: db()\n"
+          "         It returns the list of operations you may use right now.\n"
+          "STEP 2 — send ONLY an operation name: db(op=\"upsert_concept\")\n"
+          "         It returns that operation's EXACT argument schema. Never skip this "
+          "and never guess argument names — guessed names are refused.\n"
+          "STEP 3 — send the operation with its arguments to commit: db(op=..., args={...})\n"
+          "Add check=true at step 3 to validate your arguments and write nothing.",
           {"op": str, "args": dict, "check": bool})
     async def _db(a: dict):
         d = dispatch(db, role, op=a.get("op"), args=a.get("args"),

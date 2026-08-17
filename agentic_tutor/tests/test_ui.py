@@ -328,7 +328,7 @@ def test_archive_snapshots_and_reset_clears_only_the_map():
     saved = runs.archive(app.db, "claude-haiku-4-5")
     assert saved.exists()
     cleared = runs.reset_spine(app.db)
-    assert cleared == {"slices": 1, "concepts": 1, "gates": 0}
+    assert cleared == {"slices": 1, "concepts": 1, "gates": 0, "specs": 0, "frontier": 0}
     assert app.db.one("SELECT 1 FROM slices") is None
     assert session.is_adopted(app.db)                       # target survives
     assert app.db.one("SELECT 1 FROM probes")               # evidence survives

@@ -15,15 +15,15 @@ def test_seed_vocab_plants_frontier_lists():
     db = DB()
     seeded = seed_vocab(db, load(FIX))
     assert "enumerate" in seeded
-    assert db.one("SELECT status FROM vocab WHERE term='enumerate'")["status"] == "hold"
-    assert db.one("SELECT status FROM vocab WHERE term='index'")["status"] == "shown"
+    assert db.one("SELECT state FROM vocab WHERE term='enumerate'")["state"] == "hold"
+    assert db.one("SELECT state FROM vocab WHERE term='index'")["state"] == "shown"
 
 
 def test_seed_vocab_never_downgrades():
     db = DB()
-    dispatch(db, "L", "promote_vocab", {"term": "enumerate", "status": "proved"})
+    dispatch(db, "L", "promote_vocab", {"term": "enumerate", "state": "proved"})
     seed_vocab(db, load(FIX))                  # fixture holds 'enumerate' at hold
-    assert db.one("SELECT status FROM vocab WHERE term='enumerate'")["status"] == "proved"
+    assert db.one("SELECT state FROM vocab WHERE term='enumerate'")["state"] == "proved"
 
 
 def test_render_target_md_reflects_spine():

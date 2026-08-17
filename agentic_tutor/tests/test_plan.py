@@ -105,10 +105,13 @@ def test_write_frontier_refuses_the_empty_template():
     assert "REFUSED" in d.text
 
 
-def test_write_frontier_is_not_even_offered_before_any_spec_exists():
+def test_write_frontier_is_offered_but_refuses_without_the_spec():
+    """Offered from the moment a spine exists — hiding it stalled a real M/PLAN turn —
+    but it still refuses to publish a slice whose spec was never written."""
     db = _spined()
+    assert "write_frontier" in dispatch(db, "M").text
     d = dispatch(db, "M", "write_frontier", {"frontier": json.loads(FIX.read_text())})
-    assert not d.committed and "not applicable" in d.text
+    assert not d.committed and "spec" in d.text
 
 
 def test_write_frontier_refuses_a_slice_whose_own_spec_is_unwritten():
@@ -139,11 +142,10 @@ def test_new_ops_are_M_only_and_state_gated():
                           for l in dispatch(db, role).text.splitlines() if "—" in l}
     assert "write_spec" not in names("M")       # no spine yet
     assert "write_spec" not in names("L")       # never L's
+    assert "write_frontier" not in names("M")   # no spine at all yet
     dispatch(db, "M", "upsert_slice", {"slug": "s1", "title": "t", "target_file": "a.py"})
-    assert "write_spec" in names("M")
-    assert "write_frontier" not in names("M")   # no spec written yet
-    dispatch(db, "M", "write_spec", {"slice_slug": "s1", "body": SPEC})
-    assert "write_frontier" in names("M")
+    # both acts of a plan turn appear together, before either has run
+    assert "write_spec" in names("M") and "write_frontier" in names("M")
     assert "write_spec" not in names("L") and "write_frontier" not in names("L")
 
 
@@ -227,3 +229,105 @@ def test_the_frontier_file_decides_who_is_awake():
 
     assert app.frontier_empty() is False
     assert app.snapshot()["active"]["agent"] == "L"     # L now has something to teach
+
+
+# --------------------------------------------------------------------------
+# stale frontier — a re-survey left frontier.json behind, so the UI announced
+# "L waiting for you" over a spine that had never been planned.
+# --------------------------------------------------------------------------
+def _file_app():
+    from ui.server import App
+    d = Path(tempfile.mkdtemp())
+    app = App(DB(str(d / "session.db")), str(d / "ws"))
+    dispatch(app.db, "M", "set_target", {"codebase_path": "/repo"})
+    return app
+
+
+def _plan_a_slice(app, slug="s1"):
+    dispatch(app.db, "M", "upsert_slice",
+             {"slug": slug, "title": "t", "target_file": "a.py", "ordinal": 1})
+    dispatch(app.db, "M", "write_spec", {"slice_slug": slug, "body": SPEC})
+    raw = json.loads(FIX.read_text())
+    raw["slice"]["slug"] = slug
+    dispatch(app.db, "M", "write_frontier", {"frontier": raw})
+
+
+def test_resurvey_clears_the_frontier_and_the_specs():
+    from ui import runs
+    app = _file_app()
+    _plan_a_slice(app)
+    assert app.frontier_empty() is False
+
+    runs.archive(app.db, "m")
+    cleared = runs.reset_spine(app.db)
+    assert cleared["frontier"] == 1 and cleared["specs"] == 1
+    assert not (app.library / "frontier.json").exists()
+    assert list((app.library / "slices").glob("*.md")) == []
+    assert app.frontier_empty() is True
+
+
+def test_the_archive_keeps_the_specs_and_frontier_too():
+    from ui import runs
+    app = _file_app()
+    _plan_a_slice(app)
+    saved = runs.archive(app.db, "m")
+    lib = saved.with_name(saved.stem + "-library")
+    assert (lib / "frontier.json").exists()
+    assert (lib / "slices" / "s1.md").exists()
+
+
+def test_a_frontier_naming_a_missing_slice_counts_as_empty():
+    """Defence in depth: debris must never be mistaken for a lesson."""
+    app = _file_app()
+    _plan_a_slice(app, "gone")
+    app.db.execute("DELETE FROM slices WHERE slug='gone'")     # spine replaced under it
+    assert (app.library / "frontier.json").exists()
+    assert app.frontier_empty() is True
+    dispatch(app.db, "M", "upsert_slice",
+             {"slug": "fresh", "title": "t", "target_file": "b.py", "ordinal": 1})
+    assert app.snapshot()["active"]["agent"] == "M/PLAN"
+
+
+def test_a_corrupt_frontier_counts_as_empty():
+    app = _file_app()
+    _plan_a_slice(app)
+    (app.library / "frontier.json").write_text("{not json")
+    assert app.frontier_empty() is True
+
+
+# --------------------------------------------------------------------------
+# menu snapshot vs. same-turn state. M/PLAN reads the menu once, at the start of
+# a turn whose first act creates the precondition for its second act. Gating on
+# that precondition made write_frontier invisible and the turn stalled.
+# --------------------------------------------------------------------------
+def test_write_frontier_is_on_the_menu_before_any_spec_is_written():
+    db = _db()
+    dispatch(db, "M", "upsert_slice",
+             {"slug": "s1", "title": "t", "target_file": "a.py", "ordinal": 1})
+    menu = dispatch(db, "M").text
+    assert "write_spec" in menu
+    assert "write_frontier" in menu, \
+        "both acts of an M/PLAN turn must be visible in the menu it reads first"
+
+
+def test_write_frontier_still_refuses_when_that_slice_has_no_spec():
+    """Visibility is not permission — the real check runs at call time."""
+    db = _db()
+    dispatch(db, "M", "upsert_slice",
+             {"slug": "s1", "title": "t", "target_file": "a.py", "ordinal": 1})
+    raw = json.loads(FIX.read_text())
+    raw["slice"]["slug"] = "s1"
+    d = dispatch(db, "M", "write_frontier", {"frontier": raw})
+    assert "REFUSED" in d.text and "spec" in d.text
+    assert not (Path(db.meta_get("library_root")) / "frontier.json").exists()
+
+
+def test_both_acts_of_a_plan_turn_work_in_sequence():
+    db = _db()
+    dispatch(db, "M", "upsert_slice",
+             {"slug": "s1", "title": "t", "target_file": "a.py", "ordinal": 1})
+    assert "write_frontier" in dispatch(db, "M").text          # menu read once, up front
+    assert dispatch(db, "M", "write_spec",
+                    {"slice_slug": "s1", "body": SPEC}).committed
+    raw = json.loads(FIX.read_text()); raw["slice"]["slug"] = "s1"
+    assert dispatch(db, "M", "write_frontier", {"frontier": raw}).committed

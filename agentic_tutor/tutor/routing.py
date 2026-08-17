@@ -144,7 +144,7 @@ def _concept_owned(db: DB, slug: str) -> bool:
 
 
 def _terms_by_status(db: DB, statuses: tuple[str, ...]) -> list[str]:
-    q = "SELECT term FROM vocab WHERE status IN (%s) ORDER BY term" % ",".join("?" * len(statuses))
+    q = "SELECT term FROM vocab WHERE state IN (%s) ORDER BY term" % ",".join("?" * len(statuses))
     return [r["term"] for r in db.query(q, statuses)]
 
 

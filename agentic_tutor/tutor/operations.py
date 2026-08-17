@@ -61,6 +61,13 @@ _COERCE = {
 }
 
 
+def _did_you_mean(bad: str, schema: dict[str, str]) -> str:
+    """Name the closest real field. `status` -> `state` was 12 refusals in one run."""
+    import difflib
+    near = difflib.get_close_matches(bad, list(schema), n=1, cutoff=0.6)
+    return f" — did you mean '{near[0]}'?" if near else ""
+
+
 def validate(op: Operation, args: dict) -> dict:
     for r in op.required:
         if r not in args or args[r] in (None, ""):
@@ -68,7 +75,7 @@ def validate(op: Operation, args: dict) -> dict:
     clean: dict = {}
     for fld, val in args.items():
         if fld not in op.schema:
-            raise OpError(f"unknown arg: {fld}")
+            raise OpError(f"unknown arg: {fld}{_did_you_mean(fld, op.schema)}")
         try:
             clean[fld] = _COERCE[op.schema[fld]](val)
         except (ValueError, TypeError, json.JSONDecodeError) as e:
@@ -104,13 +111,13 @@ def _record_probe(db: DB, a: dict) -> OpResult:
 
 def _promote_vocab(db: DB, a: dict) -> OpResult:
     db.execute(
-        "INSERT INTO vocab(term,status) VALUES(?,?) "
-        "ON CONFLICT(term) DO UPDATE SET status=excluded.status, updated_at=datetime('now')",
-        (a["term"], a["status"]),
+        "INSERT INTO vocab(term,state) VALUES(?,?) "
+        "ON CONFLICT(term) DO UPDATE SET state=excluded.state, updated_at=datetime('now')",
+        (a["term"], a["state"]),
     )
-    conseq = (f"'{a['term']}' is now speakable." if a["status"] in ("shown", "proved")
+    conseq = (f"'{a['term']}' is now speakable." if a["state"] in ("shown", "proved")
               else f"'{a['term']}' is HELD — probe the behavior before using the word.")
-    return OpResult(text=f"OK. {conseq}", receipt=f"vocab: {a['term']}={a['status']}")
+    return OpResult(text=f"OK. {conseq}", receipt=f"vocab: {a['term']}={a['state']}")
 
 
 def _store_mapping(db: DB, a: dict) -> OpResult:
@@ -394,8 +401,8 @@ REGISTRY: dict[str, Operation] = {op.name: op for op in [
                "self_corrected": "bool", "error_class": "str", "reveals": "str",
                "terms": "str", "note": "str"},
               _record_probe, required=("kind", "result")),
-    Operation("promote_vocab", "L", "set a term's status (hold/shown/proved)",
-              {"term": "str", "status": "str"}, _promote_vocab, required=("term", "status")),
+    Operation("promote_vocab", "L", "set a term's state (hold/shown/proved)",
+              {"term": "str", "state": "str"}, _promote_vocab, required=("term", "state")),
     Operation("store_mapping", "L", "deposit an intuition mapping (trigger+solution+why)",
               {"concept_slug": "str", "polarity": "str", "trigger": "str",
                "solution": "str", "why": "str", "provenance": "str"},
@@ -437,10 +444,15 @@ REGISTRY: dict[str, Operation] = {op.name: op for op in [
               {"slice_slug": "str", "body": "str"}, _write_spec,
               required=("slice_slug", "body"),
               available=lambda db: db.one("SELECT 1 FROM slices LIMIT 1") is not None),
+    # Availability must NEVER depend on state this same turn creates. Gating this on
+    # "some slice has a spec_path" hid it from the menu M/PLAN reads at the START of a
+    # turn whose first act is writing that very spec — so M/PLAN wrote the spec, could
+    # not find write_frontier, and stopped to ask what to do. The op still refuses a
+    # slice whose spec is unwritten; that check belongs inside, where it is read at
+    # call time, not in a menu snapshot taken before the turn began.
     Operation("write_frontier", "M", "publish the filled frontier for L (rejects any empty key)",
               {"frontier": "json"}, _write_frontier, required=("frontier",),
-              available=lambda db: db.one(
-                  "SELECT 1 FROM slices WHERE spec_path IS NOT NULL LIMIT 1") is not None),
+              available=lambda db: db.one("SELECT 1 FROM slices LIMIT 1") is not None),
     # --- reads (both) ---
     Operation("list_ready_slices", "both", "list slices ready to gate",
               {}, _list_ready_slices),

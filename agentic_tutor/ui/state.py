@@ -126,12 +126,12 @@ def concepts(db: DB) -> list[dict]:
 
 
 def vocab(db: DB) -> dict:
-    rows = db.query("SELECT term,status FROM vocab ORDER BY term")
+    rows = db.query("SELECT term,state FROM vocab ORDER BY term")
     out: dict[str, list[str]] = {"ok": [], "hold": []}
     for r in rows:
-        if r["status"] in ("shown", "proved"):
+        if r["state"] in ("shown", "proved"):
             out["ok"].append(r["term"])
-        elif r["status"] == "hold":
+        elif r["state"] == "hold":
             out["hold"].append(r["term"])
     return out
 
