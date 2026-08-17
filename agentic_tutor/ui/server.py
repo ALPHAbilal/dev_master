@@ -21,6 +21,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
+from tutor import frontier
 from tutor.db import DB
 from . import runs, session, state
 from .runner import Event, Runner, ScriptedRunner, default_script
@@ -42,7 +43,7 @@ class App:
 
     def __post_init__(self):
         if self.runner is None:
-            self.runner = ScriptedRunner(self.db, default_script())
+            self.runner = _pick_runner(self)
         # where specs + frontier.json live for this session; the ops read it from meta
         if self.db.path != ":memory:":
             self.db.meta_set("library_root", str(Path(self.db.path).resolve().parent / "library"))
@@ -68,8 +69,25 @@ class App:
             return True
         return self.db.one("SELECT 1 FROM slices WHERE slug=?", (slug,)) is None
 
+    def frontier_data(self) -> dict | None:
+        """The published frontier, raw. None when there is none, or it is unusable.
+
+        Reading it here and not in `state` is the same split `frontier_empty` already
+        obeys: the App knows where the library lives, `state` stays pure and testable
+        with a dict. A frontier that fails the schema is reported as absent — the UI
+        must never render a half-filled handoff as if L could teach from it.
+        """
+        f = self.library / "frontier.json"
+        if not f.exists():
+            return None
+        try:
+            return frontier.load(f).data
+        except (frontier.FrontierError, ValueError, OSError):
+            return None
+
     def snapshot(self) -> dict:
-        snap = state.snapshot(self.db, self.frontier_empty(), self.running)
+        snap = state.snapshot(self.db, self.frontier_empty(), self.running,
+                              self.frontier_data())
         snap["transcript"] = self.transcript
         snap["runner"] = self.runner.name
         snap["model"] = self.model or _default_model()
@@ -85,6 +103,21 @@ class App:
         `trace`.
         """
         self.transcript.append(ev.as_dict())
+
+
+def _pick_runner(app: App):
+    """The live L runner when the SDK is installed; the script otherwise.
+
+    Never silent: which one is active is in every snapshot (`runner`), and the page
+    prints it in the composer footer. Tests pass a runner explicitly, so this choice
+    only governs a real `python -m ui` launch.
+    """
+    try:
+        import claude_agent_sdk                                # noqa: F401
+    except ImportError:
+        return ScriptedRunner(app.db, default_script())
+    from .runner import SdkRunner
+    return SdkRunner(app.db, model=app.model, trace=app.trace, emit=app.emit)
 
 
 def _default_model() -> str:
@@ -218,7 +251,23 @@ def _say(app: App, payload: dict) -> Response:
         return Response(400, {"error": "say something first"})
     if not session.is_adopted(app.db):
         return Response(409, {"error": "adopt a codebase before starting"})
+    if app.running:
+        return Response(409, {"error": f"{app.running} is already running"})
     app.transcript.append({"kind": "learner", "text": text, "agent": "you"})
+
+    # A live L turn runs like the M turns: background thread, `running` set, events
+    # streamed straight into the transcript by the runner's emit sink while the page
+    # polls. The scripted runner has no sink and stays synchronous.
+    if getattr(app.runner, "emit", None):
+        def work():
+            try:
+                app.runner.turn(text)
+            finally:
+                app.running = None
+        app.running = "L"
+        threading.Thread(target=work, daemon=True).start()
+        return Response(200, {"started": True, "state": app.snapshot()})
+
     for ev in app.runner.turn(text):
         app.transcript.append(ev.as_dict())
     return Response(200, {"state": app.snapshot()})

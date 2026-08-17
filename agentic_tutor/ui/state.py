@@ -89,17 +89,59 @@ def _has_spine(db: DB) -> bool:
     return db.one("SELECT 1 FROM slices LIMIT 1") is not None
 
 
-def snapshot(db: DB, frontier_empty: bool = True, running: str | None = None) -> dict:
+def snapshot(db: DB, frontier_empty: bool = True, running: str | None = None,
+             frontier_raw: dict | None = None) -> dict:
     return {
         "adopted": session.is_adopted(db),
         "root": session.current_root(db),
         "active": who_is_active(db, frontier_empty, running),
+        "frontier": frontier(frontier_raw),
         "spine": spine(db),
         "concepts": concepts(db),
         "vocab": vocab(db),
         "gate": open_gate(db),
         "evidence": recent_probes(db),
         "files": session.file_tree(db),
+    }
+
+
+def frontier(raw: dict | None) -> dict | None:
+    """The published handoff, shaped for the page. Pure — the App reads the file.
+
+    Split in two, and nothing is withheld — both halves ship:
+
+      `now`  the glance view: which slice L is teaching, into which file, which
+             concept is open. Small enough for the sidebar.
+      `full` the raw file, byte for byte, rendered in the Inspector. This is the
+             tracing view: it carries `opening_question`, `simplify_ladder`,
+             `worth_failing_at` and `just_tell`, so what L was handed can be read
+             against what L actually did. The sidebar is a summary of it, not a
+             redaction of it — a full frontier in a 20rem column is unreadable.
+
+    None means no usable frontier: L has nothing to teach and M/PLAN owes a turn.
+    """
+    if not raw:
+        return None
+    sl = raw.get("slice") or {}
+    gap = raw.get("gap") or None
+    sub = raw.get("subhole") or {}
+    return {
+        "now": {
+            "slug": sl.get("slug", ""),
+            "title": sl.get("title") or sl.get("slug", ""),
+            "target_file": sl.get("target_file", ""),
+            "why": sl.get("why_this_slice", ""),
+            "prereqs": sl.get("concept_prereqs") or [],
+            # the concept under the microscope; None = skip-gap slice, every prereq owned
+            "concept": (gap or {}).get("concept") or None,
+            "road": (gap or {}).get("road") or "",
+            "done_when": (gap or {}).get("done_when") or "",
+            "vocab_ok": (gap or {}).get("vocab_ok") or [],
+            "vocab_hold": (gap or {}).get("vocab_hold") or [],
+            "subhole": sub.get("concept") or None,
+            "skip_gap": gap is None,
+        },
+        "full": raw,
     }
 
 

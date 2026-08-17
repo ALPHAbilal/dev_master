@@ -459,7 +459,72 @@ def test_survey_prompt_points_the_agent_at_the_adopted_root():
     assert str(Path(root).resolve()) in system
 
 
-def test_sdk_runner_says_it_is_not_built_rather_than_pretending():
+def test_sdk_runner_refuses_to_teach_without_a_frontier():
+    """No handoff = L has nothing to teach. The error names whose turn it is."""
     from ui.runner import SdkRunner
-    ev = SdkRunner(DB()).turn("hello")
-    assert ev[0].kind == "error" and "not built yet" in ev[0].text
+    db = DB()
+    db.meta_set("library_root", tempfile.mkdtemp())
+    ev = SdkRunner(db).turn("hello")
+    assert ev[0].kind == "error" and "M/PLAN" in ev[0].text
+    assert SdkRunner(db).frontier_empty() is True
+
+
+# --------------------------------------------------------------------------
+# the frontier panel — the file M publishes, rendered for the page
+# --------------------------------------------------------------------------
+_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "frontier_pinned_qa.json"
+
+
+def test_snapshot_reports_no_frontier_before_one_is_published():
+    assert state.snapshot(DB())["frontier"] is None
+
+
+def test_frontier_panel_summarises_the_slice_and_keeps_the_file_whole():
+    raw = json.loads(_FIXTURE.read_text())
+    f = state.frontier(raw)
+    assert f["now"]["slug"] == "pinned-qa-group"
+    assert f["now"]["target_file"] == "soufiane_prompts/prompts/run_prompts.py"
+    assert f["now"]["concept"] == "enumerate-index"
+    assert f["now"]["road"] == "intuition-train"
+    assert f["now"]["skip_gap"] is False
+    assert f["now"]["vocab_hold"] == ["enumerate"]
+    assert "enumerate-index" in f["now"]["prereqs"]
+    # the tracing half is the file itself, unedited
+    assert f["full"] == raw
+    assert f["full"]["gap"]["just_tell"] == raw["gap"]["just_tell"]
+
+
+def test_frontier_panel_reports_a_skip_gap_slice_instead_of_a_blank_concept():
+    raw = json.loads(_FIXTURE.read_text())
+    raw.pop("gap")
+    f = state.frontier(raw)
+    assert f["now"]["skip_gap"] is True
+    assert f["now"]["concept"] is None
+
+
+def test_app_publishes_the_frontier_through_the_snapshot():
+    db, root = DB(), _codebase()
+    session.adopt_folder(db, root)
+    app = App(db, tempfile.mkdtemp())
+    lib = Path(tempfile.mkdtemp())
+    db.meta_set("library_root", str(lib))
+    assert app.snapshot()["frontier"] is None          # nothing published yet
+
+    (lib / "frontier.json").write_text(_FIXTURE.read_text())
+    assert app.snapshot()["frontier"]["now"]["slug"] == "pinned-qa-group"
+
+
+def test_a_frontier_that_fails_the_schema_is_reported_as_absent():
+    """A half-filled handoff is not a lesson. The panel must not render it as one."""
+    db = DB()
+    app = App(db, tempfile.mkdtemp())
+    lib = Path(tempfile.mkdtemp())
+    db.meta_set("library_root", str(lib))
+    raw = json.loads(_FIXTURE.read_text())
+    raw["slice"]["target_file"] = ""                   # the schema refuses this
+    (lib / "frontier.json").write_text(json.dumps(raw))
+    assert app.frontier_data() is None
+    assert app.snapshot()["frontier"] is None
+
+    (lib / "frontier.json").write_text("{not json")
+    assert app.frontier_data() is None

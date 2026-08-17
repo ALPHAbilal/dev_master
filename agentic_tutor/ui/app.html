@@ -155,6 +155,12 @@ body{
 .pill.yours{color:var(--gate); background:var(--gate-bg); border:1px solid currentColor}
 
 /* ---------- concepts ---------- */
+.kv{margin:0; padding:0; list-style:none}
+.kv li{display:flex; gap:.6rem; padding:.3rem 0; font-size:.82rem; line-height:1.55}
+.kv li + li{border-top:1px solid var(--rule2)}
+.kv .k{flex:0 0 6.2rem; font:500 .72rem/1.9 var(--mono); color:var(--ink3);
+       text-transform:uppercase; letter-spacing:.05em}
+.kv .v{flex:1; min-width:0; color:var(--ink2); word-break:break-word}
 .grp{padding:.75rem 1rem}
 .grp + .grp{border-top:1px solid var(--rule2)}
 .grp h3{
@@ -410,6 +416,7 @@ function render(){
       ${composer(a)}
     </main>
     <aside>
+      ${frontierCard()}
       ${gateCard()}
       ${spineCard()}
       ${runsCard()}
@@ -437,11 +444,39 @@ async function loadTrace(){
 
 function inspector(){
   if(!T) return '<p class="none">Loading the record…</p>';
-  if(!T.length) return `<div class="blocked"><b>No agent turns recorded yet</b>
+  const head = frontierPanel();
+  if(!T.length) return head + `<div class="blocked"><b>No agent turns recorded yet</b>
     <p>Run the survey or plan a slice, then come back. Every turn is kept here in
     full: the exact instructions it was given, every tool call with its arguments,
     every result, and what it committed.</p></div>`;
-  return T.map((t,i) => turnCard(t,i)).join('');
+  return head + T.map((t,i) => turnCard(t,i)).join('');
+}
+
+/* The frontier verbatim — the operator view. This is the file M wrote and L teaches
+   from, so it is shown unedited, including the parts the learner must not read. */
+function frontierPanel(){
+  const f = S.frontier;
+  const open = openTurns['frontier'] ? ' open' : '';
+  if(!f) return `<details class="trn" data-i="frontier"${open}>
+    <summary><span class="nm">frontier</span>
+      <span class="mdl">library/frontier.json</span>
+      <span class="tally">not published</span></summary>
+    <div class="body2"><p class="none">M/PLAN has not published a usable frontier.
+      A file that fails the schema counts as absent — L would have nothing to teach
+      from either way.</p></div></details>`;
+  const n = f.now;
+  return `<details class="trn" data-i="frontier"${open}>
+    <summary>
+      <span class="nm">frontier</span>
+      <span class="mdl">${esc(n.slug)}</span>
+      <span class="mdl">${esc(n.target_file)}</span>
+      <span class="tally">${esc(n.skip_gap ? 'skip-gap' : 'gap: '+n.concept)}</span>
+    </summary>
+    <div class="body2">
+      <div class="sec"><h4>Published handoff — verbatim, as M wrote it</h4>
+        <pre>${esc(JSON.stringify(f.full, null, 2))}</pre>
+        <button class="expand" data-x>Expand / collapse</button></div>
+    </div></details>`;
 }
 
 function turnCard(t, i){
@@ -536,6 +571,34 @@ function conceptCard(){
     <div class="tags">${by[k].map(c=>`<span class="tag ${k}">${esc(c.slug)}</span>`).join('')}</div></div>` : '';
   return card('Concepts', grp('OWNED','Owned')+grp('READY','Ready')+grp('LOCKED','Not yet'),
               S.concepts.length);
+}
+
+/* The frontier at a glance. Reads S.frontier.now only — the whole file is in the
+   Inspector, which is where you trace a handoff against what L did with it. */
+function frontierCard(){
+  const f = S.frontier;
+  if(!f) return card('The frontier',
+    `<p class="none">Nothing published yet — M/PLAN has to write the handoff before
+      L has a lesson.</p>`);
+  const n = f.now;
+  const row = (k,v) => v ? `<li><span class="k">${esc(k)}</span>
+      <span class="v">${esc(v)}</span></li>` : '';
+  const tags = (l,arr,cls) => arr && arr.length
+    ? `<div class="grp"><h3>${l} · ${arr.length}</h3><div class="tags">${
+        arr.map(t=>`<span class="tag ${cls}">${esc(t)}</span>`).join('')}</div></div>` : '';
+  return card('The frontier', `<div class="pad">
+      <div class="ttl" style="font-weight:600">${esc(n.title)}</div>
+      <ul class="kv" style="margin-top:.5rem">
+        ${row('file', n.target_file)}
+        ${row('concept', n.skip_gap ? 'none — every prereq already owned' : n.concept)}
+        ${row('road', n.road)}
+        ${row('done when', n.done_when)}
+        ${row('why', n.why)}
+        ${row('subhole', n.subhole)}
+      </ul></div>
+    ${tags('Prereqs', n.prereqs, '')}
+    ${tags('Ok to use', n.vocab_ok, 'OWNED')}
+    ${tags('Held back', n.vocab_hold, '')}`);
 }
 
 function gateCard(){

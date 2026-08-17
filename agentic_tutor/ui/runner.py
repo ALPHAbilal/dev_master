@@ -70,18 +70,56 @@ class ScriptedRunner(Runner):
 
 @dataclass
 class SdkRunner(Runner):
-    """The real L/M loop. Build order steps 4-6 — not implemented yet."""
+    """The real L turn (build order steps 4+6), behind the same seam as the script.
+
+    Holds ONE ContextManager, bound to the slice the frontier names. A different
+    slug on the next turn means the slice rolled over — the old manager is dropped
+    and a fresh one made. That drop IS the F1 wipe; nothing else clears history.
+    At each fresh start the frontier's vocab lists are seeded (code's job, F3).
+    """
 
     db: DB
+    model: str = ""
+    trace: list | None = None
+    emit: object = None                 # optional streaming sink: Callable[[Event], None]
+    _cm: object = None                  # ContextManager for the CURRENT slice
+    _slug: str | None = None
+
     name = "sdk"
 
     def turn(self, learner_text: str) -> list[Event]:
-        return [Event(
-            "error",
-            "The live agent loop is not built yet (build order steps 4-6: the L runner, "
-            "the M runner, and the orchestrator). The interface is running against the "
-            "scripted runner until then.",
-            "system")]
+        from .lesson import DEFAULT_MODEL, LessonError, load_current_frontier, run_lesson_sync
+
+        out: list[Event] = []
+
+        def sink(ev: Event) -> None:
+            out.append(ev)
+            if self.emit:
+                self.emit(ev)           # stream to the transcript as it happens
+
+        try:
+            frontier = load_current_frontier(self.db)
+        except LessonError as e:
+            sink(Event("error", str(e), "L"))
+            return out
+
+        if self._cm is None or self._slug != frontier.slice_slug:    # F1: new slice, new mind
+            from tutor.context_manager import ContextManager
+            from tutor.library import seed_vocab
+            self._cm, self._slug = ContextManager("L"), frontier.slice_slug
+            seed_vocab(self.db, frontier)
+
+        run_lesson_sync(self.db, self._cm, learner_text, sink,
+                        self.model or DEFAULT_MODEL, self.trace)
+        return out
+
+    def frontier_empty(self) -> bool:
+        from .lesson import LessonError, load_current_frontier
+        try:
+            load_current_frontier(self.db)
+            return False
+        except LessonError:
+            return True
 
 
 def default_script() -> list[list[Event]]:
