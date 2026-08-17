@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 .claude/tutor/tutor.db-shm
 .claude/tutor/tutor.db-wal
+.venv/
+.tutor/

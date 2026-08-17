@@ -77,13 +77,17 @@ def test_close_gap_refused_without_mapping():
 # the full slice trace (sim Turns 0-5)
 # --------------------------------------------------------------------------
 def _seed_slice(db):
-    """M's Turn 0: the concept + the slice that needs it."""
+    """M's Turn 0: the concept + the slice that needs it (spec file written = M/PLAN)."""
+    import tempfile
+    spec = tempfile.NamedTemporaryFile("w", suffix="-spec.md", delete=False)
+    spec.write("# spec\n")
+    spec.close()
     dispatch(db, "M", "upsert_concept",
              {"slug": "enumerate-index", "name": "enumerate", "state": "LOCKED"})
     dispatch(db, "M", "upsert_slice",
              {"slug": "pinned-qa-group", "title": "pinned QA grouping",
               "target_file": "soufiane_prompts/prompts/run_prompts.py",
-              "spec_path": "library/slices/pinned-qa-group.md",
+              "spec_path": spec.name,
               "concept_prereqs": ["enumerate-index"], "ordinal": 1})
 
 
@@ -123,6 +127,34 @@ def test_full_slice_trace_reaches_built():
     assert d.committed and "BUILT" in d.text
     assert db.one("SELECT state FROM slices WHERE slug='pinned-qa-group'")["state"] == "BUILT"
     assert db.one("SELECT state FROM gates WHERE slice_slug='pinned-qa-group'")["state"] == "PASSED"
+
+
+def test_owned_cannot_be_forced():
+    """OWNED is close_gap's alone — set_concept_state is not a side door (H1)."""
+    db = DB()
+    dispatch(db, "M", "upsert_concept", {"slug": "enumerate-index", "name": "enumerate"})
+    d = dispatch(db, "M", "set_concept_state", {"slug": "enumerate-index", "state": "OWNED"})
+    assert not d.committed and "close_gap" in d.text
+    assert db.one("SELECT state FROM concepts WHERE slug='enumerate-index'")["state"] == "LOCKED"
+
+
+def test_slice_state_only_relockable():
+    """READY is computed, BUILT is pass_gate's — set_slice_state may only re-LOCK."""
+    db = DB()
+    _seed_slice(db)
+    for forced in ("READY", "BUILT"):
+        d = dispatch(db, "M", "set_slice_state", {"slug": "pinned-qa-group", "state": forced})
+        assert not d.committed
+    d = dispatch(db, "M", "set_slice_state", {"slug": "pinned-qa-group", "state": "LOCKED"})
+    assert d.committed
+
+
+def test_set_target_registers_codebase():
+    db = DB()
+    d = dispatch(db, "M", "set_target", {"codebase_path": "/repo/soufiane_prompts"})
+    assert d.committed
+    assert db.one("SELECT codebase_path FROM target WHERE id=1")["codebase_path"] == \
+        "/repo/soufiane_prompts"
 
 
 def test_push_cap_consequence():

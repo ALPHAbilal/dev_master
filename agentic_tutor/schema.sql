@@ -4,11 +4,11 @@
 
 PRAGMA foreign_keys = ON;
 
--- The codebase being built + its decomposition into slices. The spine.
+-- The codebase being built. The spine itself lives ONLY in `slices` (ordinal
+-- order) — storing it twice was redundancy; the slices table IS the decomposition.
 CREATE TABLE IF NOT EXISTS target (
     id             INTEGER PRIMARY KEY CHECK (id = 1),   -- single row
     codebase_path  TEXT NOT NULL,
-    decomposition  TEXT,                                 -- JSON: ordered slice plan
     created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -39,16 +39,15 @@ CREATE TABLE IF NOT EXISTS concepts (
     aspect      TEXT,                                    -- lang/stdlib/design/...
     state       TEXT NOT NULL DEFAULT 'LOCKED'
                     CHECK (state IN ('OWNED','READY','LOCKED')),
-    requires    TEXT,                                    -- JSON: [concept_slug, ...] (DAG edges)
-    ordinal     INTEGER                                  -- SCAN's rough order
+    requires    TEXT                                     -- JSON: [concept_slug, ...] (DAG edges)
 );
 
 -- The blank-page wall. While OPEN: learner can't read spec, agent can't write target.
+-- No copied paths: the wall JOINS to slices for target_file/spec_path, so it can
+-- never enforce a stale copy of them.
 CREATE TABLE IF NOT EXISTS gates (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     slice_slug  TEXT NOT NULL REFERENCES slices(slug),
-    target_file TEXT NOT NULL,
-    spec_path   TEXT,
     state       TEXT NOT NULL DEFAULT 'OPEN'
                     CHECK (state IN ('OPEN','PASSED','FAILED')),
     opened_at   TEXT NOT NULL DEFAULT (datetime('now')),

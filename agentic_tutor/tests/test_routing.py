@@ -5,23 +5,35 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import tempfile
+
 from tutor import DB, dispatch
 from tutor.frontier import load, validate, empty_template, FrontierError
+from tutor.library import seed_vocab
 from tutor.routing import build_l_block, gate_wall_decision
 from tutor.hooks import pretooluse_decision
 
 FIX = Path(__file__).resolve().parent / "fixtures" / "frontier_pinned_qa.json"
 
 
-def _db_with_slice():
+def _spec_file() -> str:
+    """A real spec file on disk — open_gate refuses a slice whose spec doesn't exist."""
+    f = tempfile.NamedTemporaryFile("w", suffix="-pinned-qa-group.md", delete=False)
+    f.write("# spec: pinned QA grouping\n")
+    f.close()
+    return f.name
+
+
+def _db_with_slice(spec_path: str | None = None):
     db = DB()
     dispatch(db, "M", "upsert_concept",
              {"slug": "enumerate-index", "name": "enumerate", "state": "LOCKED"})
-    dispatch(db, "M", "upsert_slice",
-             {"slug": "pinned-qa-group", "title": "pinned QA grouping",
-              "target_file": "soufiane_prompts/prompts/run_prompts.py",
-              "spec_path": "library/slices/pinned-qa-group.md",
-              "concept_prereqs": ["enumerate-index"], "ordinal": 1})
+    args = {"slug": "pinned-qa-group", "title": "pinned QA grouping",
+            "target_file": "soufiane_prompts/prompts/run_prompts.py",
+            "concept_prereqs": ["enumerate-index"], "ordinal": 1}
+    if spec_path:
+        args["spec_path"] = spec_path
+    dispatch(db, "M", "upsert_slice", args)
     return db
 
 
@@ -59,6 +71,7 @@ def test_partial_gap_is_rejected():
 def test_first_turn_shows_opening_question_not_continue():
     db = _db_with_slice()
     f = load(FIX)
+    seed_vocab(db, f)          # slice start: frontier lists are planted into the TABLE
     block = build_l_block(db, f, is_first_turn=True)
     assert "OPEN WITH (guess-first)" in block
     assert "done-when:" not in block                 # continue framing withheld
@@ -82,14 +95,31 @@ def test_teaching_block_gone_once_concept_owned():
     assert "[GAP]" not in block                       # gap closed -> no teaching block
 
 
-def test_open_gate_replaces_teaching_with_wall():
-    db = _db_with_slice()
+def _db_gate_open(spec_path: str):
+    """A db whose slice's gap is closed and gate is OPEN (spec file must exist)."""
+    db = _db_with_slice(spec_path)
     dispatch(db, "L", "store_mapping",
              {"concept_slug": "enumerate-index", "trigger": "t", "solution": "s", "why": "w"})
     dispatch(db, "L", "close_gap", {"concept_slug": "enumerate-index"})
-    dispatch(db, "L", "open_gate", {"slice_slug": "pinned-qa-group"})
+    d = dispatch(db, "L", "open_gate", {"slice_slug": "pinned-qa-group"})
+    assert d.committed, d.text
+    return db
+
+
+def test_open_gate_replaces_teaching_with_wall():
+    db = _db_gate_open(_spec_file())
     block = build_l_block(db, load(FIX), is_first_turn=False)
     assert "[GATE — OPEN]" in block and "[GAP]" not in block
+
+
+def test_open_gate_refused_without_spec():
+    db = _db_with_slice()                              # spec_path NULL — lazy spec unwritten
+    dispatch(db, "L", "store_mapping",
+             {"concept_slug": "enumerate-index", "trigger": "t", "solution": "s", "why": "w"})
+    dispatch(db, "L", "close_gap", {"concept_slug": "enumerate-index"})
+    d = dispatch(db, "L", "open_gate", {"slice_slug": "pinned-qa-group"})
+    assert not d.committed and "spec" in d.text
+    assert db.one("SELECT 1 FROM gates WHERE state='OPEN'") is None
 
 
 def test_subhole_forces_hold_block():
@@ -116,33 +146,31 @@ def test_gate_wall_allows_when_no_gate():
 
 
 def test_gate_wall_denies_writing_target_when_open():
-    db = _db_with_slice()
-    dispatch(db, "L", "store_mapping",
-             {"concept_slug": "enumerate-index", "trigger": "t", "solution": "s", "why": "w"})
-    dispatch(db, "L", "close_gap", {"concept_slug": "enumerate-index"})
-    dispatch(db, "L", "open_gate", {"slice_slug": "pinned-qa-group"})
+    db = _db_gate_open(_spec_file())
     out = pretooluse_decision(db, {"tool_name": "Write",
                                    "tool_input": {"file_path": "run_prompts.py"}})
     assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
 
 
 def test_gate_wall_denies_reading_spec_when_open():
-    db = _db_with_slice()
-    dispatch(db, "L", "store_mapping",
-             {"concept_slug": "enumerate-index", "trigger": "t", "solution": "s", "why": "w"})
-    dispatch(db, "L", "close_gap", {"concept_slug": "enumerate-index"})
-    dispatch(db, "L", "open_gate", {"slice_slug": "pinned-qa-group"})
-    out = pretooluse_decision(db, {"tool_name": "Read",
-                                   "tool_input": {"file_path": "library/slices/pinned-qa-group.md"}})
+    spec = _spec_file()
+    db = _db_gate_open(spec)
+    out = pretooluse_decision(db, {"tool_name": "Read", "tool_input": {"file_path": spec}})
     assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
 
 
+def test_gate_wall_reads_live_slice_row_not_a_copy():
+    # the wall joins slices — a spine correction mid-gate is enforced immediately
+    db = _db_gate_open(_spec_file())
+    dispatch(db, "M", "upsert_slice",
+             {"slug": "pinned-qa-group", "title": "pinned QA grouping",
+              "target_file": "soufiane_prompts/prompts/renamed.py", "ordinal": 1})
+    dec, _ = gate_wall_decision(db, "Write", {"file_path": "renamed.py"})
+    assert dec == "deny"
+
+
 def test_gate_wall_allows_unrelated_file_when_open():
-    db = _db_with_slice()
-    dispatch(db, "L", "store_mapping",
-             {"concept_slug": "enumerate-index", "trigger": "t", "solution": "s", "why": "w"})
-    dispatch(db, "L", "close_gap", {"concept_slug": "enumerate-index"})
-    dispatch(db, "L", "open_gate", {"slice_slug": "pinned-qa-group"})
+    db = _db_gate_open(_spec_file())
     out = pretooluse_decision(db, {"tool_name": "Read",
                                    "tool_input": {"file_path": "some/other/notes.md"}})
     assert out == {}

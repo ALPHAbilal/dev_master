@@ -27,6 +27,36 @@ whole target codebase exists in his repo, written by his hand.
 The learner talks only to L. L touches the world only through **tools** (never shell,
 never raw SQL). M touches only tools + the library + the research tool.
 
+**M wakes in three named turns.** Same agent, same core (G2), same tools — only the
+injected instruction set differs. There is no separate "scanner agent"; naming the turns
+is what keeps that from being re-invented:
+
+| turn | when it fires | writes | frequency over a codebase's life |
+|---|---|---|---|
+| **M/SURVEY** | a target is adopted | the spine: `target` row, `slices`, the concept DAG, `target.md` | **once**, plus rare repairs |
+| **M/PLAN** | frontier.md is empty (a slice closed) | `frontier.md` — the next slice + its gap | once per slice |
+| **M/SUBHOLE** | a handoff cell is filled (F4) | a sub-gap under the untouched `slice:` line | 0–2 per slice, capped |
+
+```
+target adopted ──► M/SURVEY ×1 ═══════════════════════ the map
+                       │
+    ┌──────────── per slice, N times ──────────────────┐
+    │  M/PLAN ×1 ─► L teaches ─► GATE ─► slice BUILT   │
+    │                 └─ M/SUBHOLE ×0-2                │
+    └──────────────────────────────────────────────────┘
+                       │ last gate passes
+                       ▼  SOLO — the codebase is his
+```
+
+**Re-survey only when the territory changes** — the target is refactored, or the spine
+proves wrong. Note the second case is normally a *spine repair*, not a fresh survey:
+hitting the subhole cap means M mis-sized, and the fix is inserting a smaller slice
+(F4, G2 rule 6), not re-walking the whole codebase.
+
+M/SURVEY is the cheapest turn in the system and the one whose errors cost the most —
+a bad spine misroutes every slice after it. That is why it is built LAST (build order
+step 7): only a working loop can prove a spine good or bad.
+
 ---
 
 ## Part B — The DB, cut from 20 tables to 7
@@ -38,7 +68,7 @@ decomposition** and the **gate** (the blank-page wall) — must survive. Propose
 
 | Keep | Why it survives the pedagogy |
 |---|---|
-| `target` | the codebase he's building + its **decomposition into slices** (was `targets`). The spine. |
+| `target` | the codebase he's building (path only). The spine itself lives ONLY in `slices` — storing an ordered plan here too was redundancy, and it was removed. |
 | `slices` | each real function/file he must write, its spec, its state (LOCKED/READY/BUILT), its concept-prereqs. **This is the unit of progress.** |
 | `concepts` | the bank = DAG nodes + mastery overlay (OWNED/READY/LOCKED). Prereqs that slices require. |
 | `gates` | the blank-page wall. While open: he can't read the spec, and the agent can't write his target file. **The mechanism by which real code gets built.** |
@@ -61,13 +91,36 @@ decomposition** and the **gate** (the blank-page wall) — must survive. Propose
 
 Net: **~7 tables.** There is **no global `phase` row** (see Part E).
 
+### One fact, one place (the anti-redundancy pass, DECIDED — enforced in code)
+
+Every fact in the system has exactly one home; everything else is a render, a seed,
+or a refusal:
+
+1. **`gates` stores no paths.** The wall JOINs to `slices` for `target_file`/
+   `spec_path` — it can never enforce a stale copy.
+2. **The spine lives only in `slices`** (`ordinal` order). `target` holds the
+   codebase path, nothing more; `decompose_target` became `set_target`.
+3. **OWNED is earned, never set.** `set_concept_state` refuses `OWNED`; only
+   `close_gap` (which requires a positive mapping) grants it. No side doors (H1).
+4. **READY and BUILT are computed.** `set_slice_state` may only re-LOCK (spine
+   repair); READY comes from owned prereqs, BUILT from `pass_gate` alone.
+5. **`target.md` is generated** from the DB (`library.render_target_md`), never
+   hand-written.
+6. **The vocab table is the only door.** The frontier's vocab lists are seed input
+   (`library.seed_vocab` plants them at slice start); the door and the router read
+   the table exclusively, so a mid-slice promotion is never shadowed.
+7. **`spec_path` non-NULL ⇒ the spec exists**, because the only turn that sets the
+   path is the one that writes the file (lazy specs), and `open_gate` refuses NULL.
+
 ---
 
 ## Part C — The library layout (the PLAN as files)
 
 ```
 library/
-  target.md              ← the whole build, decomposed into slices, in order. M owns.
+  target.md              ← the spine, GENERATED from the DB by code after any spine
+                           write (library.render_target_md). A render, never a source
+                           — M writes it zero times, so it cannot drift.
   frontier.md            ← the ONE active slice + the concept gap being taught right now.
   concepts/
     enumerate-index.md    ← per-concept map: trigger, solution, why, road, provenance
@@ -424,7 +477,7 @@ L turn N (gap open)   → CONTINUE set: the gap's done-when + road reminder + th
                         since last turn (new probes rows only). NOT the full opening.
 L turn N (gate open)  → GATE set: the wall text + what he may/may not see. The
                         teaching blocks are GONE (Part D Turn 4 already shows this).
-M turn 1 (new target) → DECOMPOSE set: full target, write target.md + slices.
+M turn 1 (new target) → SURVEY set: full target, write target.md + slices.
 M turn N (steady)     → PLAN set: new evidence rows since last plan + overlays. Not
                         the decomposition instructions — that job is done.
 ```
@@ -654,7 +707,99 @@ You wake to an EMPTY frontier.md (keys, no values). Your job is to fill every ke
 [HISTORY]      ← on request: past history/NNN-*.md files (what was planned vs
                  what happened — your calibration record)
 [SUBHOLE]      ← only on a subhole wakeup: the filled cell + its instructions
-[DECOMPOSE]    ← only on a brand-new target: write target.md + slices first
+[SURVEY]       ← only on a brand-new target (M/SURVEY): write target.md + slices first
+```
+
+### G2a — The `[SURVEY]` block (M/SURVEY, injected once per target)
+
+```
+[SURVEY] — you are looking at this codebase for the first and only time.
+
+You are not teaching. You are drawing the map every later turn navigates by.
+Output = the spine in the DB. You write NO frontier; that is your next turn's job.
+
+1. READ THE REAL CODE FIRST. Grep the entry points, then Read the files they
+   reach. You may not invent a slice for code you have not read.
+2. Cut the codebase into SLICES. A slice is ONE function or file the learner
+   can write in one sitting, from a spec, behind a closed gate.
+   Sizing test — a slice is correctly sized when:
+     - it has a name he could say out loud ("group the pinned questions")
+     - it has <= 2 concept-prereqs he does not already own
+     - it can be judged: run it, or read it, and know PASS or FAIL
+   Too big => cut it. Too small => it is not a slice, it is a line.
+3. ORDER them into a spine: dependency order, not file order. Slice N may only
+   need concepts and slices from before it. The FIRST slice must need the
+   fewest unowned concepts — it is where he starts cold.
+4. For each slice name its concept-prereqs. A concept is a thing that can be
+   OWNED or not (`enumerate-index`), never a task (`write the loop`).
+5. Build the concept DAG: every prereq becomes a concepts row with its edges.
+   All start CANT — you have no evidence yet. Assume nothing about him.
+6. RESEARCH (WebSearch/WebFetch) only for two questions: is this the standard
+   NAME for this concept, and is edge X->Y a real prerequisite? Never to fetch
+   tutorials or teaching material — that is not your job on this turn.
+7. Write slice ROWS only — leave `spec_path` NULL. You author no spec files and
+   no paths-to-nothing: M/PLAN writes each spec lazily AND sets `spec_path` in
+   the same act, so a non-NULL path always means the file exists. `open_gate`
+   refuses a NULL spec_path; the column is the fact.
+8. Write it all through db(). Then STOP. One survey, then observe.
+   You do not plan the first slice on this turn.
+```
+
+**Why specs are lazy (DECIDED).** M/SURVEY leaves `slices.spec_path` NULL and writes no
+`library/slices/*.md`. M/PLAN authors that one spec when it plans that slice. Three
+reasons: a spec written N slices early is written blind to the evidence the learner
+will have produced by then; survey stays cheap (it is the turn with the least
+information and the most leverage, so it should commit the least); and a spine repair
+that drops or splits a slice throws away no written spec. **Invariant:** the spec file
+must exist before its gate opens — M/PLAN writes it in the same turn it fills the gate
+keys, and `open_gate` refuses a slice whose `spec_path` is missing.
+
+### The wakeups — what makes M run again (all deterministic, no agent decides)
+
+```
+gate PASS ─► code archives frontier.md -> history/NNN-<slice>.md
+            code writes a FRESH frontier.md: KEYS ONLY, all values empty
+            code drops M's ContextManager        (F1: new slice = cold M)
+                     │
+                     ▼  the EMPTY frontier IS the wakeup
+            M/PLAN wakes cold: [EVIDENCE] (probes since last turn) + [OVERLAYS]
+            picks the earliest READY slice, writes its spec file, fills every key
+                     │
+                     ▼
+            L's next turn reads the new frontier — L never knew M ran.
+```
+
+Same cell pattern, three triggers, one rule — **a filled/emptied cell is a wakeup**:
+
+| wakeup signal | who wakes | keeps context? |
+|---|---|---|
+| empty `frontier.md` | M/PLAN | no — cold (new slice) |
+| filled `slices.subhole_*` cell | M/SUBHOLE | **yes** — same slice, course correction |
+| cleared subhole cell | L | mid-slice history persists |
+| no `target` row at all | M/SURVEY | n/a — first turn of the project |
+
+### How M discovers its tools (identical to L — one gateway, one menu)
+
+M does **not** get a different tool mechanism. `db()` is role-filtered inside
+`gateway.dispatch(db, role, ...)`: calling it with no args returns the menu for THAT
+role in THAT state. M sees `upsert_slice`, `set_target`, `clear_subhole`; it
+never sees `record_probe` or `open_gate` — those are L's. No order is prescribed and
+none needs to be: the menu is a pure function of state, so an op that is not legal yet
+is simply not listed.
+
+**Tool-use discipline is rented context, never core prose (the G3/H1 lesson).** The
+efficient-use rules for `Grep`/`Read`/`Web` do not live in G2 — they are one block
+injected only on turns where those tools are live, exactly like the `db()` menu:
+
+```
+[TOOL DISCIPLINE]  ← injected on SURVEY turns (and M/SUBHOLE research turns)
+ Grep  first, always. Pattern + path filter; never a bare pattern over the repo.
+       You are locating, not reading. Cheap and wide.
+ Read  only files Grep proved matter, and only the ranges it pointed at.
+       A whole-file Read of something you have not located is a bug, not thoroughness.
+ Web   two questions only: the standard NAME of a concept, and whether a
+       prerequisite edge is real. Two calls is a lot; five means you are drifting.
+ db()  last. It is the only write. menu -> describe -> commit.
 ```
 
 ### G3 — What is deliberately NOT in the instructions

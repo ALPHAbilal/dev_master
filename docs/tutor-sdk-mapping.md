@@ -37,7 +37,7 @@ is in the other's context — they never share a session).
 
 | Design piece (sim doc) | SDK primitive | How |
 |---|---|---|
-| **7 DB tables** | our code + SQLite | unchanged; the SDK never sees the DB directly |
+| **7 DB tables** | our code + SQLite | unchanged; the SDK never sees the DB directly. One-fact-one-place rules (sim doc Part B) are op-level refusals, not prose. |
 | **Function-tool mindset (H1)** | `@tool` + `create_sdk_mcp_server` | in-process MCP server, no subprocess, no shell. Every mutation is a tool call. |
 | **`db()` gateway + menu disclosure (F6)** | ONE `@tool` named `db` | its schema is one arg. Call with none → returns the state-filtered menu as text; call with an op name → returns that op's schema-as-text; call with args → validates + commits. The full op docs never sit in the tool list. **This is the ONLY tutor-state tool** — see Q#8 below. |
 | **Every op through the menu (Q#8, DECIDED)** | no extra tools | even hot-path ops (`record_probe`) go through `db()`. One gateway, one pattern, zero exceptions — the tool list stays constant and tiny. Menu round-trips are made cheap by F7 (they get collapsed to a receipt next turn anyway). |
@@ -53,6 +53,7 @@ is in the other's context — they never share a session).
 | **Frontier archive at gate PASS** | our code, on the PostToolUse for `pass_gate` | move frontier.md → history/NNN, write fresh empty frontier. Pure code, no agent. (`PreCompact` is available too but we don't need it for this.) |
 | **M/L wall** | two separate sessions | structural: neither appears in the other's transcript. M's only inputs are DB rows we hand it in its prompt; it has no learner-facing tools. |
 | **M research tool (online+offline)** | `WebFetch`/`WebSearch` + `Read`/`Grep` in `options_M.allowed_tools` | L gets `Read`/`Grep` only (offline codebase search), no web. |
+| **M's three turns (M/SURVEY, M/PLAN, M/SUBHOLE)** | one `options_M`, three injected sets | not three agents and not subagents — the same M session shape with a different instruction block picked from state (F2/F3's rule). M/SURVEY additionally needs `Read`/`Grep`/`WebSearch` over the *target* repo to write the spine; it is the only M turn that writes `slices` rows. |
 | **Roads / teaching-support keys** | prompt content, not SDK | G1/G2 cores are the `system_prompt`; frontier.md arrives via the UserPromptSubmit injection. |
 
 ---
@@ -167,8 +168,8 @@ async def run_slice(slice):
    walk Turns 1–4 of the sim for real.
 5. **M alone**, fed real probes rows — prove it writes a valid frontier.md (schema-gated).
 6. **The orchestrator loop** joining them + the F1 wipe + F4 subhole handoff.
-7. **SCAN/COVERAGE** (one-time target decomposition) last — it only fills tables the
-   loop already consumes.
+7. **M/SURVEY** (the one-time survey turn: target decomposition) last — it only fills
+   tables the loop already consumes.
 
 Each step is runnable and testable before the next. Nothing is built that the trace in
 `tutor-simulation.md` doesn't call for.

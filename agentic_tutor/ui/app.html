@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tutor</title>
+<style>
+  :root{
+    --bg:#fbfaf7; --fg:#1c1b19; --muted:#6f6a62; --faint:#a8a29a;
+    --rule:#e3ded4; --accent:#8a5a2b; --gate:#a03a2c; --owned:#3f6b3a;
+    --code:#f1ede4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#16150f; --fg:#e8e4da; --muted:#9b958a; --faint:#6a655c;
+      --rule:#2e2b23; --accent:#d3a06a; --gate:#e08a7a; --owned:#8fbf85;
+      --code:#211f18;
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--fg);
+    font:15px/1.65 ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--accent)}
+  .wrap{max-width:1180px; margin:0 auto; padding:3rem 2rem 6rem}
+
+  /* ---- masthead ---- */
+  header{border-bottom:1px solid var(--rule); padding-bottom:1.2rem; margin-bottom:2.4rem}
+  h1{font-size:1.05rem; font-weight:600; margin:0 0 .4rem; letter-spacing:.02em}
+  .root{color:var(--faint); font-size:.8rem; word-break:break-all}
+  .who{margin-top:.9rem; display:flex; align-items:baseline; gap:.6rem; flex-wrap:wrap}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);
+       display:inline-block; animation:pulse 1.8s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  .agent{font-weight:600; color:var(--accent)}
+  .activity{color:var(--muted); font-size:.85rem}
+
+  /* ---- adopt screen ---- */
+  .adopt{max-width:640px; margin:4rem auto}
+  .adopt h2{font-size:1rem; font-weight:600; margin:0 0 .5rem}
+  .adopt p{color:var(--muted); font-size:.88rem; margin:0 0 2rem}
+  label{display:block; font-size:.78rem; color:var(--muted); margin:1.6rem 0 .4rem;
+        text-transform:uppercase; letter-spacing:.08em}
+  input[type=text]{
+    width:100%; padding:.7rem .85rem; background:transparent; color:var(--fg);
+    border:1px solid var(--rule); border-radius:3px; font:inherit; font-size:.9rem}
+  input[type=text]:focus{outline:none; border-color:var(--accent)}
+  button{
+    margin-top:.9rem; padding:.6rem 1.2rem; font:inherit; font-size:.85rem;
+    background:var(--fg); color:var(--bg); border:0; border-radius:3px; cursor:pointer}
+  button:hover{opacity:.85}
+  button:disabled{opacity:.4; cursor:default}
+  .drop{
+    margin-top:.4rem; padding:2rem 1rem; text-align:center; color:var(--faint);
+    border:1px dashed var(--rule); border-radius:4px; font-size:.85rem; cursor:pointer}
+  .drop.over{border-color:var(--accent); color:var(--accent)}
+  .or{text-align:center; color:var(--faint); font-size:.75rem; margin:1.8rem 0 0;
+      letter-spacing:.1em}
+  .err{color:var(--gate); font-size:.85rem; margin-top:1rem; min-height:1.2em}
+
+  /* ---- two columns ---- */
+  .cols{display:grid; grid-template-columns:minmax(0,1.55fr) minmax(0,1fr); gap:3.5rem}
+  @media (max-width:900px){ .cols{grid-template-columns:1fr; gap:2.5rem} }
+
+  /* ---- transcript ---- */
+  .turn{margin:0 0 1.9rem}
+  .speaker{font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+           color:var(--faint); margin-bottom:.35rem}
+  .turn.learner .speaker{color:var(--muted)}
+  .turn.learner .body{border-left:2px solid var(--rule); padding-left:1rem; color:var(--muted)}
+  .body{white-space:pre-wrap; word-wrap:break-word}
+  .turn.receipt .body{color:var(--owned); font-size:.82rem}
+  .turn.handoff .body{color:var(--accent); font-size:.82rem; font-style:italic}
+  .turn.error .body{color:var(--gate); font-size:.85rem}
+  .empty{color:var(--faint); font-style:italic}
+  .composer{margin-top:2.5rem; border-top:1px solid var(--rule); padding-top:1.3rem}
+  textarea{
+    width:100%; min-height:5.5rem; resize:vertical; padding:.75rem .85rem;
+    background:transparent; color:var(--fg); border:1px solid var(--rule);
+    border-radius:3px; font:inherit; font-size:.9rem}
+  textarea:focus{outline:none; border-color:var(--accent)}
+  .hint{font-size:.72rem; color:var(--faint); margin-top:.5rem}
+
+  /* ---- state panels ---- */
+  section{margin-bottom:2.4rem}
+  h3{font-size:.72rem; text-transform:uppercase; letter-spacing:.11em;
+     color:var(--faint); font-weight:600; margin:0 0 .8rem;
+     border-bottom:1px solid var(--rule); padding-bottom:.4rem}
+  ul{list-style:none; margin:0; padding:0; font-size:.83rem}
+  li{padding:.28rem 0; display:flex; gap:.6rem; align-items:baseline}
+  .tag{font-size:.66rem; letter-spacing:.06em; color:var(--faint);
+       border:1px solid var(--rule); border-radius:2px; padding:.05rem .35rem;
+       flex-shrink:0}
+  .tag.BUILT,.tag.OWNED{color:var(--owned); border-color:var(--owned)}
+  .tag.READY{color:var(--accent); border-color:var(--accent)}
+  .name{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .sub{color:var(--faint); font-size:.72rem}
+  .gate{border:1px solid var(--gate); border-radius:3px; padding:.8rem .9rem;
+        color:var(--gate); font-size:.82rem; line-height:1.5}
+  .files{max-height:19rem; overflow:auto; font-size:.78rem}
+  .files li.gated .name{color:var(--gate); font-weight:600}
+  .none{color:var(--faint); font-size:.8rem; font-style:italic}
+  code{background:var(--code); padding:.08rem .3rem; border-radius:2px; font-size:.9em}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+const $ = (h) => { const d=document.createElement('div'); d.innerHTML=h.trim(); return d.firstChild; };
+const esc = (s) => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let S = null, busy = false;
+
+async function api(path, opts){
+  const r = await fetch(path, opts);
+  const j = await r.json().catch(()=>({error:'bad response'}));
+  if(!r.ok) throw new Error(j.error || 'request failed');
+  return j;
+}
+
+async function load(){ S = await api('/api/state'); render(); }
+
+// ---------- adopt ----------
+function renderAdopt(){
+  document.getElementById('app').innerHTML = `
+    <div class="adopt">
+      <h1>tutor</h1>
+      <h2>Which codebase are we building?</h2>
+      <p>Nothing is hardcoded. Point at a folder on this machine, or drop a zip.
+         The tutor surveys it once, cuts it into slices, and teaches you to write
+         them yourself.</p>
+      <label for="path">folder on this machine</label>
+      <input type="text" id="path" placeholder="/home/you/projects/thing" autocomplete="off">
+      <button id="go">adopt this folder</button>
+      <p class="or">— or —</p>
+      <label>upload a zip</label>
+      <div class="drop" id="drop">drop a .zip here, or click to choose</div>
+      <input type="file" id="file" accept=".zip" hidden>
+      <div class="err" id="err"></div>
+    </div>`;
+
+  const err = document.getElementById('err');
+  const fail = (e) => err.textContent = e.message || String(e);
+
+  document.getElementById('go').onclick = async () => {
+    const path = document.getElementById('path').value.trim();
+    if(!path) return fail(new Error('type a folder path first'));
+    err.textContent = 'adopting…';
+    try { S = (await api('/api/adopt',{method:'POST',body:JSON.stringify({path})})).state; render(); }
+    catch(e){ fail(e); }
+  };
+  document.getElementById('path').addEventListener('keydown', e => {
+    if(e.key === 'Enter') document.getElementById('go').click();
+  });
+
+  const drop = document.getElementById('drop'), file = document.getElementById('file');
+  const send = async (f) => {
+    if(!f) return;
+    err.textContent = `extracting ${f.name}…`;
+    try {
+      S = (await api('/api/adopt-zip?name='+encodeURIComponent(f.name),
+                     {method:'POST', body:f})).state;
+      render();
+    } catch(e){ fail(e); }
+  };
+  drop.onclick = () => file.click();
+  file.onchange = () => send(file.files[0]);
+  drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+  drop.ondragleave = () => drop.classList.remove('over');
+  drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); send(e.dataTransfer.files[0]); };
+}
+
+// ---------- session ----------
+function render(){
+  if(!S.adopted) return renderAdopt();
+  const a = S.active;
+  document.getElementById('app').innerHTML = `
+    <header>
+      <h1>tutor</h1>
+      <div class="root">${esc(S.root)}</div>
+      <div class="who">
+        <span class="dot"></span>
+        <span class="agent">${esc(a.label)}</span>
+        <span class="activity">${esc(a.activity)}</span>
+      </div>
+    </header>
+    <div class="cols">
+      <main>
+        ${transcript()}
+        ${composer(a)}
+      </main>
+      <aside>
+        ${gatePanel()}
+        ${panel('the spine', S.spine.map(s => li(
+            s.state, s.title,
+            `${s.target_file}${s.has_spec ? '' : ' · spec not written yet'}${s.subhole ? ' · subhole: '+s.subhole : ''}`
+          )).join(''))}
+        ${panel('concepts', S.concepts.map(c => li(c.state, c.name, c.slug)).join(''))}
+        ${vocabPanel()}
+        ${panel('files', S.files.map(f =>
+            `<li class="${f.gated?'gated':''}"><span class="name">${esc(f.path)}</span>${
+              f.gated ? '<span class="tag">yours</span>' : ''}</li>`).join(''), 'files')}
+      </aside>
+    </div>`;
+  wireComposer();
+}
+
+const li = (state, name, sub) =>
+  `<li><span class="tag ${esc(state||'')}">${esc(state||'—')}</span>
+       <span class="name">${esc(name)}<br><span class="sub">${esc(sub||'')}</span></span></li>`;
+
+function panel(title, inner, cls){
+  return `<section><h3>${esc(title)}</h3>${
+    inner ? `<ul class="${cls||''}">${inner}</ul>` : '<p class="none">nothing here yet</p>'}</section>`;
+}
+
+function gatePanel(){
+  if(!S.gate) return '';
+  return `<section><h3>gate — open</h3><div class="gate">
+    <strong>${esc(S.gate.title)}</strong><br>
+    You write <code>${esc(S.gate.target_file)}</code> yourself. The spec is hidden and
+    the tutor may not write into it.</div></section>`;
+}
+
+function vocabPanel(){
+  const v = S.vocab, mk = (arr) => arr.length ? esc(arr.join(', ')) : '<span class="none">none</span>';
+  if(!v.ok.length && !v.hold.length) return '';
+  return `<section><h3>vocabulary</h3>
+    <ul><li><span class="name">ok to use<br><span class="sub">${mk(v.ok)}</span></span></li>
+        <li><span class="name">held<br><span class="sub">${mk(v.hold)}</span></span></li></ul></section>`;
+}
+
+function transcript(){
+  if(!S.transcript.length)
+    return `<p class="empty">The tutor is waiting. Say something to begin —
+            it will ask before it explains.</p>`;
+  return S.transcript.map(t => {
+    const who = t.kind === 'learner' ? 'you' : (t.agent || 'L');
+    return `<div class="turn ${esc(t.kind)}">
+      <div class="speaker">${esc(who)}</div>
+      <div class="body">${esc(t.text)}</div></div>`;
+  }).join('');
+}
+
+function composer(a){
+  const waiting = a.learner_waits;
+  return `<div class="composer">
+    <textarea id="say" placeholder="${waiting
+      ? a.label + ' is working — you can still type; it will be read when L has the turn'
+      : 'your answer…'}"></textarea>
+    <button id="send">send</button>
+    <div class="hint">runner: ${esc(S.runner)}${
+      S.runner === 'scripted' ? ' — the live agent loop is not wired yet' : ''} ·
+      ⌘/ctrl + enter to send</div>
+    <div class="err" id="err"></div>
+  </div>`;
+}
+
+function wireComposer(){
+  const box = document.getElementById('say'), btn = document.getElementById('send'),
+        err = document.getElementById('err');
+  const send = async () => {
+    const text = box.value.trim();
+    if(!text || busy) return;
+    busy = true; btn.disabled = true; err.textContent = '';
+    try { S = (await api('/api/say',{method:'POST',body:JSON.stringify({text})})).state; render(); }
+    catch(e){ err.textContent = e.message; btn.disabled = false; }
+    finally { busy = false; }
+  };
+  btn.onclick = send;
+  box.addEventListener('keydown', e => {
+    if(e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send();
+  });
+  box.focus();
+}
+
+load().catch(e => document.getElementById('app').innerHTML =
+  `<p class="err">could not reach the tutor server: ${esc(e.message)}</p>`);
+</script>
+</body>
+</html>

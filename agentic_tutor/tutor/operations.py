@@ -151,8 +151,17 @@ def _open_gate(db: DB, a: dict) -> OpResult:
         raise OpError(f"no such slice: {a['slice_slug']}")
     if db.one("SELECT 1 FROM gates WHERE slice_slug=? AND state='OPEN'", (a["slice_slug"],)):
         raise OpError(f"a gate is already OPEN for {a['slice_slug']}")
-    db.execute("INSERT INTO gates(slice_slug,target_file,spec_path,state) VALUES(?,?,?,'OPEN')",
-               (sl["slug"], sl["target_file"], sl["spec_path"]))
+    # lazy specs: the gate hides a spec, so the spec must EXIST before the wall goes up.
+    # spec_path NULL = M/PLAN never wrote it (the column is the fact); missing file =
+    # someone deleted it by hand. Either way, the gate stays closed.
+    if not sl["spec_path"]:
+        raise OpError(f"no spec written for {sl['slug']} yet (spec_path is NULL) — "
+                      f"M/PLAN must author the spec before this gate can open")
+    from pathlib import Path
+    if not Path(sl["spec_path"]).exists():
+        raise OpError(f"spec file missing on disk: {sl['spec_path']} — "
+                      f"the gate cannot hide a spec that does not exist")
+    db.execute("INSERT INTO gates(slice_slug,state) VALUES(?,'OPEN')", (sl["slug"],))
     return OpResult(
         text=f"OK. Gate OPEN. Wall active: spec hidden, you may NOT write {sl['target_file']}. "
              f"He writes it, or it did not happen.",
@@ -202,12 +211,12 @@ def _raise_subhole(db: DB, a: dict) -> OpResult:
 # --------------------------------------------------------------------------
 def _upsert_concept(db: DB, a: dict) -> OpResult:
     db.execute(
-        "INSERT INTO concepts(slug,name,definition,aspect,state,requires,ordinal) "
-        "VALUES(?,?,?,?,?,?,?) ON CONFLICT(slug) DO UPDATE SET "
+        "INSERT INTO concepts(slug,name,definition,aspect,state,requires) "
+        "VALUES(?,?,?,?,?,?) ON CONFLICT(slug) DO UPDATE SET "
         "name=excluded.name, definition=excluded.definition, aspect=excluded.aspect, "
-        "requires=excluded.requires, ordinal=excluded.ordinal",
+        "requires=excluded.requires",
         (a["slug"], a["name"], a.get("definition"), a.get("aspect"),
-         a.get("state", "LOCKED"), _as_json(a.get("requires")), a.get("ordinal")),
+         a.get("state", "LOCKED"), _as_json(a.get("requires"))),
     )
     return OpResult(text=f"OK. Concept {a['slug']} upserted.",
                     receipt=f"concept: {a['slug']}")
@@ -229,6 +238,9 @@ def _upsert_slice(db: DB, a: dict) -> OpResult:
 def _set_concept_state(db: DB, a: dict) -> OpResult:
     if not db.one("SELECT 1 FROM concepts WHERE slug=?", (a["slug"],)):
         raise OpError(f"no such concept: {a['slug']}")
+    if a["state"] == "OWNED":
+        raise OpError("OWNED is earned, never set: only close_gap (which requires a "
+                      "positive mapping) may grant it. No side doors (H1).")
     db.execute("UPDATE concepts SET state=? WHERE slug=?", (a["state"], a["slug"]))
     return OpResult(text=f"OK. {a['slug']} → {a['state']}.",
                     receipt=f"concept-state: {a['slug']}={a['state']}")
@@ -237,6 +249,9 @@ def _set_concept_state(db: DB, a: dict) -> OpResult:
 def _set_slice_state(db: DB, a: dict) -> OpResult:
     if not db.one("SELECT 1 FROM slices WHERE slug=?", (a["slug"],)):
         raise OpError(f"no such slice: {a['slug']}")
+    if a["state"] != "LOCKED":
+        raise OpError("only LOCKED may be forced (spine repair). READY is computed "
+                      "from owned prereqs; BUILT is granted by pass_gate alone.")
     db.execute("UPDATE slices SET state=? WHERE slug=?", (a["state"], a["slug"]))
     return OpResult(text=f"OK. Slice {a['slug']} → {a['state']}.",
                     receipt=f"slice-state: {a['slug']}={a['state']}")
@@ -252,15 +267,16 @@ def _clear_subhole(db: DB, a: dict) -> OpResult:
                     receipt=f"subhole-cleared: {a['slice_slug']}")
 
 
-def _decompose_target(db: DB, a: dict) -> OpResult:
+def _set_target(db: DB, a: dict) -> OpResult:
     db.execute(
-        "INSERT INTO target(id,codebase_path,decomposition) VALUES(1,?,?) "
-        "ON CONFLICT(id) DO UPDATE SET codebase_path=excluded.codebase_path, "
-        "decomposition=excluded.decomposition",
-        (a["codebase_path"], _as_json(a.get("decomposition"))),
+        "INSERT INTO target(id,codebase_path) VALUES(1,?) "
+        "ON CONFLICT(id) DO UPDATE SET codebase_path=excluded.codebase_path",
+        (a["codebase_path"],),
     )
-    return OpResult(text="OK. Target decomposition stored.",
-                    receipt=f"target: {a['codebase_path']}")
+    return OpResult(
+        text="OK. Target registered. The spine itself is the slices table — "
+             "upsert_slice each slice with its ordinal.",
+        receipt=f"target: {a['codebase_path']}")
 
 
 # --------------------------------------------------------------------------
@@ -343,23 +359,22 @@ REGISTRY: dict[str, Operation] = {op.name: op for op in [
     # --- M: the planner ---
     Operation("upsert_concept", "M", "create/update a concept (DAG node)",
               {"slug": "str", "name": "str", "definition": "str", "aspect": "str",
-               "state": "str", "requires": "json", "ordinal": "int"},
+               "state": "str", "requires": "json"},
               _upsert_concept, required=("slug", "name")),
     Operation("upsert_slice", "M", "create/update a slice (unit of progress)",
               {"slug": "str", "title": "str", "target_file": "str", "spec_path": "str",
                "state": "str", "kind": "str", "concept_prereqs": "json", "ordinal": "int"},
               _upsert_slice, required=("slug", "title", "target_file")),
-    Operation("set_concept_state", "M", "force a concept's mastery state",
+    Operation("set_concept_state", "M", "set a concept LOCKED/READY (OWNED is close_gap's alone)",
               {"slug": "str", "state": "str"}, _set_concept_state, required=("slug", "state")),
-    Operation("set_slice_state", "M", "force a slice's build state",
+    Operation("set_slice_state", "M", "re-LOCK a slice (spine repair; READY/BUILT are computed)",
               {"slug": "str", "state": "str"}, _set_slice_state, required=("slug", "state")),
     Operation("clear_subhole", "M", "clear a slice's subhole after re-planning",
               {"slice_slug": "str", "plan_note": "str"}, _clear_subhole,
               required=("slice_slug",), available=lambda db: db.one(
                   "SELECT 1 FROM slices WHERE subhole_concept IS NOT NULL") is not None),
-    Operation("decompose_target", "M", "store the codebase + its slice decomposition",
-              {"codebase_path": "str", "decomposition": "json"}, _decompose_target,
-              required=("codebase_path",)),
+    Operation("set_target", "M", "register the codebase being built (the spine = slices rows)",
+              {"codebase_path": "str"}, _set_target, required=("codebase_path",)),
     # --- reads (both) ---
     Operation("list_ready_slices", "both", "list slices ready to gate",
               {}, _list_ready_slices),

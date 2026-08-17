@@ -84,7 +84,7 @@ def _teaching_block(gap: dict, is_first_turn: bool) -> str:
 
 def _gate_block(f: Frontier, gate: dict) -> str:
     return ("[GATE — OPEN] the wall is live.\n"
-            f"  he writes {gate['target_file']} himself; spec is hidden; you write nothing into it.\n"
+            f"  he writes {f.target_file} himself; spec is hidden; you write nothing into it.\n"
             f"  when it is in the file, judge it and pass_gate (or fail_gate).")
 
 
@@ -95,12 +95,12 @@ def _subhole_hold_block(f: Frontier) -> str:
 
 
 def _vocab_block(db: DB, gap: dict | None) -> str:
+    # single source of truth: the vocab TABLE. The frontier's vocab lists are seed
+    # input only — library.seed_vocab() plants them at slice start; the door and this
+    # block read the table exclusively, so a mid-slice promotion is never shadowed
+    # by a stale frontier line.
     ok = _terms_by_status(db, ("shown", "proved"))
     hold = _terms_by_status(db, ("hold",))
-    # also fold in frontier-declared lists (may not be in DB yet)
-    if gap:
-        ok = sorted(set(ok) | set(gap.get("vocab_ok", [])))
-        hold = sorted(set(hold) | set(gap.get("vocab_hold", [])))
     lines = ["[VOCAB]"]
     lines.append(f"  ok to use: {_join(ok) or '(none)'}")
     lines.append(f"  HELD (do not use): {_join(hold) or '(none)'}")
@@ -111,8 +111,14 @@ def _vocab_block(db: DB, gap: dict | None) -> str:
 # the gate wall (the one true PreToolUse hook)
 # --------------------------------------------------------------------------
 def gate_wall_decision(db: DB, tool_name: str, tool_input: dict) -> tuple[str, str]:
-    """('allow'|'deny', reason). Denies spec-read and target-write while a gate is OPEN."""
-    gate = db.one("SELECT * FROM gates WHERE state='OPEN'")
+    """('allow'|'deny', reason). Denies spec-read and target-write while a gate is OPEN.
+
+    Joins to slices for the paths — gates stores no copies, so the wall can never
+    enforce a stale target_file/spec_path.
+    """
+    gate = db.one(
+        "SELECT g.slice_slug, s.target_file, s.spec_path FROM gates g "
+        "JOIN slices s ON s.slug = g.slice_slug WHERE g.state='OPEN'")
     if not gate:
         return ("allow", "")
     path = _path_of(tool_input)
