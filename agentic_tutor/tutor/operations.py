@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Callable
 
 from .db import DB
@@ -267,6 +268,63 @@ def _clear_subhole(db: DB, a: dict) -> OpResult:
                     receipt=f"subhole-cleared: {a['slice_slug']}")
 
 
+def _library_root(db: DB) -> Path:
+    """Where specs and the frontier live. The UI sets this per session."""
+    return Path(db.meta_get("library_root", "library"))
+
+
+def _write_spec(db: DB, a: dict) -> OpResult:
+    """Write a slice's spec file AND set its spec_path — one act, never two.
+
+    The lazy-spec invariant (tutor-simulation.md Part C): a non-NULL spec_path must
+    always mean the file exists. Splitting this into "write the file" then "remember to
+    set the column" is exactly how that invariant rots, so there is no way to do one
+    without the other.
+    """
+    slug = a["slice_slug"]
+    sl = db.one("SELECT * FROM slices WHERE slug=?", (slug,))
+    if not sl:
+        raise OpError(f"no such slice: {slug}")
+    body = a["body"]
+    if len(body.strip()) < 40:
+        raise OpError("a spec that short cannot brief him — write the real thing")
+    dest = _library_root(db) / "slices" / f"{slug}.md"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(body, encoding="utf-8")
+    db.execute("UPDATE slices SET spec_path=? WHERE slug=?", (str(dest), slug))
+    return OpResult(
+        text=f"OK. Spec written to {dest} and spec_path set. The gate for {slug} can "
+             f"now open once its prereqs are OWNED.",
+        receipt=f"spec: {slug} -> {dest.name}")
+
+
+def _write_frontier(db: DB, a: dict) -> OpResult:
+    """Validate and publish the M->L handoff. A partial fill is refused, not written."""
+    from .frontier import validate, FrontierError
+    raw = a["frontier"]
+    if not isinstance(raw, dict):
+        raise OpError("frontier must be an object")
+    try:
+        f = validate(raw)
+    except FrontierError as e:
+        raise OpError(f"frontier rejected: {e}")
+    slug = f.slice_slug
+    sl = db.one("SELECT spec_path FROM slices WHERE slug=?", (slug,))
+    if not sl:
+        raise OpError(f"frontier names an unknown slice: {slug}")
+    if not sl["spec_path"]:
+        raise OpError(f"write the spec for {slug} first — a frontier may not point at "
+                      f"a slice whose spec does not exist")
+    dest = _library_root(db) / "frontier.json"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(json.dumps(raw, indent=2), encoding="utf-8")
+    gap = f.gap["concept"] if f.gap else "(no gap — all prereqs owned)"
+    return OpResult(
+        text=f"OK. Frontier published for {slug} (gap: {gap}). L will read it on its "
+             f"next turn. Your turn is over — do not plan past this slice.",
+        receipt=f"frontier: {slug} (gap {gap})")
+
+
 def _set_target(db: DB, a: dict) -> OpResult:
     db.execute(
         "INSERT INTO target(id,codebase_path) VALUES(1,?) "
@@ -375,6 +433,14 @@ REGISTRY: dict[str, Operation] = {op.name: op for op in [
                   "SELECT 1 FROM slices WHERE subhole_concept IS NOT NULL") is not None),
     Operation("set_target", "M", "register the codebase being built (the spine = slices rows)",
               {"codebase_path": "str"}, _set_target, required=("codebase_path",)),
+    Operation("write_spec", "M", "write a slice's spec file and set its path (one act)",
+              {"slice_slug": "str", "body": "str"}, _write_spec,
+              required=("slice_slug", "body"),
+              available=lambda db: db.one("SELECT 1 FROM slices LIMIT 1") is not None),
+    Operation("write_frontier", "M", "publish the filled frontier for L (rejects any empty key)",
+              {"frontier": "json"}, _write_frontier, required=("frontier",),
+              available=lambda db: db.one(
+                  "SELECT 1 FROM slices WHERE spec_path IS NOT NULL LIMIT 1") is not None),
     # --- reads (both) ---
     Operation("list_ready_slices", "both", "list slices ready to gate",
               {}, _list_ready_slices),

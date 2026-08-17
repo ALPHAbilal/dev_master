@@ -185,3 +185,30 @@ def test_subhole_roundtrip():
     assert d.committed
     row = db.one("SELECT subhole_concept FROM slices WHERE slug='pinned-qa-group'")
     assert row["subhole_concept"] is None
+
+
+# --------------------------------------------------------------------------
+# dry run — added after a live M/SURVEY committed a junk "_probe_" slice and
+# concept purely to discover the schema.
+# --------------------------------------------------------------------------
+def test_check_validates_without_writing():
+    db = DB()
+    d = dispatch(db, "M", "upsert_slice",
+                 {"slug": "s1", "title": "t", "target_file": "app.py"}, check=True)
+    assert d.committed is False and d.receipt is None
+    assert "DRY RUN" in d.text
+    assert db.one("SELECT 1 FROM slices WHERE slug='s1'") is None
+
+
+def test_check_still_reports_bad_args():
+    db = DB()
+    d = dispatch(db, "M", "upsert_slice", {"slug": "s1"}, check=True)   # missing required
+    assert "REFUSED" in d.text and d.committed is False
+
+
+def test_check_false_still_commits():
+    db = DB()
+    d = dispatch(db, "M", "upsert_slice",
+                 {"slug": "s1", "title": "t", "target_file": "app.py"})
+    assert d.committed is True
+    assert db.one("SELECT 1 FROM slices WHERE slug='s1'")

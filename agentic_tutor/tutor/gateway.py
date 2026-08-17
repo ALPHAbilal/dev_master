@@ -26,7 +26,15 @@ class Disclosure:
     committed: bool = False
 
 
-def dispatch(db: DB, role: str, op: str | None = None, args: dict | None = None) -> Disclosure:
+def dispatch(db: DB, role: str, op: str | None = None, args: dict | None = None,
+             check: bool = False) -> Disclosure:
+    """check=True: validate the args and say what WOULD happen. Nothing is written.
+
+    Without this an agent that wants to confirm a call's shape has only one way to
+    find out — make the call. A real M/SURVEY run did exactly that, committing a
+    slice and a concept both titled "IGNORE - schema probe artifact" to learn the
+    schema. A dry run is cheaper than a polluted spine.
+    """
     # step 1 — no op: the menu
     if not op:
         ops = menu_for(db, role)
@@ -53,6 +61,10 @@ def dispatch(db: DB, role: str, op: str | None = None, args: dict | None = None)
         if not operation.available(db):
             raise OpError(f"'{op}' is not applicable in the current state")
         clean = validate(operation, args)
+        if check:
+            return Disclosure(
+                text=f"DRY RUN — args are valid for {op}; nothing was written.\n"
+                     f"accepted: {clean}\nCall again without check to commit.")
         result = operation.run(db, clean)
     except OpError as e:
         # refusal: nothing committed, no receipt persists
@@ -77,10 +89,12 @@ def make_db_tool(db: DB, role: str, on_commit=None):
             "make_db_tool() needs the SDK. `pip install claude-agent-sdk`."
         ) from e
 
-    @tool("db", "Interact with tutor state. Call with no args to see what you can do.",
-          {"op": str, "args": dict})
+    @tool("db", "Interact with tutor state. Call with no args to see what you can do. "
+                "Pass check=true to validate a call without writing anything.",
+          {"op": str, "args": dict, "check": bool})
     async def _db(a: dict):
-        d = dispatch(db, role, op=a.get("op"), args=a.get("args"))
+        d = dispatch(db, role, op=a.get("op"), args=a.get("args"),
+                     check=bool(a.get("check")))
         if d.committed and d.receipt and on_commit:
             on_commit(d.receipt)
         return {"content": [{"type": "text", "text": d.text}]}

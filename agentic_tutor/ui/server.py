@@ -17,13 +17,13 @@ from __future__ import annotations
 import json
 import threading
 from dataclasses import dataclass, field
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
 from tutor.db import DB
-from . import session, state
-from .runner import Runner, ScriptedRunner, default_script
+from . import runs, session, state
+from .runner import Event, Runner, ScriptedRunner, default_script
 
 PAGE = Path(__file__).resolve().parent / "app.html"
 
@@ -37,20 +37,50 @@ class App:
     runner: Runner = None                       # type: ignore[assignment]
     transcript: list[dict] = field(default_factory=list)
     running: str | None = None                  # the agent EXECUTING right now, or None
+    model: str = ""                             # pinned agent model; "" = survey default
+    trace: list = field(default_factory=list)   # operator record: every turn, verbatim
 
     def __post_init__(self):
         if self.runner is None:
             self.runner = ScriptedRunner(self.db, default_script())
+        # where specs + frontier.json live for this session; the ops read it from meta
+        if self.db.path != ":memory:":
+            self.db.meta_set("library_root", str(Path(self.db.path).resolve().parent / "library"))
+
+    @property
+    def library(self) -> Path:
+        return Path(self.db.meta_get("library_root", "library"))
+
+    def frontier_empty(self) -> bool:
+        """The wakeup signal (Part C): no frontier file = M/PLAN owes a turn.
+
+        The FILE is the fact, not a flag we keep — the same rule the design gives.
+        """
+        return not (self.library / "frontier.json").exists()
 
     def snapshot(self) -> dict:
-        snap = state.snapshot(self.db, self.runner.frontier_empty(), self.running)
+        snap = state.snapshot(self.db, self.frontier_empty(), self.running)
         snap["transcript"] = self.transcript
         snap["runner"] = self.runner.name
+        snap["model"] = self.model or _default_model()
+        snap["runs"] = runs.history(self.db)
         return snap
 
     def emit(self, ev) -> None:
-        """Append one agent event. The page polls, so this is the live feed."""
+        """Append one event to the LEARNER's transcript.
+
+        M's prose never arrives here — agentrun.drive() only forwards `say` events for
+        learner-facing agents. What does arrive from an M turn is the handoff notice and
+        the receipts, i.e. that it happened and what it changed. The full turn lives in
+        `trace`.
+        """
         self.transcript.append(ev.as_dict())
+
+
+def _default_model() -> str:
+    """Read lazily so the module still imports with no SDK installed."""
+    from .survey import DEFAULT_MODEL
+    return DEFAULT_MODEL
 
 
 @dataclass
@@ -89,22 +119,69 @@ def handle(app: App, method: str, path: str, body: bytes = b"", query: dict | No
     if method == "POST" and path == "/api/survey":
         return _survey(app)
 
+    if method == "POST" and path == "/api/plan":
+        return _plan(app)
+
+    if method == "GET" and path == "/api/trace":
+        # the operator record: every turn, verbatim. Kept out of /api/state because it
+        # is large and the learner's page polls state every second while a turn runs.
+        return Response(200, {"turns": [t.as_dict() for t in app.trace]})
+
     return Response(404, {"error": f"no route: {method} {path}"})
 
 
+def _plan(app: App) -> Response:
+    """Run one M/PLAN turn. Cold every time — that IS the F1 wipe for this agent."""
+    if not session.is_adopted(app.db):
+        return Response(409, {"error": "adopt a codebase first"})
+    if app.running:
+        return Response(409, {"error": f"{app.running} is already running"})
+    if app.db.one("SELECT 1 FROM slices LIMIT 1") is None:
+        return Response(409, {"error": "no spine yet — run the survey first"})
+
+    from .plan import run_plan_sync
+    model = app.model or _default_model()
+
+    def work():
+        try:
+            run_plan_sync(app.db, app.emit, model, app.trace)
+        finally:
+            app.running = None
+
+    app.running = "M/PLAN"
+    threading.Thread(target=work, daemon=True).start()
+    return Response(200, {"started": True, "state": app.snapshot()})
+
+
 def _survey(app: App) -> Response:
-    """Launch M/SURVEY in a background thread; the page polls /api/state for the feed."""
+    """Launch M/SURVEY in a background thread; the page polls /api/state for the feed.
+
+    A re-survey archives the current spine first, then clears it. Never a silent
+    overwrite: the previous map stays on disk so two runs can be compared.
+    """
     if not session.is_adopted(app.db):
         return Response(409, {"error": "adopt a codebase first"})
     if app.running:
         return Response(409, {"error": f"{app.running} is already running"})
 
+    model = app.model or _default_model()
+    if app.db.one("SELECT 1 FROM slices LIMIT 1"):
+        try:
+            saved = runs.archive(app.db, model)
+        except runs.ArchiveError as e:
+            return Response(409, {"error": str(e)})
+        cleared = runs.reset_spine(app.db)
+        app.emit(Event("handoff",
+                       f"Previous spine archived to runs/{saved.name} "
+                       f"({cleared['slices']} slices, {cleared['concepts']} concepts) "
+                       f"and cleared. Starting a fresh survey.", "system"))
+
     from .survey import run_survey_sync
 
     def work():
         try:
-            for ev in run_survey_sync(app.db):
-                app.emit(ev)
+            # emits as it streams, not at the end
+            run_survey_sync(app.db, app.emit, app.model or _default_model(), app.trace)
         finally:
             app.running = None                  # the indicator must never stay stuck on
 
@@ -173,4 +250,6 @@ def serve(app: App, port: int = 8765) -> None:
             pass                                # the terminal stays quiet
 
     print(f"tutor  →  http://127.0.0.1:{port}   (ctrl-c to stop)")
-    HTTPServer(("127.0.0.1", port), Handler).serve_forever()
+    # threading: an agent turn runs on a worker thread while the page keeps polling
+    # /api/state for its output. A single-threaded server would block the whole feed.
+    ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()

@@ -18,11 +18,13 @@ def main() -> None:
     ap.add_argument("--db", default=".tutor/session.db")
     ap.add_argument("--workspace", default=".tutor/workspace")
     ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--model", default="",
+                    help="model for agent turns; empty uses survey.DEFAULT_MODEL")
     args = ap.parse_args()
 
     Path(args.db).parent.mkdir(parents=True, exist_ok=True)
     Path(args.workspace).mkdir(parents=True, exist_ok=True)
-    serve(App(DB(args.db), args.workspace), port=args.port)
+    serve(App(DB(args.db), args.workspace, model=args.model), port=args.port)
 
 
 if __name__ == "__main__":

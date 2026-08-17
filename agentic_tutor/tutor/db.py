@@ -6,6 +6,7 @@ connection, applies schema.sql, and exposes row-dict helpers. No pedagogy here.
 from __future__ import annotations
 
 import sqlite3
+import threading
 from pathlib import Path
 
 SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schema.sql"
@@ -16,8 +17,12 @@ class DB:
 
     def __init__(self, path: str | Path = ":memory:"):
         self.path = str(path)
-        self.conn = sqlite3.connect(self.path)
+        # check_same_thread=False: an agent turn runs on a worker thread while the
+        # interface reads state on the request thread. `lock` keeps those serialized —
+        # SQLite allows the cross-thread handle, it does not make it concurrent.
+        self.conn = sqlite3.connect(self.path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
+        self.lock = threading.RLock()
         self.conn.execute("PRAGMA foreign_keys = ON")
         self._init_schema()
 
@@ -27,17 +32,19 @@ class DB:
 
     # --- tiny query helpers -------------------------------------------------
     def query(self, sql: str, params: tuple = ()) -> list[dict]:
-        cur = self.conn.execute(sql, params)
-        return [dict(r) for r in cur.fetchall()]
+        with self.lock:
+            cur = self.conn.execute(sql, params)
+            return [dict(r) for r in cur.fetchall()]
 
     def one(self, sql: str, params: tuple = ()) -> dict | None:
         rows = self.query(sql, params)
         return rows[0] if rows else None
 
     def execute(self, sql: str, params: tuple = ()) -> sqlite3.Cursor:
-        cur = self.conn.execute(sql, params)
-        self.conn.commit()
-        return cur
+        with self.lock:
+            cur = self.conn.execute(sql, params)
+            self.conn.commit()
+            return cur
 
     # --- meta kv ------------------------------------------------------------
     def meta_get(self, key: str, default=None):

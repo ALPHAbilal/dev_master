@@ -240,6 +240,225 @@ def test_page_is_served():
     assert r.status == 200 and b"<title>tutor</title>" in r.body
 
 
+# --------------------------------------------------------------------------
+# the indicator must never claim work that is not happening
+# --------------------------------------------------------------------------
+def test_due_is_not_running():
+    db = DB()
+    session.adopt_folder(db, _codebase())
+    who = state.who_is_active(db, frontier_empty=True, running=None)
+    assert who["agent"] == "M/SURVEY"
+    assert who["status"] == "due"
+    assert "has not run yet" in who["activity"]
+
+
+def test_running_is_only_reported_when_actually_running():
+    db = DB()
+    session.adopt_folder(db, _codebase())
+    who = state.who_is_active(db, frontier_empty=True, running="M/SURVEY")
+    assert who["status"] == "running"
+    assert "reading your codebase" in who["activity"]
+
+
+def test_running_survey_keeps_its_label_after_it_writes_its_first_slice():
+    """Regression: writing a slice flipped the picker to PLAN mid-run and the header
+    relabelled a still-running SURVEY as 'M/PLAN due'."""
+    db = DB()
+    session.adopt_folder(db, _codebase())
+    dispatch(db, "M", "upsert_slice", {"slug": "s1", "title": "t", "target_file": "app.py"})
+    who = state.who_is_active(db, frontier_empty=True, running="M/SURVEY")
+    assert who["agent"] == "M/SURVEY" and who["status"] == "running"
+
+
+def test_the_button_follows_the_wakeup():
+    db = DB()
+    session.adopt_folder(db, _codebase())
+    assert state.who_is_active(db, True)["start_label"] == "Run the survey"
+    dispatch(db, "M", "upsert_slice", {"slug": "s1", "title": "t", "target_file": "app.py"})
+    assert state.who_is_active(db, True)["start_label"] == "Plan the next slice"
+
+
+def test_l_waiting_is_not_a_running_state():
+    db = DB()
+    session.adopt_folder(db, _codebase())
+    dispatch(db, "M", "upsert_slice", {"slug": "s1", "title": "t", "target_file": "app.py"})
+    who = state.who_is_active(db, frontier_empty=False)
+    assert who["status"] == "waiting" and who["learner_waits"] is False
+
+
+def test_survey_route_refuses_before_adoption_and_when_busy():
+    app = _app()
+    assert handle(app, "POST", "/api/survey").status == 409       # nothing adopted
+    handle(app, "POST", "/api/adopt", json.dumps({"path": _codebase()}).encode())
+    app.running = "M/SURVEY"
+    r = handle(app, "POST", "/api/survey")
+    assert r.status == 409 and "already running" in r.body["error"]
+
+
+def test_survey_prompt_is_refused_once_a_spine_exists():
+    from ui.survey import survey_prompt, SurveyError
+    db = DB()
+    session.adopt_folder(db, _codebase())
+    system, first = survey_prompt(db)
+    assert "[SURVEY]" in system and "spec_path` NULL" in system
+    dispatch(db, "M", "upsert_slice", {"slug": "s1", "title": "t", "target_file": "app.py"})
+    try:
+        survey_prompt(db)
+        assert False, "a second survey is a spine repair, not a survey"
+    except SurveyError:
+        pass
+
+
+# --------------------------------------------------------------------------
+# archive-before-resurvey — a second survey must never silently overwrite the first
+# --------------------------------------------------------------------------
+def _file_app():
+    d = Path(tempfile.mkdtemp())
+    return App(DB(str(d / "session.db")), str(d / "ws"))
+
+
+def test_archive_snapshots_and_reset_clears_only_the_map():
+    from ui import runs
+    app = _file_app()
+    session.adopt_folder(app.db, _codebase())
+    dispatch(app.db, "M", "upsert_slice", {"slug": "s1", "title": "t", "target_file": "a.py"})
+    dispatch(app.db, "M", "upsert_concept", {"slug": "c1", "name": "c"})
+    dispatch(app.db, "L", "record_probe", {"kind": "predict", "result": "HIT"})
+
+    saved = runs.archive(app.db, "claude-haiku-4-5")
+    assert saved.exists()
+    cleared = runs.reset_spine(app.db)
+    assert cleared == {"slices": 1, "concepts": 1, "gates": 0}
+    assert app.db.one("SELECT 1 FROM slices") is None
+    assert session.is_adopted(app.db)                       # target survives
+    assert app.db.one("SELECT 1 FROM probes")               # evidence survives
+
+
+def test_history_lists_archived_runs_with_their_sizes():
+    from ui import runs
+    app = _file_app()
+    session.adopt_folder(app.db, _codebase())
+    dispatch(app.db, "M", "upsert_slice", {"slug": "s1", "title": "t", "target_file": "a.py"})
+    runs.archive(app.db, "model-a")
+    h = runs.history(app.db)
+    assert len(h) == 1 and h[0]["slices"] == 1 and h[0]["label"] == "model-a"
+
+
+def test_resurvey_archives_before_clearing():
+    app = _file_app()
+    handle(app, "POST", "/api/adopt", json.dumps({"path": _codebase()}).encode())
+    dispatch(app.db, "M", "upsert_slice", {"slug": "s1", "title": "t", "target_file": "a.py"})
+    handle(app, "POST", "/api/survey")                      # SDK absent -> run errors out
+    from ui import runs
+    assert len(runs.history(app.db)) == 1, "the old spine must be archived first"
+    assert app.db.one("SELECT 1 FROM slices") is None       # and then cleared
+    assert any("archived" in t["text"] for t in app.transcript)
+
+
+def test_in_memory_session_refuses_to_archive_rather_than_losing_the_spine():
+    from ui import runs
+    app = _app()
+    handle(app, "POST", "/api/adopt", json.dumps({"path": _codebase()}).encode())
+    dispatch(app.db, "M", "upsert_slice", {"slug": "s1", "title": "t", "target_file": "a.py"})
+    r = handle(app, "POST", "/api/survey")
+    assert r.status == 409
+    assert app.db.one("SELECT 1 FROM slices"), "a failed archive must clear nothing"
+
+
+def test_spine_makes_the_session_resurveyable():
+    db = DB()
+    session.adopt_folder(db, _codebase())
+    assert state.who_is_active(db, True)["resurveyable"] is False
+    dispatch(db, "M", "upsert_slice", {"slug": "s1", "title": "t", "target_file": "a.py"})
+    assert state.who_is_active(db, True)["resurveyable"] is True
+
+
+def test_plan_is_launchable_now_that_it_has_a_runner():
+    db = DB()
+    session.adopt_folder(db, _codebase())
+    dispatch(db, "M", "upsert_slice", {"slug": "s1", "title": "t", "target_file": "app.py"})
+    who = state.who_is_active(db, frontier_empty=True)
+    assert who["agent"] == "M/PLAN"
+    assert who["startable"] is True and who["blocked_by"] is None
+    assert who["start_route"] == "/api/plan"
+
+
+def test_subhole_still_reports_its_missing_runner():
+    """The one M turn with no runner must still say so rather than dead-ending."""
+    db = DB()
+    session.adopt_folder(db, _codebase())
+    dispatch(db, "M", "upsert_slice", {"slug": "s1", "title": "t", "target_file": "app.py"})
+    dispatch(db, "L", "raise_subhole",
+             {"slice_slug": "s1", "concept_slug": "c", "evidence": "e"})
+    who = state.who_is_active(db, frontier_empty=False)
+    assert who["agent"] == "M/SUBHOLE" and who["startable"] is False
+    assert who["blocked_by"] and "step 6" in who["blocked_by"]
+
+
+def test_survey_due_is_startable_so_has_no_blocker():
+    db = DB()
+    session.adopt_folder(db, _codebase())
+    who = state.who_is_active(db, frontier_empty=True)
+    assert who["startable"] is True and who["blocked_by"] is None
+
+
+def test_model_is_pinned_not_inherited():
+    from ui.survey import DEFAULT_MODEL
+    src = (Path(__file__).resolve().parent.parent / "ui" / "survey.py").read_text()
+    assert "model=model" in src, "the survey must pass an explicit model, never inherit"
+    assert DEFAULT_MODEL.startswith("claude-")
+
+
+def test_snapshot_reports_the_model_so_the_screen_never_guesses():
+    app = _app()
+    assert app.snapshot()["model"].startswith("claude-")
+    app.model = "claude-opus-5"
+    assert app.snapshot()["model"] == "claude-opus-5"
+
+
+def test_survey_options_contain_the_agent():
+    """Regression: a live run invoked Skill and Bash because host settings leaked in."""
+    src = (Path(__file__).resolve().parent.parent / "ui" / "survey.py").read_text()
+    assert "setting_sources=[]" in src           # no host CLAUDE.md, skills, or perms
+    for escape in ("Bash", "Skill", "Task", "Write"):
+        assert f'"{escape}"' in src, f"{escape} must be explicitly disallowed"
+
+
+def test_survey_emits_during_the_run_not_after_it():
+    """The whole point of the feed: events must arrive while the survey is working."""
+    from ui import survey as survey_mod
+    seen = []
+
+    async def fake_run(db, emit, model=None, trace=None):
+        emit(Event("handoff", f"M/SURVEY started on {model}", "M/SURVEY"))
+        assert seen, "the first event must already be delivered before the run ends"
+        emit(Event("tool", "grep def ", "M/SURVEY"))
+
+    original = survey_mod.run_survey
+    survey_mod.run_survey = fake_run
+    try:
+        survey_mod.run_survey_sync(DB(), lambda e: seen.append(e))
+    finally:
+        survey_mod.run_survey = original
+    assert [e.kind for e in seen] == ["handoff", "tool"]
+
+
+def test_survey_errors_are_surfaced_not_swallowed():
+    from ui import survey as survey_mod
+    seen = []
+    survey_mod.run_survey_sync(DB(), seen.append)     # no codebase adopted
+    assert seen and seen[0].kind == "error"
+
+
+def test_survey_prompt_points_the_agent_at_the_adopted_root():
+    from ui.survey import survey_prompt
+    db = DB()
+    root = _codebase()
+    session.adopt_folder(db, root)
+    system, _ = survey_prompt(db)
+    assert str(Path(root).resolve()) in system
+
+
 def test_sdk_runner_says_it_is_not_built_rather_than_pretending():
     from ui.runner import SdkRunner
     ev = SdkRunner(DB()).turn("hello")

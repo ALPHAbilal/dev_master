@@ -143,7 +143,10 @@ def _tool_discipline_block() -> str:
        A whole-file Read of something you have not located is a bug.
  Web   two questions only: the standard NAME of a concept, and whether a
        prerequisite edge is real. Two calls is a lot; five means you are drifting.
- db()  last. It is the only write. menu -> describe -> commit."""
+ db()  last. It is the only write. menu -> describe -> commit.
+       Unsure of a call? Pass check=true — it validates and writes NOTHING.
+       NEVER write a throwaway row to find out what a schema wants. A junk row in
+       the spine misroutes every later turn; a dry run costs one call."""
 
 
 def _evidence_block(db: DB) -> str:

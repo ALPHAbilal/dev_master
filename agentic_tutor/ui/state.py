@@ -29,6 +29,17 @@ ACTIVITY = {
     None: "waiting for you",
 }
 
+# Which M turns still have no runner, and what would have to be built to give them one.
+# Surfaced verbatim in the UI so a stalled session explains itself.
+MISSING_RUNNER = {
+    "SUBHOLE": ("M/SUBHOLE has no runner yet (build order step 6). L is holding on a "
+                "shaky prerequisite that nothing can re-plan."),
+}
+
+# M turns that can actually be launched, and the button that launches them.
+RUNNABLE = {"SURVEY": "Run the survey", "PLAN": "Plan the next slice"}
+ROUTE = {"SURVEY": "/api/survey", "PLAN": "/api/plan"}
+
 
 def who_is_active(db: DB, frontier_empty: bool, running: str | None = None) -> dict:
     """Who holds the turn, and — critically — whether anything is actually EXECUTING.
@@ -44,22 +55,38 @@ def who_is_active(db: DB, frontier_empty: bool, running: str | None = None) -> d
     if not session.is_adopted(db):
         return {"agent": None, "label": "no codebase yet", "status": "idle",
                 "activity": "waiting for a codebase", "learner_waits": True}
+    # What is ACTUALLY executing outranks what the picker predicts. A running SURVEY
+    # writes slices, which immediately makes the picker say "PLAN is due" — reporting
+    # that while SURVEY is still working would swap the label mid-run and claim the
+    # wrong agent. Only the orchestrator clears `running`.
+    if running:
+        key = running.split("/")[-1] if running.startswith("M/") else "L"
+        return {"agent": running, "label": running, "status": "running",
+                "activity": ACTIVITY.get(key, "working"), "learner_waits": True,
+                "startable": False}
     turn = pick_m_turn(db, frontier_empty)
     if turn:
-        is_running = running == f"M/{turn}"
+        # Only SURVEY has a runner today. Saying "due" and greying the composer with no
+        # explanation strands the learner: nothing to press, nothing to type, no reason
+        # given. Name the missing piece instead.
         return {
-            "agent": f"M/{turn}", "label": f"M/{turn}",
-            "status": "running" if is_running else "due",
-            "activity": (ACTIVITY[turn] if is_running
-                         else f"has not run yet — it would be {ACTIVITY[turn]}"),
+            "agent": f"M/{turn}", "label": f"M/{turn}", "status": "due",
+            "activity": f"has not run yet — it would be {ACTIVITY[turn]}",
             "learner_waits": True,
-            "startable": turn == "SURVEY",
+            "startable": turn in RUNNABLE,
+            "blocked_by": None if turn in RUNNABLE else MISSING_RUNNER[turn],
+            "resurveyable": _has_spine(db),
+            "start_label": RUNNABLE.get(turn, ""),
+            "start_route": ROUTE.get(turn, ""),
         }
-    if running == "L":
-        return {"agent": "L", "label": "L", "status": "running",
-                "activity": ACTIVITY["L"], "learner_waits": True}
     return {"agent": "L", "label": "L", "status": "waiting",
-            "activity": "waiting for you", "learner_waits": False}
+            "activity": "waiting for you", "learner_waits": False,
+            "startable": False, "blocked_by": None, "resurveyable": _has_spine(db)}
+
+
+def _has_spine(db: DB) -> bool:
+    """A spine exists, so 'run the survey' means re-survey: archive, clear, redraw."""
+    return db.one("SELECT 1 FROM slices LIMIT 1") is not None
 
 
 def snapshot(db: DB, frontier_empty: bool = True, running: str | None = None) -> dict:
