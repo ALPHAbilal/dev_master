@@ -553,7 +553,7 @@ def test_lesson_prompt_opens_with_the_opening_question_then_switches():
     cm = ContextManager("L")
     p1 = lesson_prompt(db, cm, f, "hi, where do we start?")
     assert "OPEN WITH" in p1 and f.gap["opening_question"] in p1
-    assert "[LEARNER] hi, where do we start?" in p1
+    assert "[USER] hi, where do we start?" in p1
     cm.append_assistant("what does the loop hand you each step?")
     p2 = lesson_prompt(db, cm, f, "the item, I think")
     assert "OPEN WITH" not in p2 and "done-when" in p2      # F2: continue framing
