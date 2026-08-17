@@ -1,0 +1,25 @@
+{
+  "id": 4,
+  "project_id": "dev_master",
+  "slug": "fstring",
+  "depth": 0,
+  "parent_id": null,
+  "why": "f-strings: interpolation in real schema-builder code",
+  "anchor_file": "soufiane_prompts/prompts/run_prompts.py",
+  "anchor_lo": 104,
+  "anchor_hi": 111,
+  "resume_q": null,
+  "rungs": {
+    "predict": "HIT",
+    "perturb": "HIT",
+    "produce": "HIT",
+    "transfer": "HIT"
+  },
+  "pending": [],
+  "state": "PASSED",
+  "hop_budget": 2,
+  "opened_at": "2026-08-14T00:22:21",
+  "closed_at": "2026-08-14T00:40:22",
+  "kind": "TARGET",
+  "done_def": null
+}

@@ -1,0 +1,25 @@
+{
+  "id": 1,
+  "project_id": "dev_master",
+  "slug": "uuid",
+  "depth": 0,
+  "parent_id": null,
+  "why": "the anchor: load_ledger, the function he is rebuilding",
+  "anchor_file": "soufiane_prompts/prompts/run_prompts.py",
+  "anchor_lo": 469,
+  "anchor_hi": 486,
+  "resume_q": null,
+  "rungs": {
+    "predict": "HIT",
+    "perturb": "HIT",
+    "produce": "HIT",
+    "transfer": "HIT"
+  },
+  "pending": [],
+  "state": "PASSED",
+  "hop_budget": 2,
+  "opened_at": "2026-08-12T15:59:54",
+  "closed_at": "2026-08-14T00:18:32",
+  "kind": "TARGET",
+  "done_def": null
+}
