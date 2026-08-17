@@ -96,11 +96,13 @@ def lesson_prompt(db: DB, cm: ContextManager, frontier: Frontier,
     The routing block is injected HERE by render(), not by a UserPromptSubmit hook:
     we own history, so injection is a rendering concern (tutor-sdk-mapping.md §3).
     """
+    # F2 is decided BEFORE his message lands: this UI's turn 1 begins with the
+    # learner speaking, so appending first would make every turn a continue turn.
+    first = cm.is_first_turn
     cm.append_learner(learner_text)
     cm.collapse()
-    opening = build_l_block(db, frontier, True)
-    cont = build_l_block(db, frontier, False)
-    return cm.render(opening_block=opening, continue_block=cont)
+    block = build_l_block(db, frontier, first)
+    return cm.render(opening_block=block, continue_block=block)
 
 
 async def run_lesson(db: DB, cm: ContextManager, learner_text: str,

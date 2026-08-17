@@ -528,3 +528,122 @@ def test_a_frontier_that_fails_the_schema_is_reported_as_absent():
 
     (lib / "frontier.json").write_text("{not json")
     assert app.frontier_data() is None
+
+
+# --------------------------------------------------------------------------
+# the L turn (build order step 4) — pure parts, no SDK, no model
+# --------------------------------------------------------------------------
+def _published(db, raw=None):
+    lib = Path(tempfile.mkdtemp())
+    db.meta_set("library_root", str(lib))
+    raw = raw or json.loads(_FIXTURE.read_text())
+    (lib / "frontier.json").write_text(json.dumps(raw))
+    return raw
+
+
+def test_lesson_prompt_opens_with_the_opening_question_then_switches():
+    from tutor.context_manager import ContextManager
+    from tutor.frontier import validate
+    from ui.lesson import lesson_prompt
+    db = DB()
+    f = validate(json.loads(_FIXTURE.read_text()))
+    # the concept must exist and be unowned for the teaching block to render
+    dispatch(db, "M", "upsert_concept",
+             {"slug": "enumerate-index", "name": "enumerate", "state": "READY"})
+    cm = ContextManager("L")
+    p1 = lesson_prompt(db, cm, f, "hi, where do we start?")
+    assert "OPEN WITH" in p1 and f.gap["opening_question"] in p1
+    assert "[LEARNER] hi, where do we start?" in p1
+    cm.append_assistant("what does the loop hand you each step?")
+    p2 = lesson_prompt(db, cm, f, "the item, I think")
+    assert "OPEN WITH" not in p2 and "done-when" in p2      # F2: continue framing
+    assert "what does the loop hand you each step?" in p2   # history survived
+
+
+def test_lesson_refuses_an_unusable_frontier_and_names_the_planner():
+    from ui.lesson import LessonError, load_current_frontier
+    db = DB()
+    raw = json.loads(_FIXTURE.read_text())
+    raw["gap"]["opening_question"] = ""                     # schema-refused
+    _published(db, raw)
+    try:
+        load_current_frontier(db)
+        assert False, "should have raised"
+    except LessonError as e:
+        assert "re-run M/PLAN" in str(e)
+
+
+def test_sdk_runner_wipes_history_at_the_slice_boundary():
+    """F1: a new slug on the frontier drops the old ContextManager, and the
+    frontier's vocab is seeded exactly at that fresh start (F3)."""
+    from ui import lesson as lesson_mod
+    from ui.runner import SdkRunner
+
+    db = DB()
+    raw = _published(db)
+    calls = []
+    r = SdkRunner(db)
+    original = lesson_mod.run_lesson_sync
+    lesson_mod.run_lesson_sync = lambda db_, cm, text, sink, model, trace: calls.append(cm)
+    try:
+        r.turn("first")
+        first_cm = calls[0]
+        r.turn("second")
+        assert calls[1] is first_cm                         # same slice, same mind
+        raw["slice"]["slug"] = "next-slice"
+        _seen = json.dumps(raw)
+        (Path(db.meta_get("library_root")) / "frontier.json").write_text(_seen)
+        db.execute("INSERT INTO slices(slug,title,target_file,state) "
+                   "VALUES('next-slice','next','x.py','READY')")
+        r.turn("third")
+        assert calls[2] is not first_cm                     # F1: the wipe
+    finally:
+        lesson_mod.run_lesson_sync = original
+    assert db.one("SELECT state FROM vocab WHERE term='enumerate'")["state"] == "hold"
+
+
+def test_rollover_archives_the_frontier_only_when_the_slice_is_built():
+    from tutor.frontier import validate
+    from ui.lesson import _rollover_if_built
+    db = DB()
+    _published(db)
+    f = validate(json.loads(_FIXTURE.read_text()))
+    lib = Path(db.meta_get("library_root"))
+    seen = []
+    db.execute("INSERT INTO slices(slug,title,target_file,state) "
+               "VALUES('pinned-qa-group','t','run_prompts.py','READY')")
+    _rollover_if_built(db, f, seen.append)
+    assert (lib / "frontier.json").exists() and not seen    # not BUILT: nothing moves
+
+    db.execute("UPDATE slices SET state='BUILT' WHERE slug='pinned-qa-group'")
+    _rollover_if_built(db, f, seen.append)
+    assert not (lib / "frontier.json").exists()             # code did the rollover
+    assert (lib / "archive" / "frontier-pinned-qa-group.json").exists()
+    assert seen and seen[0].kind == "handoff" and "M/PLAN" in seen[0].text
+
+
+def test_say_runs_a_live_runner_in_the_background_with_running_set():
+    from ui.runner import Event, Runner
+
+    class FakeLive(Runner):
+        name = "sdk"
+        def __init__(self, app_holder):
+            self.emit = None                                # set after App exists
+        def turn(self, text):
+            self.emit(Event("say", "echo: " + text, "L"))
+            return []
+
+    live = FakeLive(None)
+    db, root = DB(), _codebase()
+    session.adopt_folder(db, root)
+    app = App(db, tempfile.mkdtemp(), runner=live)
+    live.emit = app.emit
+    r = handle(app, "POST", "/api/say", json.dumps({"text": "hello"}).encode())
+    assert r.status == 200 and r.body.get("started") is True
+    import time
+    for _ in range(50):                                     # the thread is near-instant
+        if any(t.get("text") == "echo: hello" for t in app.transcript):
+            break
+        time.sleep(0.02)
+    assert any(t["kind"] == "learner" for t in app.transcript)
+    assert any(t.get("text") == "echo: hello" for t in app.transcript)
