@@ -24,6 +24,7 @@ from . import session
 ACTIVITY = {
     "SURVEY": "reading your codebase and drawing the map",
     "PLAN": "planning the next slice",
+    "REGAP": "aiming the next gap on this slice",
     "SUBHOLE": "re-planning around a shaky prerequisite",
     "L": "teaching",
     None: "waiting for you",
@@ -37,11 +38,13 @@ MISSING_RUNNER = {
 }
 
 # M turns that can actually be launched, and the button that launches them.
-RUNNABLE = {"SURVEY": "Run the survey", "PLAN": "Plan the next slice"}
-ROUTE = {"SURVEY": "/api/survey", "PLAN": "/api/plan"}
+RUNNABLE = {"SURVEY": "Run the survey", "PLAN": "Plan the next slice",
+            "REGAP": "Aim the next gap"}
+ROUTE = {"SURVEY": "/api/survey", "PLAN": "/api/plan", "REGAP": "/api/plan"}
 
 
-def who_is_active(db: DB, frontier_empty: bool, running: str | None = None) -> dict:
+def who_is_active(db: DB, frontier_empty: bool, running: str | None = None,
+                  frontier: dict | None = None) -> dict:
     """Who holds the turn, and — critically — whether anything is actually EXECUTING.
 
     `status` is the honest bit and must never be faked:
@@ -64,7 +67,7 @@ def who_is_active(db: DB, frontier_empty: bool, running: str | None = None) -> d
         return {"agent": running, "label": running, "status": "running",
                 "activity": ACTIVITY.get(key, "working"), "learner_waits": True,
                 "startable": False}
-    turn = pick_m_turn(db, frontier_empty)
+    turn = pick_m_turn(db, frontier_empty, frontier)
     if turn:
         # Only SURVEY has a runner today. Saying "due" and greying the composer with no
         # explanation strands the learner: nothing to press, nothing to type, no reason
@@ -94,7 +97,7 @@ def snapshot(db: DB, frontier_empty: bool = True, running: str | None = None,
     return {
         "adopted": session.is_adopted(db),
         "root": session.current_root(db),
-        "active": who_is_active(db, frontier_empty, running),
+        "active": who_is_active(db, frontier_empty, running, frontier_raw),
         "frontier": frontier(frontier_raw),
         "spine": spine(db),
         "concepts": concepts(db),

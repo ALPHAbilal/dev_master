@@ -43,6 +43,44 @@ class DB:
         if "status" in cols and "state" not in cols:
             self.conn.execute("ALTER TABLE vocab RENAME COLUMN status TO state")
 
+        # v2 map columns: probes.level, concepts.review_due/review_streak. ADD COLUMN
+        # is safe on an old table; the probes kind-CHECK, however, is baked into the
+        # table SQL, so an old probes table must be rebuilt to accept the new kinds.
+        pcols = {r[1] for r in self.conn.execute("PRAGMA table_info(probes)")}
+        if pcols and "level" not in pcols:
+            self.conn.execute("ALTER TABLE probes ADD COLUMN level INTEGER")
+        ccols = {r[1] for r in self.conn.execute("PRAGMA table_info(concepts)")}
+        if ccols and "review_due" not in ccols:
+            self.conn.execute("ALTER TABLE concepts ADD COLUMN review_due TEXT")
+            self.conn.execute(
+                "ALTER TABLE concepts ADD COLUMN review_streak INTEGER NOT NULL DEFAULT 0")
+        # legacy single-cell subhole -> a row on the new stack
+        scols = {r[1] for r in self.conn.execute("PRAGMA table_info(slices)")}
+        if "subhole_concept" in scols:
+            for r in self.conn.execute(
+                    "SELECT slug, subhole_concept, subhole_evidence FROM slices "
+                    "WHERE subhole_concept IS NOT NULL").fetchall():
+                self.conn.execute(
+                    "INSERT INTO subholes(slice_slug,concept_slug,evidence) VALUES(?,?,?)",
+                    (r[0], r[1], r[2] or "(migrated)"))
+                self.conn.execute(
+                    "UPDATE slices SET subhole_concept=NULL, subhole_evidence=NULL "
+                    "WHERE slug=?", (r[0],))
+
+        row = self.conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='probes'").fetchone()
+        if row and "'entry'" not in row[0]:
+            self.conn.executescript("""
+                ALTER TABLE probes RENAME TO probes_old;
+            """)
+            self.conn.executescript(SCHEMA_PATH.read_text())   # recreate probes fresh
+            self.conn.execute("""
+                INSERT INTO probes(id,concept_slug,kind,result,pushes,self_corrected,
+                                   error_class,reveals,terms,note,created_at,level)
+                SELECT id,concept_slug,kind,result,pushes,self_corrected,
+                       error_class,reveals,terms,note,created_at,level FROM probes_old""")
+            self.conn.execute("DROP TABLE probes_old")
+
     # --- tiny query helpers -------------------------------------------------
     def query(self, sql: str, params: tuple = ()) -> list[dict]:
         with self.lock:

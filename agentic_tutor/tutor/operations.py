@@ -87,12 +87,15 @@ def validate(op: Operation, args: dict) -> dict:
 # L operations — the teacher's writes
 # --------------------------------------------------------------------------
 def _record_probe(db: DB, a: dict) -> OpResult:
+    if a["kind"] == "entry" and a.get("level") not in (3, 4, 5):
+        raise OpError("an entry probe needs level 3 (study), 4 (complete) or 5 (produce) — "
+                      "it routes where the gap loop begins")
     db.execute(
         "INSERT INTO probes(concept_slug,kind,result,pushes,self_corrected,"
-        "error_class,reveals,terms,note) VALUES(?,?,?,?,?,?,?,?,?)",
+        "error_class,reveals,terms,note,level) VALUES(?,?,?,?,?,?,?,?,?,?)",
         (a.get("concept_slug"), a["kind"], a["result"], a.get("pushes", 0),
          a.get("self_corrected", 0), a.get("error_class"), a.get("reveals"),
-         a.get("terms"), a.get("note")),
+         a.get("terms"), a.get("note"), a.get("level")),
     )
     pushes = a.get("pushes", 0)
     if pushes >= 4:
@@ -107,6 +110,42 @@ def _record_probe(db: DB, a: dict) -> OpResult:
         text=f"OK. Probe stored ({a['result']}, {pushes} pushes). {conseq}",
         receipt=f"probe: {a.get('concept_slug','?')} {a['result']} pushes={pushes}",
     )
+
+
+def _record_review(db: DB, a: dict) -> OpResult:
+    """⓪ REACTIVATE: one cold recall of an OWNED concept, judged."""
+    slug, result = a["concept_slug"], a["result"]
+    row = db.one("SELECT state, review_streak FROM concepts WHERE slug=?", (slug,))
+    if not row:
+        raise OpError(f"no such concept: {slug}")
+    if row["state"] != "OWNED":
+        raise OpError(f"{slug} is {row['state']}, not OWNED — only owned concepts are reviewed")
+    db.execute("INSERT INTO probes(concept_slug,kind,result,note) VALUES(?,?,?,?)",
+               (slug, "review", result, a.get("note")))
+    if result == "HIT":
+        streak = row["review_streak"] + 1
+        days = min(2 ** (streak + 1), 60)                # 4, 8, 16, 32, 60 days
+        db.execute("UPDATE concepts SET review_streak=?, "
+                   "review_due=datetime('now', ?) WHERE slug=?",
+                   (streak, f"+{days} days", slug))
+        return OpResult(text=f"OK. {slug} held — next cold recall in {days} days.",
+                        receipt=f"review: {slug} HIT (streak {streak})")
+    # a miss on cold recall means the ownership decayed: demote, re-earn it.
+    db.execute("UPDATE concepts SET state='READY', review_streak=0, "
+               "review_due=datetime('now','+1 day') WHERE slug=?", (slug,))
+    return OpResult(
+        text=f"OK. {slug} decayed → demoted to READY. It re-enters a gap loop; "
+             f"do NOT reteach it now — tell the learner it will come back.",
+        receipt=f"review: {slug} MISS → demoted")
+
+
+def _session_note(db: DB, a: dict) -> OpResult:
+    """⑪ CONSOLIDATE: the LEARNER's summary of the session, in his words."""
+    if not (a.get("note") or "").strip():
+        raise OpError("session_note needs `note`: HIS summary, not yours")
+    db.meta_set("last_session_note", a["note"])
+    return OpResult(text="OK. Session note stored — next session opens from it.",
+                    receipt="session-note stored")
 
 
 def _promote_vocab(db: DB, a: dict) -> OpResult:
@@ -140,15 +179,54 @@ def _close_gap(db: DB, a: dict) -> OpResult:
     slug = a["concept_slug"]
     if not db.one("SELECT 1 FROM concepts WHERE slug=?", (slug,)):
         raise OpError(f"no such concept: {slug}")
+    # the map's close protocol, machine-checked (MAP.md): ⑤ fresh production,
+    # ⑦ two varied applications, ⑧ the mapping in HIS words. Missing rows name
+    # themselves — the refusal text IS the protocol.
+    missing = []
+    if not db.one("SELECT 1 FROM probes WHERE concept_slug=? AND kind='produce' "
+                  "AND result='HIT'", (slug,)):
+        missing.append("a produce HIT (⑤: he built a FRESH instance, alone)")
+    varies = db.one("SELECT COUNT(*) AS n FROM probes WHERE concept_slug=? "
+                    "AND kind='vary' AND result='HIT'", (slug,))["n"]
+    if varies < 2:
+        missing.append(f"{2 - varies} more vary HIT(s) (⑦: same concept, different surface)")
     if not db.one("SELECT 1 FROM mappings WHERE concept_slug=? AND polarity='positive'", (slug,)):
-        raise OpError(f"cannot close {slug}: no positive mapping stored yet")
-    db.execute("UPDATE concepts SET state='OWNED' WHERE slug=?", (slug,))
+        missing.append("a positive mapping (⑧: trigger/solution/why in HIS words)")
+    if missing:
+        raise OpError(f"cannot close {slug}: missing " + "; ".join(missing))
+    db.execute("UPDATE concepts SET state='OWNED', "
+               "review_due=datetime('now','+2 days'), review_streak=0 WHERE slug=?", (slug,))
+    # backward (LIFO) subhole resolution: closing the concept resolves its stack row;
+    # the next unresolved row (its parent or a sibling) becomes the active detour.
+    sub = db.one("SELECT * FROM subholes WHERE concept_slug=? AND state != 'RESOLVED'",
+                 (slug,))
+    conseq = None
+    if sub:
+        db.execute("UPDATE subholes SET state='RESOLVED', resolved_at=datetime('now') "
+                   "WHERE id=?", (sub["id"],))
+        rest = unresolved_subholes(db)
+        if rest:
+            nxt = rest[-1]
+            # the parent/sibling needs the frontier re-aimed at it: back to OPEN
+            db.execute("UPDATE subholes SET state='OPEN' WHERE id=?", (nxt["id"],))
+            conseq = (f"Subhole resolved. The stack now returns to {nxt['concept_slug']} "
+                      f"— HOLD, the planner re-aims the frontier automatically.")
+        else:
+            root = db.one("SELECT * FROM subholes WHERE state='RESOLVED' "
+                          "ORDER BY id LIMIT 1")
+            resume = (root or {}).get("bookmark") or "the slice work"
+            conseq = (f"Subhole stack EMPTY — resume the main work as if the detour never "
+                      f"happened: {resume}."
+                      + (" Reopen the gate (db open_gate) and put him back on the file."
+                         if sub["gate_was_open"] or (root or {}).get("gate_was_open")
+                         else ""))
     # does any slice now have ALL prereqs owned?
     freed = _slices_now_ready(db)
-    if freed:
-        conseq = f"All prereqs owned for {', '.join(freed)} → gate-when fires. Open the gate."
-    else:
-        conseq = "Concept OWNED. Continue the slice."
+    if conseq is None:
+        if freed:
+            conseq = f"All prereqs owned for {', '.join(freed)} → gate-when fires. Open the gate."
+        else:
+            conseq = "Concept OWNED. Continue the slice."
     return OpResult(text=f"OK. {slug} → OWNED. {conseq}",
                     receipt=f"gap-closed: {slug} → OWNED")
 
@@ -181,6 +259,9 @@ def _pass_gate(db: DB, a: dict) -> OpResult:
     g = db.one("SELECT * FROM gates WHERE slice_slug=? AND state='OPEN'", (a["slice_slug"],))
     if not g:
         raise OpError(f"no OPEN gate for {a['slice_slug']}")
+    if not (a.get("note") or "").strip():
+        raise OpError("pass_gate needs `note`: what you checked his code against the spec "
+                      "(the judged behaviours, not a feeling). No note, no pass.")
     db.execute("UPDATE gates SET state='PASSED', closed_at=datetime('now') WHERE id=?", (g["id"],))
     db.execute("UPDATE slices SET state='BUILT', built_at=datetime('now') WHERE slug=?",
                (a["slice_slug"],))
@@ -200,17 +281,57 @@ def _fail_gate(db: DB, a: dict) -> OpResult:
                     receipt=f"gate-fail: {a['slice_slug']}")
 
 
+def unresolved_subholes(db: DB) -> list[dict]:
+    """The stack, root first. The LAST row is the active detour (LIFO)."""
+    return db.query("SELECT * FROM subholes WHERE state != 'RESOLVED' ORDER BY id")
+
+
 def _raise_subhole(db: DB, a: dict) -> OpResult:
     sl = db.one("SELECT * FROM slices WHERE slug=?", (a["slice_slug"],))
     if not sl:
         raise OpError(f"no such slice: {a['slice_slug']}")
+    slug = a["concept_slug"]
+    if not db.one("SELECT 1 FROM concepts WHERE slug=?", (slug,)):
+        near = db.query("SELECT slug FROM concepts WHERE slug LIKE ? OR ? LIKE "
+                        "'%' || slug || '%' LIMIT 3", (f"%{slug}%", slug))
+        hint = ("; closest in the DAG: " + ", ".join(r["slug"] for r in near)) if near else ""
+        raise OpError(f"no such concept: {slug}{hint}. A subhole names a DAG node — "
+                      f"use its exact slug.")
+    stack = unresolved_subholes(db)
+    if any(s["concept_slug"] == slug for s in stack):
+        raise OpError(f"{slug} is already on the subhole stack — HOLD, it is being handled")
+    if len(stack) >= 3:
+        raise OpError("three unresolved foundations under one slice means the slice is "
+                      "mis-sized — fail_gate (if open) and let the planner shrink it "
+                      "instead of digging deeper")
+    # CODE does the bookkeeping the raise implies (the map's ① stage):
+    # the ownership just proved decayed, and an open wall cannot stand on it.
+    demoted = False
+    row = db.one("SELECT state FROM concepts WHERE slug=?", (slug,))
+    if row["state"] == "OWNED":
+        db.execute("UPDATE concepts SET state='READY', review_streak=0 WHERE slug=?", (slug,))
+        demoted = True
+    gate = db.one("SELECT id FROM gates WHERE slice_slug=? AND state='OPEN'",
+                  (a["slice_slug"],))
+    if gate:
+        db.execute("DELETE FROM gates WHERE id=?", (gate["id"],))   # re-lock: reopened on resume
+    parent = stack[-1]["concept_slug"] if stack else None
     db.execute(
-        "UPDATE slices SET subhole_concept=?, subhole_evidence=? WHERE slug=?",
-        (a["concept_slug"], a["evidence"], a["slice_slug"]),
-    )
+        "INSERT INTO subholes(slice_slug,concept_slug,parent_concept,evidence,"
+        "bookmark,gate_was_open) VALUES(?,?,?,?,?,?)",
+        (a["slice_slug"], slug, parent, a["evidence"],
+         a.get("bookmark") or a["evidence"], 1 if gate else 0))
+    extras = []
+    if demoted:
+        extras.append(f"{slug} demoted OWNED→READY (it must be re-earned in full)")
+    if gate:
+        extras.append("the open gate is re-locked until the stack resolves")
     return OpResult(
-        text="OK. Subhole handed to M. HOLD — do not answer him until the frontier updates.",
-        receipt=f"subhole-raised: {a['concept_slug']} in {a['slice_slug']}",
+        text="OK. Subhole pushed on the stack (depth "
+             f"{len(stack) + 1}). {' ; '.join(extras) or 'Recorded.'} "
+             "HOLD — one honest line to him (a short detour, then back), then stop; "
+             "the planner wakes automatically.",
+        receipt=f"subhole-raised: {slug} in {a['slice_slug']} (depth {len(stack) + 1})",
     )
 
 
@@ -266,13 +387,17 @@ def _set_slice_state(db: DB, a: dict) -> OpResult:
 
 
 def _clear_subhole(db: DB, a: dict) -> OpResult:
-    db.execute(
-        "UPDATE slices SET subhole_concept=NULL, subhole_evidence=NULL, subhole_plan=? "
-        "WHERE slug=?",
-        (a.get("plan_note"), a["slice_slug"]),
-    )
-    return OpResult(text="OK. Subhole cleared — L may continue on the updated frontier.",
-                    receipt=f"subhole-cleared: {a['slice_slug']}")
+    """M marks the DEEPEST OPEN subhole PLANNED — its gap is now in the frontier."""
+    row = db.one("SELECT * FROM subholes WHERE state='OPEN' ORDER BY id DESC LIMIT 1")
+    if not row:
+        raise OpError("no OPEN subhole to clear")
+    db.execute("UPDATE subholes SET state='PLANNED' WHERE id=?", (row["id"],))
+    if a.get("plan_note"):
+        db.execute("UPDATE slices SET subhole_plan=? WHERE slug=?",
+                   (a["plan_note"], row["slice_slug"]))
+    return OpResult(
+        text=f"OK. {row['concept_slug']} marked PLANNED — L wakes on the new frontier gap.",
+        receipt=f"subhole-planned: {row['concept_slug']}")
 
 
 def _library_root(db: DB) -> Path:
@@ -399,8 +524,13 @@ REGISTRY: dict[str, Operation] = {op.name: op for op in [
     Operation("record_probe", "L", "record one judged answer as evidence",
               {"concept_slug": "str", "kind": "str", "result": "str", "pushes": "int",
                "self_corrected": "bool", "error_class": "str", "reveals": "str",
-               "terms": "str", "note": "str"},
+               "terms": "str", "note": "str", "level": "int"},
               _record_probe, required=("kind", "result")),
+    Operation("record_review", "L", "judge one cold recall of an OWNED concept (⓪)",
+              {"concept_slug": "str", "result": "str", "note": "str"},
+              _record_review, required=("concept_slug", "result")),
+    Operation("session_note", "L", "store the LEARNER's own session summary (⑪)",
+              {"note": "str"}, _session_note, required=("note",)),
     Operation("promote_vocab", "L", "set a term's state (hold/shown/proved)",
               {"term": "str", "state": "str"}, _promote_vocab, required=("term", "state")),
     Operation("store_mapping", "L", "deposit an intuition mapping (trigger+solution+why)",
@@ -413,13 +543,14 @@ REGISTRY: dict[str, Operation] = {op.name: op for op in [
               {"slice_slug": "str"}, _open_gate, required=("slice_slug",),
               available=lambda db: not _has_open_gate(db)),
     Operation("pass_gate", "L", "close an open gate as PASSED → slice BUILT",
-              {"slice_slug": "str"}, _pass_gate, required=("slice_slug",),
-              available=_has_open_gate),
+              {"slice_slug": "str", "note": "str"}, _pass_gate,
+              required=("slice_slug", "note"), available=_has_open_gate),
     Operation("fail_gate", "L", "close an open gate as FAILED",
               {"slice_slug": "str"}, _fail_gate, required=("slice_slug",),
               available=_has_open_gate),
-    Operation("raise_subhole", "L", "hand a shaky prereq to M and HOLD",
-              {"slice_slug": "str", "concept_slug": "str", "evidence": "str"},
+    Operation("raise_subhole", "L", "push a shaky prereq on the subhole stack and HOLD",
+              {"slice_slug": "str", "concept_slug": "str", "evidence": "str",
+               "bookmark": "str"},
               _raise_subhole, required=("slice_slug", "concept_slug", "evidence")),
     # --- M: the planner ---
     Operation("upsert_concept", "M", "create/update a concept (DAG node)",
@@ -434,10 +565,10 @@ REGISTRY: dict[str, Operation] = {op.name: op for op in [
               {"slug": "str", "state": "str"}, _set_concept_state, required=("slug", "state")),
     Operation("set_slice_state", "M", "re-LOCK a slice (spine repair; READY/BUILT are computed)",
               {"slug": "str", "state": "str"}, _set_slice_state, required=("slug", "state")),
-    Operation("clear_subhole", "M", "clear a slice's subhole after re-planning",
-              {"slice_slug": "str", "plan_note": "str"}, _clear_subhole,
-              required=("slice_slug",), available=lambda db: db.one(
-                  "SELECT 1 FROM slices WHERE subhole_concept IS NOT NULL") is not None),
+    Operation("clear_subhole", "M", "mark the deepest OPEN subhole PLANNED (its gap is live)",
+              {"plan_note": "str"}, _clear_subhole,
+              available=lambda db: db.one(
+                  "SELECT 1 FROM subholes WHERE state='OPEN'") is not None),
     Operation("set_target", "M", "register the codebase being built (the spine = slices rows)",
               {"codebase_path": "str"}, _set_target, required=("codebase_path",)),
     Operation("write_spec", "M", "write a slice's spec file and set its path (one act)",

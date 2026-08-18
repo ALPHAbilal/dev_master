@@ -142,3 +142,37 @@ def test_evidence_pointer_advances():
 def test_core_is_constant_and_short():
     assert "planner" in M_CORE and "SLICE" in M_CORE
     assert len(M_CORE.splitlines()) < 25          # the router carries the situation
+
+
+def test_regap_wakes_when_gap_owned_but_prereqs_remain():
+    db = _adopted_db()
+    dispatch(db, "M", "upsert_concept", {"slug": "file-streaming", "name": "fs"})
+    frontier = {"slice": {"slug": "s1",
+                          "concept_prereqs": ["enumerate-index", "file-streaming"]},
+                "gap": {"concept": "enumerate-index"}}
+    # gap concept not OWNED yet -> still teaching, no REGAP
+    assert pick_m_turn(db, frontier_empty=False, frontier=frontier) is None
+    db.execute("UPDATE concepts SET state='OWNED' WHERE slug='enumerate-index'")
+    assert pick_m_turn(db, frontier_empty=False, frontier=frontier) == "REGAP"
+    # every prereq owned -> nothing to regap; the gate opens instead
+    db.execute("UPDATE concepts SET state='OWNED' WHERE slug='file-streaming'")
+    assert pick_m_turn(db, frontier_empty=False, frontier=frontier) is None
+
+
+def test_review_lifecycle_schedules_and_demotes():
+    db = _adopted_db()
+    # not OWNED -> refused
+    d = dispatch(db, "L", "record_review", {"concept_slug": "enumerate-index", "result": "HIT"})
+    assert not d.committed and "OWNED" in d.text
+    db.execute("UPDATE concepts SET state='OWNED', review_due=datetime('now','-1 day') "
+               "WHERE slug='enumerate-index'")
+    from tutor.routing import review_block
+    assert "enumerate-index" in review_block(db)             # due -> in the ⓪ block
+    d = dispatch(db, "L", "record_review", {"concept_slug": "enumerate-index", "result": "HIT"})
+    assert d.committed
+    assert review_block(db) == ""                            # pushed into the future
+    row = db.one("SELECT review_streak FROM concepts WHERE slug='enumerate-index'")
+    assert row["review_streak"] == 1
+    d = dispatch(db, "L", "record_review", {"concept_slug": "enumerate-index", "result": "MISS"})
+    assert d.committed and "demoted" in d.text
+    assert db.one("SELECT state FROM concepts WHERE slug='enumerate-index'")["state"] == "READY"

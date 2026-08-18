@@ -70,7 +70,7 @@ def test_close_gap_refused_without_mapping():
     db = DB()
     dispatch(db, "M", "upsert_concept", {"slug": "enumerate-index", "name": "enumerate"})
     d = dispatch(db, "L", "close_gap", {"concept_slug": "enumerate-index"})
-    assert not d.committed and "no positive mapping" in d.text
+    assert not d.committed and "missing" in d.text and "mapping" in d.text
 
 
 # --------------------------------------------------------------------------
@@ -105,6 +105,11 @@ def test_full_slice_trace_reaches_built():
     dispatch(db, "L", "record_probe",
              {"concept_slug": "enumerate-index", "kind": "produce",
               "result": "HIT", "pushes": 1, "self_corrected": True})
+    # the map's close protocol: two varied applications beyond the fresh production
+    dispatch(db, "L", "record_probe",
+             {"concept_slug": "enumerate-index", "kind": "vary", "result": "HIT"})
+    dispatch(db, "L", "record_probe",
+             {"concept_slug": "enumerate-index", "kind": "vary", "result": "HIT"})
     dispatch(db, "L", "promote_vocab", {"term": "enumerate", "state": "proved"})
     dispatch(db, "L", "store_mapping",
              {"concept_slug": "enumerate-index",
@@ -123,7 +128,9 @@ def test_full_slice_trace_reaches_built():
     assert "Wall active" in d.text
     dispatch(db, "L", "record_probe",
              {"concept_slug": "pinned-qa-group", "kind": "build", "result": "HIT"})
-    d = dispatch(db, "L", "pass_gate", {"slice_slug": "pinned-qa-group"})
+    d = dispatch(db, "L", "pass_gate",
+                 {"slice_slug": "pinned-qa-group",
+                  "note": "pairs item+index per spec; edge cases checked"})
     assert d.committed and "BUILT" in d.text
     assert db.one("SELECT state FROM slices WHERE slug='pinned-qa-group'")["state"] == "BUILT"
     assert db.one("SELECT state FROM gates WHERE slice_slug='pinned-qa-group'")["state"] == "PASSED"

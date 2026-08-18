@@ -78,12 +78,84 @@ def test_first_turn_shows_opening_question_not_continue():
     assert "HELD (do not use): enumerate" in block   # vocab door surfaced
 
 
-def test_later_turn_shows_continue_framing():
+def _probe(db, concept, kind, result, **kw):
+    a = {"concept_slug": concept, "kind": kind, "result": result}
+    a.update(kw)
+    d = dispatch(db, "L", "record_probe", a)
+    assert d.committed, d.text
+
+
+def test_step_machine_walks_the_map():
+    from tutor.routing import gap_step
     db = _db_with_slice()
     f = load(FIX)
+    c = f.gap["concept"]
+    assert gap_step(db, f.gap) == "PROBE"                     # no entry yet
+    _probe(db, c, "entry", "HIT", level=5)
+    assert gap_step(db, f.gap) == "PRODUCE"                   # near-complete footing
+    _probe(db, c, "produce", "MISS")
+    assert gap_step(db, f.gap) == "COMPLETE"                  # a MISS drops one level
+    _probe(db, c, "complete", "HIT")
+    assert gap_step(db, f.gap) == "PRODUCE"                   # scaffold earned the retry
+    _probe(db, c, "produce", "HIT")
+    # produce HIT with held vocab -> NAME (fixture holds the term 'enumerate')
+    from tutor.library import seed_vocab
+    seed_vocab(db, f)
+    assert gap_step(db, f.gap) == "NAME"
+    for t in f.gap.get("vocab_hold") or []:
+        dispatch(db, "L", "promote_vocab", {"term": t, "state": "shown"})
+    assert gap_step(db, f.gap) == "VARY"
+    _probe(db, c, "vary", "HIT")
+    assert gap_step(db, f.gap) == "VARY"                      # one round is not enough
+    _probe(db, c, "vary", "HIT")
+    assert gap_step(db, f.gap) == "ABSTRACT"
+
+
+def test_entry_level_three_routes_through_study_and_complete():
+    from tutor.routing import gap_step
+    db = _db_with_slice()
+    f = load(FIX)
+    c = f.gap["concept"]
+    _probe(db, c, "entry", "HIT", level=3)
+    assert gap_step(db, f.gap) == "STUDY"
+    _probe(db, c, "predict", "HIT")
+    assert gap_step(db, f.gap) == "COMPLETE"
+    _probe(db, c, "complete", "HIT")
+    assert gap_step(db, f.gap) == "PRODUCE"
+
+
+def test_step_block_rents_only_the_current_step():
+    db = _db_with_slice()
+    f = load(FIX)
+    c = f.gap["concept"]
+    block = build_l_block(db, f, is_first_turn=True)
+    assert "STEP PROBE" in block and "OPEN WITH" in block
+    assert f.gap["just_tell"] not in block                    # the answer stays out
+    _probe(db, c, "entry", "HIT", level=5)
     block = build_l_block(db, f, is_first_turn=False)
-    assert "done-when:" in block and "OPEN WITH" not in block
-    assert "if stuck, descend ONE step" in block
+    assert "STEP PRODUCE" in block and "PREDICTION" in block
+    assert f.gap["just_tell"] not in block                    # still out at produce
+    _probe(db, c, "produce", "HIT")
+    from tutor.library import seed_vocab
+    seed_vocab(db, f)
+    block = build_l_block(db, f, is_first_turn=False)
+    assert "STEP NAME" in block and f.gap["just_tell"] in block   # earned NOW
+
+
+def test_post_commit_guidance_announces_the_next_step():
+    from tutor.routing import post_commit_guidance
+    db = _db_with_slice()
+    f = load(FIX)
+    c = f.gap["concept"]
+    assert post_commit_guidance(db, f.gap) is None            # no probe yet -> silent
+    _probe(db, c, "entry", "HIT", level=5)
+    note = post_commit_guidance(db, f.gap)
+    assert note and "PRODUCE" in note
+    _probe(db, c, "produce", "MISS", pushes=4)
+    assert "cap" in post_commit_guidance(db, f.gap)           # push cap -> hard stop
+    assert "close_gap" in post_commit_guidance(db, f.gap, op="store_mapping")
+    assert "Stop teaching" in post_commit_guidance(db, f.gap, op="close_gap")
+    assert "session_note" in post_commit_guidance(db, f.gap, op="pass_gate")
 
 
 def test_teaching_block_gone_once_concept_owned():

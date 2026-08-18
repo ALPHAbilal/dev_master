@@ -39,6 +39,27 @@ class PlanError(SurveyError):
     """The planning turn could not run. The frontier is unchanged."""
 
 
+def regap_prompt(db: DB, frontier: dict) -> tuple[str, str]:
+    """(system, first) for M/REGAP: same slice, next gap. Pure, testable."""
+    sl = frontier.get("slice") or {}
+    unowned = [p for p in sl.get("concept_prereqs") or []
+               if not (r := db.one("SELECT state FROM concepts WHERE slug=?", (p,)))
+               or r["state"] != "OWNED"]
+    if not unowned:
+        raise PlanError("REGAP called but every prereq is owned — the gate should open instead")
+    system = M_CORE + "\n\n" + build_m_block(db, "REGAP")
+    first = (
+        f"The gap `{(frontier.get('gap') or {}).get('concept')}` on slice `{sl.get('slug')}` "
+        f"just CLOSED, but the slice still has unowned prereqs: {', '.join(unowned)}.\n\n"
+        "One act: db(op=\"write_frontier\") — republish the frontier with the SAME slice "
+        "block, untouched, and a NEW gap block for ONE of those prereqs (the evidence above "
+        "tells you which road and size fit him now). Fill every gap key. Do not touch the "
+        "spec. Then stop.\n\nUse this exact shape:\n\n"
+        + json.dumps(empty_template(sl.get("slug", "")), indent=2)
+    )
+    return system, first
+
+
 def plan_prompt(db: DB) -> tuple[str, str]:
     """(system_prompt, first_message) — pure, testable without the SDK."""
     if db.one("SELECT 1 FROM slices LIMIT 1") is None:
@@ -66,7 +87,8 @@ def plan_prompt(db: DB) -> tuple[str, str]:
 
 
 async def run_plan(db: DB, emit: Callable[[Event], None],
-                   model: str = DEFAULT_MODEL, trace: list | None = None) -> None:
+                   model: str = DEFAULT_MODEL, trace: list | None = None,
+                   frontier: dict | None = None) -> None:
     try:
         from claude_agent_sdk import ClaudeAgentOptions, create_sdk_mcp_server
     except ImportError as e:
@@ -74,9 +96,11 @@ async def run_plan(db: DB, emit: Callable[[Event], None],
             "claude-agent-sdk is not installed in the interpreter running the server. "
             "Install it (pip install claude-agent-sdk) and restart.") from e
 
-    system, first = plan_prompt(db)
+    # frontier given = REGAP (same slice, next gap); absent = PLAN (next slice)
+    system, first = regap_prompt(db, frontier) if frontier else plan_prompt(db)
+    label = "M/REGAP" if frontier else "M/PLAN"
     tr = TurnTrace(
-        agent="M/PLAN", model=model, system_prompt=system, first_message=first,
+        agent=label, model=model, system_prompt=system, first_message=first,
         tools_allowed=["db"],
         context_note="Cold. M/PLAN wakes with no memory of the last slice (F1). Its only "
                      "inputs are the [EVIDENCE] probe rows and [OVERLAYS] above — a fresh "
@@ -88,7 +112,7 @@ async def run_plan(db: DB, emit: Callable[[Event], None],
 
     def on_commit(r: str) -> None:
         tr.receipt(r)
-        emit(Event("receipt", r, "M/PLAN"))
+        emit(Event("receipt", r, label))
 
     db_tool = make_db_tool(db, "M", on_commit=on_commit)
     server = create_sdk_mcp_server("tutor", tools=[db_tool])
@@ -105,18 +129,19 @@ async def run_plan(db: DB, emit: Callable[[Event], None],
         model=model,
     )
 
-    emit(Event("handoff", f"M/PLAN started  ·  model: {model}", "M/PLAN"))
-    result = await drive("M/PLAN", first, options, emit, tr)
+    emit(Event("handoff", f"{label} started  ·  model: {model}", label))
+    result = await drive(label, first, options, emit, tr)
     line = _result_line(db, result)
     tr.finish(line)
-    emit(Event("handoff", line, "M/PLAN"))
+    emit(Event("handoff", line, label))
     mark_probes_seen(db)                           # this turn has consumed the evidence
 
 
 def run_plan_sync(db: DB, emit: Callable[[Event], None],
-                  model: str = DEFAULT_MODEL, trace: list | None = None) -> None:
+                  model: str = DEFAULT_MODEL, trace: list | None = None,
+                  frontier: dict | None = None) -> None:
     try:
-        asyncio.run(run_plan(db, emit, model, trace))
+        asyncio.run(run_plan(db, emit, model, trace, frontier))
     except PlanError as e:
         emit(Event("error", str(e), "M/PLAN"))
     except Exception as e:                                   # surface, never swallow

@@ -27,6 +27,7 @@ from . import runs, session, state
 from .runner import Event, Runner, ScriptedRunner, default_script
 
 PAGE = Path(__file__).resolve().parent / "app.html"
+DEV_PAGE = Path(__file__).resolve().parent / "dev.html"
 
 
 @dataclass
@@ -40,6 +41,7 @@ class App:
     running: str | None = None                  # the agent EXECUTING right now, or None
     model: str = ""                             # pinned agent model; "" = survey default
     trace: list = field(default_factory=list)   # operator record: every turn, verbatim
+    _auto_done: set = field(default_factory=set)  # autowake one-shot tokens (loop guard)
 
     def __post_init__(self):
         if self.runner is None:
@@ -94,6 +96,83 @@ class App:
         snap["runs"] = runs.history(self.db)
         return snap
 
+    def autowake(self) -> None:
+        """Fire the owed agent turn WITHOUT waiting for a keystroke (Part C, live).
+
+        Called on every state poll; a pure no-op unless an agent actually owes a turn:
+          frontier empty + spine exists  -> M/PLAN plans the next slice, automatically
+          frontier published, L silent   -> L opens: greets, frames the slice, asks
+        Each wakeup fires ONCE per state (token set) so a failing turn can never loop.
+        Only the live SDK runner autowakes — the scripted runner has nothing to say.
+        """
+        if self.running or not getattr(self.runner, "emit", None):
+            return
+        if not session.is_adopted(self.db):
+            return
+        if self.db.one("SELECT 1 FROM slices LIMIT 1") is None:
+            return                                  # survey is a deliberate, manual act
+
+        if self.frontier_empty():
+            built = self.db.one("SELECT COUNT(*) AS c FROM slices WHERE state='BUILT'")["c"]
+            token = f"plan:{built}"
+            if token in self._auto_done:
+                return
+            self._auto_done.add(token)
+            self.emit(Event("handoff", "Session open — no frontier published, so M/PLAN "
+                                       "is waking automatically to plan the next slice.",
+                            "system"))
+            self._start("M/PLAN", self._run_plan)
+            return
+
+        data = self.frontier_data()
+        if not data:
+            return
+
+        from tutor.routing_m import pick_m_turn
+        if pick_m_turn(self.db, False, data) == "REGAP":
+            gap = (data.get("gap") or {}).get("concept")
+            token = f"regap:{data['slice']['slug']}:{gap}"
+            if token in self._auto_done:
+                return
+            self._auto_done.add(token)
+            self.emit(Event("handoff", f"Gap {gap} closed — M is aiming the next gap "
+                                       f"on this slice.", "system"))
+            self._start("M/REGAP", lambda: self._run_plan(frontier=data))
+            return
+
+        token = f"greet:{data['slice']['slug']}:{(data.get('gap') or {}).get('concept')}"
+        if token in self._auto_done or self._l_spoke_since_handoff():
+            return
+        self._auto_done.add(token)
+        opener = ("(session opened — the learner has not typed yet. Greet him first: in a "
+                  "few short lines say what he is building and why (the why-this-slice), "
+                  "where things stand, run any [REVIEW] block, then the current step. "
+                  "Do not wait for him.)")
+        self._start("L", lambda: self.runner.turn(opener))
+
+    def _l_spoke_since_handoff(self) -> bool:
+        """Has L already opened this frontier? Scan back to the last handoff marker."""
+        for ev in reversed(self.transcript):
+            if ev.get("kind") == "say" and ev.get("agent") == "L":
+                return True
+            if ev.get("kind") == "handoff":
+                return False
+        return bool(self.transcript)
+
+    def _start(self, label: str, fn) -> None:
+        def work():
+            try:
+                fn()
+            finally:
+                self.running = None
+        self.running = label
+        threading.Thread(target=work, daemon=True).start()
+
+    def _run_plan(self, frontier: dict | None = None) -> None:
+        from .plan import run_plan_sync
+        run_plan_sync(self.db, self.emit, self.model or _default_model(),
+                      self.trace, frontier)
+
     def emit(self, ev) -> None:
         """Append one event to the LEARNER's transcript.
 
@@ -143,6 +222,7 @@ def handle(app: App, method: str, path: str, body: bytes = b"", query: dict | No
         return Response(200, PAGE.read_bytes(), "text/html; charset=utf-8")
 
     if method == "GET" and path == "/api/state":
+        app.autowake()                     # the poll IS the session-open signal
         return Response(200, app.snapshot())
 
     if method == "POST" and path == "/api/adopt":
@@ -165,6 +245,26 @@ def handle(app: App, method: str, path: str, body: bytes = b"", query: dict | No
     if method == "POST" and path == "/api/plan":
         return _plan(app)
 
+    if method == "GET" and path == "/dev":
+        return Response(200, DEV_PAGE.read_bytes(), "text/html; charset=utf-8")
+
+    if method == "GET" and path == "/api/dev":
+        # the operator's facts: EVERYTHING the learner page firewalls away.
+        # Read-only, straight off the DB — no shaping, no redaction.
+        return Response(200, {
+            "active": state.who_is_active(app.db, app.frontier_empty(), app.running,
+                                          app.frontier_data()),
+            "probes": [dict(r) for r in app.db.query("SELECT * FROM probes ORDER BY id DESC")],
+            "mappings": [dict(r) for r in app.db.query("SELECT * FROM mappings ORDER BY id DESC")],
+            "vocab": [dict(r) for r in app.db.query("SELECT * FROM vocab ORDER BY term")],
+            "gates": [dict(r) for r in app.db.query("SELECT * FROM gates ORDER BY rowid DESC")],
+            "concepts": [dict(r) for r in app.db.query("SELECT * FROM concepts ORDER BY slug")],
+            "slices": [dict(r) for r in app.db.query("SELECT * FROM slices ORDER BY ordinal")],
+            "meta": [dict(r) for r in app.db.query("SELECT * FROM meta ORDER BY key")],
+            "frontier": app.frontier_data(),
+            "autowake_tokens": sorted(app._auto_done),
+        })
+
     if method == "GET" and path == "/api/trace":
         # the operator record: every turn, verbatim. Kept out of /api/state because it
         # is large and the learner's page polls state every second while a turn runs.
@@ -182,16 +282,20 @@ def _plan(app: App) -> Response:
     if app.db.one("SELECT 1 FROM slices LIMIT 1") is None:
         return Response(409, {"error": "no spine yet — run the survey first"})
 
+    from tutor.routing_m import pick_m_turn
     from .plan import run_plan_sync
     model = app.model or _default_model()
+    data = app.frontier_data()
+    regap = (data if not app.frontier_empty()
+             and pick_m_turn(app.db, False, data) == "REGAP" else None)
 
     def work():
         try:
-            run_plan_sync(app.db, app.emit, model, app.trace)
+            run_plan_sync(app.db, app.emit, model, app.trace, regap)
         finally:
             app.running = None
 
-    app.running = "M/PLAN"
+    app.running = "M/REGAP" if regap else "M/PLAN"
     threading.Thread(target=work, daemon=True).start()
     return Response(200, {"started": True, "state": app.snapshot()})
 

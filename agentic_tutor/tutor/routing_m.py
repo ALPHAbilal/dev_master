@@ -52,7 +52,7 @@ Your inputs are probes rows and the overlays. Your output is the library.
 # --------------------------------------------------------------------------
 # the wakeup picker — a pure function of state, no agent decides
 # --------------------------------------------------------------------------
-def pick_m_turn(db: DB, frontier_empty: bool) -> str | None:
+def pick_m_turn(db: DB, frontier_empty: bool, frontier: dict | None = None) -> str | None:
     # No target = no codebase adopted yet. M has nothing to survey; this is not a
     # wakeup, it is the absence of a session.
     if db.one("SELECT 1 FROM target WHERE id=1") is None:
@@ -62,11 +62,29 @@ def pick_m_turn(db: DB, frontier_empty: bool) -> str | None:
     # off that row would skip the survey forever: the row exists before M ever runs.
     if db.one("SELECT 1 FROM slices LIMIT 1") is None:
         return "SURVEY"
-    if db.one("SELECT 1 FROM slices WHERE subhole_concept IS NOT NULL"):
+    if db.one("SELECT 1 FROM subholes WHERE state='OPEN'"):
         return "SUBHOLE"
     if frontier_empty:
         return "PLAN"
+    # REGAP: the frontier's gap closed but the slice still has unowned prereqs —
+    # the spent-gap state cell IS the wakeup; L must never bridge this itself.
+    if frontier and _gap_spent(db, frontier):
+        return "REGAP"
     return None
+
+
+def _gap_spent(db: DB, frontier: dict) -> bool:
+    gap = frontier.get("gap") or {}
+    concept = gap.get("concept")
+    if concept:
+        row = db.one("SELECT state FROM concepts WHERE slug=?", (concept,))
+        if not row or row["state"] != "OWNED":
+            return False                      # still teaching this gap
+    prereqs = (frontier.get("slice") or {}).get("concept_prereqs") or []
+    unowned = [p for p in prereqs
+               if not (r := db.one("SELECT state FROM concepts WHERE slug=?", (p,)))
+               or r["state"] != "OWNED"]
+    return bool(unowned)
 
 
 # --------------------------------------------------------------------------
@@ -82,6 +100,8 @@ def build_m_block(db: DB, turn: str, codebase_path: str | None = None) -> str:
                             _tool_discipline_block()])
     if turn == "PLAN":
         return "\n\n".join([_evidence_block(db), _overlays_block(db)])
+    if turn == "REGAP":
+        return "\n\n".join([_evidence_block(db), _overlays_block(db)])
     raise ValueError(f"unknown M turn: {turn}")
 
 
@@ -91,6 +111,7 @@ def tools_for_turn(turn: str) -> tuple[str, ...]:
         "SURVEY": ("Read", "Grep", "WebSearch", "WebFetch"),
         "SUBHOLE": ("Read", "Grep", "WebSearch", "WebFetch"),
         "PLAN": ("Write",),        # M/PLAN authors the spec file in the same act
+        "REGAP": (),               # the spec exists; this turn only re-aims the frontier
     }[turn]
 
 
@@ -187,12 +208,15 @@ def _zpd_meter(db: DB) -> str:
 
 
 def _subhole_block(db: DB) -> str:
-    row = db.one("SELECT slug, subhole_concept, subhole_evidence FROM slices "
-                 "WHERE subhole_concept IS NOT NULL")
-    return f"""[SUBHOLE] — L hit a shaky prereq mid-slice and is HOLDING for you.
-  slice: {row['slug']}
-  concept: {row['subhole_concept']}
-  evidence: {row['subhole_evidence']}
-Keep the SLICE block untouched. Research the shaky concept, write its GAP block
-under the existing keys, fill subhole-plan, then clear_subhole to release L.
-Max 2 sub-gaps per slice — a third means you mis-sized: insert a smaller slice."""
+    stack = db.query("SELECT * FROM subholes WHERE state != 'RESOLVED' ORDER BY id")
+    row = stack[-1]                                  # LIFO: deepest is the active detour
+    above = "".join(f"\n    under: {s['concept_slug']}" for s in stack[:-1])
+    return f"""[SUBHOLE] — L hit a shaky prereq mid-work and is HOLDING for you.
+  slice: {row['slice_slug']}
+  concept: {row['concept_slug']}  (stack depth {len(stack)}){above}
+  evidence: {row['evidence']}
+Two acts, then stop:
+1. write_frontier — the SAME slice block, untouched, and a GAP block for exactly
+   this concept, sized by the evidence (he held it once: entry is rarely from zero).
+2. clear_subhole — releases L onto that gap.
+Never touch the spec or the spine. Resolution is backward: deepest first."""

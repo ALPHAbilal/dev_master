@@ -555,8 +555,12 @@ def test_lesson_prompt_opens_with_the_opening_question_then_switches():
     assert "OPEN WITH" in p1 and f.gap["opening_question"] in p1
     assert "[USER] hi, where do we start?" in p1
     cm.append_assistant("what does the loop hand you each step?")
+    # the entry probe advances the step machine past PROBE (level 5 = produce)
+    dispatch(db, "L", "record_probe",
+             {"concept_slug": "enumerate-index", "kind": "entry",
+              "result": "HIT", "level": 5})
     p2 = lesson_prompt(db, cm, f, "the item, I think")
-    assert "OPEN WITH" not in p2 and "done-when" in p2      # F2: continue framing
+    assert "OPEN WITH" not in p2 and "STEP PRODUCE" in p2   # the router moved on
     assert "what does the loop hand you each step?" in p2   # history survived
 
 

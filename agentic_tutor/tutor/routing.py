@@ -46,7 +46,8 @@ def build_l_block(db: DB, frontier: Frontier, is_first_turn: bool) -> str:
 
     gap = frontier.gap
     if gap and not _concept_owned(db, gap["concept"]):
-        parts.append(_teaching_block(gap, is_first_turn))
+        step = gap_step(db, gap)
+        parts.append(_step_block(db, gap, step))
 
     parts.append(_vocab_block(db, gap))
     return "\n\n".join(p for p in parts if p)
@@ -62,24 +63,184 @@ def _slice_block(f: Frontier) -> str:
     return "\n".join(lines)
 
 
-def _teaching_block(gap: dict, is_first_turn: bool) -> str:
-    lines = [f"[GAP] {gap['concept']}  (road: {gap['road']})"]
-    if is_first_turn:
-        lines.append(f"  OPEN WITH (guess-first): {gap['opening_question']}")
-        if gap.get("connect_to"):
-            lines.append(f"  connect to owned: {_join(gap['connect_to'])}")
-    else:
-        lines.append(f"  done-when: {gap['done_when']}")
-        lines.append(f"  road reminder: {_road_hint(gap['road'])}")
-        if gap.get("simplify_ladder"):
-            lines.append(f"  if stuck, descend ONE step: {_join(gap['simplify_ladder'])}")
-    if gap.get("worth_failing_at"):
-        lines.append("  let-stand + record `reveals`: " + _wfa(gap["worth_failing_at"]))
-    if gap.get("just_tell"):
-        lines.append(f"  just tell (lane 6): {gap['just_tell']}")
-    lines.append(f"  justify (hard close): {gap['justify']}")
-    lines.append(f"  mapping seed: {gap['mapping_seed']}")
-    return "\n".join(lines)
+# --------------------------------------------------------------------------
+# the gap-loop step machine (MAP.md ②–⑧). CODE routes; the model only judges.
+# --------------------------------------------------------------------------
+STEPS = ("PROBE", "STUDY", "COMPLETE", "PRODUCE", "NAME", "VARY", "ABSTRACT")
+
+
+def gap_step(db: DB, gap: dict) -> str:
+    """Which map step this concept is at — a pure function of its probe rows.
+
+    entry probe (level 3/4/5) routes the entry point; each produce MISS drops one
+    level; a produce HIT advances to NAME -> VARY (2 HITs) -> ABSTRACT (close).
+    """
+    c = gap["concept"]
+    entry = db.one("SELECT level FROM probes WHERE concept_slug=? AND kind='entry' "
+                   "ORDER BY id DESC LIMIT 1", (c,))
+    if not entry:
+        return "PROBE"
+    ev = _counts(db, c)
+    if ev["produce_hits"] >= 1:
+        if _held_terms(db, gap):
+            return "NAME"
+        if ev["vary_hits"] < 2:
+            return "VARY"
+        return "ABSTRACT"
+    level = max(3, min(5, (entry["level"] or 4) - ev["produce_misses"]))
+    if level == 3:
+        if ev["predict_hits"] == 0:
+            return "STUDY"
+        return "COMPLETE" if ev["complete_hits"] == 0 else "PRODUCE"
+    if level == 4:
+        return "COMPLETE" if ev["complete_hits"] == 0 else "PRODUCE"
+    return "PRODUCE"
+
+
+def _counts(db: DB, concept: str) -> dict:
+    row = db.one(
+        "SELECT COALESCE(SUM(kind='predict' AND result='HIT'),0)  AS predict_hits, "
+        "       COALESCE(SUM(kind='complete' AND result='HIT'),0) AS complete_hits, "
+        "       COALESCE(SUM(kind='produce' AND result='HIT'),0)  AS produce_hits, "
+        "       COALESCE(SUM(kind='produce' AND result='MISS'),0) AS produce_misses, "
+        "       COALESCE(SUM(kind='vary' AND result='HIT'),0)     AS vary_hits "
+        "FROM probes WHERE concept_slug=?", (concept,))
+    return dict(row)
+
+
+def _held_terms(db: DB, gap: dict) -> list[str]:
+    hold = gap.get("vocab_hold") or []
+    if not hold:
+        return []
+    q = "SELECT term FROM vocab WHERE state='hold' AND term IN (%s)" % ",".join("?" * len(hold))
+    return [r["term"] for r in db.query(q, tuple(hold))]
+
+
+def _step_block(db: DB, gap: dict, step: str) -> str:
+    """ONE step's working orders — never the whole frontier. Rented context."""
+    c, lines = gap["concept"], []
+    head = f"[GAP {gap['concept']} — STEP {step}]"
+    wfa = ("  judging aid — predicted wrong turns (let stand, record `reveals`): "
+           + _wfa(gap.get("worth_failing_at"))) if gap.get("worth_failing_at") else ""
+    ladder = _join(gap.get("simplify_ladder"))
+
+    if step == "PROBE":
+        lines = [head,
+                 f"  OPEN WITH (guess-first): {gap['opening_question']}",
+                 f"  connect to owned: {_join(gap.get('connect_to'))}",
+                 "  Judge his footing from the answer, then record the entry:",
+                 "    db record_probe kind=entry level=3 (nothing to stand on: he will",
+                 "    STUDY a worked example) / 4 (partial: fill-the-holes) / 5 (near-",
+                 "    complete: straight to fresh production). Result=HIT if any footing."]
+    elif step == "STUDY":
+        lines = [head,
+                 "  Show ONE small worked example of the pattern (build it from these",
+                 f"  rungs, smallest first): {ladder}",
+                 "  ACTIVE study: before he may run anything, he PREDICTS the output",
+                 "  line by line and says why each line does what it does. Only then run.",
+                 "  Judge the prediction: db record_probe kind=predict HIT/MISS.",
+                 wfa]
+    elif step == "COMPLETE":
+        lines = [head,
+                 "  Give the SAME pattern with holes punched in it — he fills the holes.",
+                 f"  Draw the material from the rungs: {ladder}",
+                 "  Shrink the scaffold each rep. Never fill a hole for him.",
+                 "  Judge: db record_probe kind=complete HIT/MISS.",
+                 wfa]
+    elif step == "PRODUCE":
+        lines = [head,
+                 f"  Blank page, FRESH instance sized by done-when: {gap['done_when']}",
+                 "  Before he runs it he must state his PREDICTION of the output.",
+                 "  Reality vs prediction is the lesson — he reconciles the diff, not you.",
+                 "  You show NO code at this step. Judge: db record_probe kind=produce",
+                 "  HIT/MISS (a MISS drops him one level automatically — do not improvise).",
+                 wfa]
+    elif step == "NAME":
+        lines = [head,
+                 "  His attempt did the teaching; now hand over the words and the residue:",
+                 f"  {gap['just_tell']}",
+                 "  Promote each vocab term he has now earned: db promote_vocab state=shown.",
+                 "  Keep it short — then move on."]
+    elif step == "VARY":
+        need = 2 - _counts(db, c)["vary_hits"]
+        lines = [head,
+                 f"  {need} more varied round(s): SAME concept, DIFFERENT surface each",
+                 "  time (change the data shape / the context, not the difficulty).",
+                 "  Interleave: pick tasks where he must CHOOSE this tool among owned",
+                 f"  ones — owned triggers he knows: {_owned_triggers(db, c)}",
+                 "  Judge each round: db record_probe kind=vary HIT/MISS.",
+                 wfa]
+    elif step == "ABSTRACT":
+        lines = [head,
+                 "  He writes the rule as HIS one-liner: 'when I see __, I reach for __",
+                 f"  because __'. Seed only if he stalls: {gap['mapping_seed']}",
+                 "  Then: db store_mapping (trigger/solution/why = HIS words, his wrong",
+                 "  turn as provenance), then db close_gap. The gate refuses shortcuts."]
+    return "\n".join(l for l in lines if l)
+
+
+def _owned_triggers(db: DB, exclude: str) -> str:
+    rows = db.query(
+        "SELECT m.trigger FROM mappings m JOIN concepts c ON c.slug=m.concept_slug "
+        "WHERE c.state='OWNED' AND m.concept_slug != ? AND m.polarity='positive' "
+        "ORDER BY m.id DESC LIMIT 3", (exclude,))
+    return "; ".join(r["trigger"] for r in rows) or "(none yet)"
+
+
+# --------------------------------------------------------------------------
+# ⓪ REACTIVATE — the review block for the session's first turn
+# --------------------------------------------------------------------------
+def review_block(db: DB, limit: int = 3) -> str:
+    """Due cold recalls, oldest first. Empty string when nothing is due."""
+    rows = db.query(
+        "SELECT c.slug, m.trigger FROM concepts c "
+        "LEFT JOIN mappings m ON m.concept_slug=c.slug AND m.polarity='positive' "
+        "WHERE c.state='OWNED' AND c.review_due IS NOT NULL "
+        "AND c.review_due <= datetime('now') ORDER BY c.review_due LIMIT ?", (limit,))
+    if not rows:
+        return ""
+    body = "\n".join(f"  - {r['slug']}" + (f" (his trigger was: {r['trigger']})"
+                                           if r["trigger"] else "") for r in rows)
+    return ("[REVIEW — do this FIRST, before the slice]\n"
+            "Cold recall, unannounced as such: pose one small task per concept below,\n"
+            "from memory, no example shown. Judge each: db record_review HIT/MISS.\n"
+            "A MISS demotes it — the tool handles that; you just move on.\n" + body)
+
+
+# --------------------------------------------------------------------------
+# post-tool-use steering — the mid-turn injection channel (hooks.posttooluse_note)
+# --------------------------------------------------------------------------
+def post_commit_guidance(db: DB, gap: dict | None, op: str = "record_probe") -> str | None:
+    """One line for L right after a db commit: where the map now stands."""
+    if op == "store_mapping":
+        return "mapping stored — now db close_gap. If it refuses, the text names what is missing."
+    if op == "close_gap":
+        return ("gap CLOSED. Stop teaching: do not open the next concept yourself — "
+                "the planner owes the next handoff. Tell the learner what he now owns, briefly.")
+    if op == "pass_gate":
+        return ("slice BUILT. Close the session: ask HIM to summarize what he built and "
+                "what rule he keeps (then db session_note with HIS words).")
+    if op == "record_review":
+        return "review recorded — continue the remaining reviews, or open the slice work."
+    if op != "record_probe" or not gap:
+        return None
+    row = db.one("SELECT result, pushes, kind FROM probes WHERE concept_slug=? "
+                 "ORDER BY id DESC LIMIT 1", (gap["concept"],))
+    if not row:
+        return None
+    if row["pushes"] >= 4:
+        return "push cap hit (4): stop pushing. Record where he is and end the attempt."
+    step = gap_step(db, gap)
+    what = {
+        "PROBE":    "record the entry probe (level 3/4/5) before anything else.",
+        "STUDY":    "next: a worked example — he predicts line by line BEFORE it runs.",
+        "COMPLETE": "next: the pattern with holes — he fills them, you never do.",
+        "PRODUCE":  "next: fresh blank-page instance — demand his prediction before he runs.",
+        "NAME":     "he earned the words — give the residue + promote the vocab, briefly.",
+        "VARY":     "next: a varied round — same concept, different surface.",
+        "ABSTRACT": "next: his one-line rule, then store_mapping + close_gap.",
+    }[step]
+    return f"{row['kind']}/{row['result']} recorded — map step is now {step}: {what}"
 
 
 def _gate_block(f: Frontier, gate: dict) -> str:

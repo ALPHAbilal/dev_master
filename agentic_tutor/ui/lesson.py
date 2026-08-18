@@ -38,40 +38,27 @@ from .trace import TurnTrace
 
 MAX_LESSON_TURNS = 30
 
-# G1 — Agent L, constant core (docs/tutor-simulation.md Part G, verbatim).
-L_CORE = """You are the tutor. You are the only agent the learner sees.
+# L's constant core (MAP.md v2). Deliberately short: everything situational is
+# rented context — the STEP block, the menu, post-commit steering. Only laws that
+# hold on EVERY turn live here.
+L_CORE = """You are the tutor — the only agent the learner sees. Code routes the
+learning map; you judge quality. You never decide what comes next — your db() rows do.
 
-1. Never answer before he attempts. His code is evidence; his self-report is a hint.
-2. The FRONTIER block below is your ONLY instruction on what to teach and how.
-   Do not teach anything else. He must always know WHY he is building this
-   (its why-this-slice line) — never let the work feel like a floating drill.
-3. OPEN with the frontier's opening-question — guess-first, never lecture-first —
-   and surface its connect-to line: name the owned mapping this builds on.
-4. Follow the road:
-   - intuition-train: he guesses; let worth-failing-at mistakes stand; nudge,
-     never fix. Cap: 4 pushes, then record and stop.
-   - fast-map: show the solution cleanly, then he applies it once, fresh.
-   - slow-solve: he proves it fully; you only verify the proof.
-5. When he is stuck: descend the simplify-ladder ONE step. Shrink the problem;
-   never reveal the answer. Off-ladder improvisation only if the ladder is spent.
-6. When he takes a wrong turn: if it is listed in worth-failing-at, let it stand
-   and record its `reveals` label in the probe row. If unlisted, judge: productive
-   (stand) or noise like syntax/names (just tell — lane 6, like just-tell says).
-7. A gap does NOT close on working code. Close requires ALL of done-when:
-   fresh-instance success + the justify step — he states the WHY in his own
-   words. No why, no close.
-8. Vocabulary door: never use a vocab-hold term. If HE uses one, probe the
-   behavior before promoting the word.
-9. Every judged answer becomes a probes row via the tool — result, pushes,
-   and the reveals label when a predicted wrong turn was hit.
-10. Close a gap by depositing the mapping: start from mapping-seed's trigger, but
-    author solution/why/provenance from what HE actually did — his wrong turn is
-    the provenance. The tool rejects a mapping without trigger+solution+why.
-11. If a supposedly-owned prereq is failing here: fill the SUBHOLE keys via the
-    tool and HOLD — do not answer him until the frontier updates (M is on it).
-12. While a GATE block is present: he writes the target file himself, spec hidden,
-    you write nothing into it. He produces, or it did not happen.
-13. No praise without evidence. Short, direct. Name gaps he cannot see."""
+1. The [STEP] block below is your only working orders. Do exactly that step —
+   never the next one, never your own curriculum. Every judged answer becomes
+   a db row IN THE SAME TURN; a step without its row did not happen.
+2. He attempts before you explain. Before any code of his runs, his PREDICTION
+   is on the table; reality vs prediction is the lesson, and HE reconciles it.
+3. Never write, complete, or fix his code beyond what the step explicitly allows.
+4. Vocabulary door: never use a HELD term. If HE uses one, probe the behavior
+   it names before promoting the word.
+5. If a supposedly-owned prerequisite is failing: db raise_subhole and HOLD —
+   do not answer him until the frontier updates.
+6. While a [GATE] block is present: he writes the target file himself, spec
+   hidden, your hands off. He produces, or it did not happen.
+7. Bookkeeping is invisible: pushes, probes, levels, step names, HIT/MISS never
+   appear in the chat. He sees the journey — what he builds, why, what is next.
+8. No praise without evidence. Short, direct. Name gaps he cannot see."""
 
 
 class LessonError(SurveyError):
@@ -89,19 +76,42 @@ def load_current_frontier(db: DB) -> Frontier:
         raise LessonError(f"the published frontier is unusable ({e}) — re-run M/PLAN") from e
 
 
+def tools_block(db: DB) -> str:
+    """Pre-seeded menu: L never spends turns discovering its own API."""
+    from tutor.operations import menu_for
+    lines = ["[TOOLS] db() ops live now (args, * = required; check=true = validate only):"]
+    for op in menu_for(db, "L"):
+        args = ", ".join(f + ("*" if f in op.required else "") for f in op.schema)
+        lines.append(f"  {op.name}({args}) — {op.summary}")
+    return "\n".join(lines)
+
+
 def lesson_prompt(db: DB, cm: ContextManager, frontier: Frontier,
                   learner_text: str) -> str:
     """Append his message, collapse, render. Pure — testable without the SDK.
 
     The routing block is injected HERE by render(), not by a UserPromptSubmit hook:
     we own history, so injection is a rendering concern (tutor-sdk-mapping.md §3).
+    First turn of a session additionally carries ⓪: due reviews + his last session
+    note; every turn carries the step block and the live op menu.
     """
     # F2 is decided BEFORE his message lands: this UI's turn 1 begins with the
     # learner speaking, so appending first would make every turn a continue turn.
     first = cm.is_first_turn
     cm.append_learner(learner_text)
     cm.collapse()
-    block = build_l_block(db, frontier, first)
+    parts = []
+    if first:
+        from tutor.routing import review_block
+        note = db.meta_get("last_session_note", "")
+        if note:
+            parts.append(f"[LAST SESSION — his own summary] {note}")
+        rb = review_block(db)
+        if rb:
+            parts.append(rb)
+    parts.append(build_l_block(db, frontier, first))
+    parts.append(tools_block(db))
+    block = "\n\n".join(parts)
     return cm.render(opening_block=block, continue_block=block)
 
 

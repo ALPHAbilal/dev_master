@@ -174,7 +174,7 @@ def test_built_slices_are_skipped():
     db = _spined()
     dispatch(db, "M", "write_spec", {"slice_slug": "pinned-qa-group", "body": SPEC})
     dispatch(db, "L", "open_gate", {"slice_slug": "pinned-qa-group"})
-    dispatch(db, "L", "pass_gate", {"slice_slug": "pinned-qa-group"})
+    dispatch(db, "L", "pass_gate", {"slice_slug": "pinned-qa-group", "note": "judged vs spec"})
     assert _next_slice(db) is None
 
 

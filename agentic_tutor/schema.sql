@@ -39,7 +39,9 @@ CREATE TABLE IF NOT EXISTS concepts (
     aspect      TEXT,                                    -- lang/stdlib/design/...
     state       TEXT NOT NULL DEFAULT 'LOCKED'
                     CHECK (state IN ('OWNED','READY','LOCKED')),
-    requires    TEXT                                     -- JSON: [concept_slug, ...] (DAG edges)
+    requires    TEXT,                                    -- JSON: [concept_slug, ...] (DAG edges)
+    review_due    TEXT,                                  -- spaced retrieval: next cold recall
+    review_streak INTEGER NOT NULL DEFAULT 0             -- consecutive review HITs
 );
 
 -- The blank-page wall. While OPEN: learner can't read spec, agent can't write target.
@@ -60,8 +62,10 @@ CREATE TABLE IF NOT EXISTS probes (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     concept_slug   TEXT,                                 -- may be a slice slug for kind=build
     kind           TEXT NOT NULL
-                       CHECK (kind IN ('predict','produce','build','stall','review')),
+                       CHECK (kind IN ('entry','predict','complete','produce','vary',
+                                       'build','stall','review')),
     result         TEXT NOT NULL CHECK (result IN ('HIT','PARTIAL','MISS')),
+    level          INTEGER,                              -- kind=entry: 3 study / 4 complete / 5 produce
     pushes         INTEGER NOT NULL DEFAULT 0,
     self_corrected INTEGER NOT NULL DEFAULT 0,           -- 0/1
     error_class    TEXT,
@@ -69,6 +73,23 @@ CREATE TABLE IF NOT EXISTS probes (
     terms          TEXT,                                 -- JSON or csv
     note           TEXT,
     created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- The subhole STACK: decayed prereqs discovered mid-work, any nesting depth.
+-- LIFO: the highest unresolved id is the active detour; resolution walks backward
+-- until the stack is empty, then the main work resumes from the root bookmark.
+CREATE TABLE IF NOT EXISTS subholes (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    slice_slug   TEXT NOT NULL REFERENCES slices(slug),
+    concept_slug TEXT NOT NULL REFERENCES concepts(slug),
+    parent_concept TEXT,                                 -- gap being taught when raised; NULL = the gate itself
+    evidence     TEXT NOT NULL,
+    bookmark     TEXT,                                   -- what L was doing, to resume verbatim
+    gate_was_open INTEGER NOT NULL DEFAULT 0,            -- reopen the wall on final resume
+    state        TEXT NOT NULL DEFAULT 'OPEN'
+                     CHECK (state IN ('OPEN','PLANNED','RESOLVED')),
+    raised_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    resolved_at  TEXT
 );
 
 -- The intuition unit: trigger + solution + why. polarity=negative = a misconception.
