@@ -37,7 +37,7 @@ standard-library Python only at first. The old backend and `ui/` remain untouche
 **Deliverables**
 
 - package layout and configuration object (`database path`, `workspace root`,
-  `archive root`, `session id`)
+`archive root`, `session id`)
 - domain names shared by the backend: `Unit`, `Axis`, `StackFrame`, `Event`,
   `Workspace`, `Handoff`, `WakeupPacket`, `ReturnStamp`
 - error hierarchy for validation, invariant, unavailable capability, and stale
@@ -75,11 +75,15 @@ HandoffService     read/write latest; move/restore parked continuation
 StateReader        returns only step-scoped domain data
 ```
 
-Archive and event movement must be one guarded transaction boundary: archive
+The workspace keeps one visible learner file throughout an active unit. Every
+test captures an internal checkpoint of the exact tested revision; unit archive
+contains the final file plus only those test-linked checkpoints. Archive and
+event movement must be one guarded transaction boundary: archive
 artifact written durably first; only then mark/move the live events.
 
 **Done when:** workspace edits, event recording, archive sealing, and handoff
-restore work without an agent and are idempotent after a simulated crash/retry.
+read/write work without an agent; archive retries are idempotent after a
+simulated crash. Full stack checkpoint/restore is deliberately Stage 9.
 
 ## Stage 3 — formal contracts and validation wall
 

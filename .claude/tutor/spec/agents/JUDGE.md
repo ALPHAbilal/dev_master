@@ -95,7 +95,9 @@ Design calls taken (recommended, reversible):
   "category": "working-code-wrong-reasoning",
   "evidence_ref": "turn-3",
   "hidden_gap": {"slug":"dict-vs-list-lookup",
-                 "why":"reason is about ORDER; real reason is O(1) grouping"}
+                 "why":"reason is about ORDER; real reason is O(1) grouping",
+                 "axis":"RATIONALE",
+                 "anchor":{"kind":"code","file":"run_prompts.py","lo":120,"hi":131}}
 }
 ```
 `hidden_gap` is null when none. Code reads `category` to route; if `hidden_gap`

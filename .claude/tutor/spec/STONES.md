@@ -175,11 +175,14 @@ Two scopes to keep straight:
              has a stable `document_id`; unit archives save representative
              snapshots/diffs under a human-readable archive title.
     HOLDS    document_id, display_name, language/extension, current content,
-             current revision/hash
+             current revision/hash, plus hidden revision checkpoints for every
+             test-run revision. The learner sees only the one stable document.
     READS    action hooks, probe, teach, test, grade, distill
     WRITES   learner editor actions through the guarded workspace service
-    LIFE     LIVE and mutable. Unit closure does not delete it; a route may reset
-             it only through an explicit workspace-template policy.
+    LIFE     LIVE and mutable. Never reset between tests: learner edits and tests
+             the same document continuously. Unit close archives the final file
+             plus test-linked checkpoints; a route may reset the visible document
+             only through an explicit next-unit workspace-template policy.
 
 ## 12. events  (DB — LIVE → ARCHIVED)  — the automatic activity trace
     PLAIN    The application records every learner command, edit, test result,

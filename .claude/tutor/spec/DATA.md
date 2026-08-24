@@ -60,8 +60,10 @@ old tutor_db.py) that REFUSES illegal writes. Below: real columns + example row.
  slug        text     stable name, e.g. "pinned_qa_group"
  file        text     where it lives on disk
  lo, hi      int      line range
+ ordinal     int      mapper dependency order (stable next-unit choice)
  depth       int      0 = top-level unit ; >0 = a sub-hole
  parent_id   int      which unit this was descended from (null at depth 0)
+ anchor_kind text     code (highlight file:lo-hi) | conceptual (parent context only)
  state       text     NEW|POINTED|PROBED|TAUGHT|TESTED|JUDGED|OWNED|PARKED
  created_at  ts
 
@@ -83,6 +85,7 @@ axes fire; the axis-set in `axes` already encodes it.
  verdict      text    UNGRADED|SOLID|SHAKY|MISSING
  shaky_count  int     how many times SHAKY on this axis (2 → MISSING)
  evidence_ref text    pointer to the proof (transcript turn / probes row id)
+ ordinal      int     mapper-supplied firing-axis order within the unit
  updated_at   ts
 
  example rows for unit 12:
@@ -174,6 +177,8 @@ distill (R). PERSIST: this is the long memory — "where has he struggled before
   kind:"test", payload:{command:"pytest -q"}, result:{exit:1, output:"..."},
   revision_hash:"sha256:..."}
 ```
+For every `test` event, the workspace service first seals an internal checkpoint
+of that exact revision; `payload.workspace_checkpoint` records its revision/hash.
 Touched by: action hooks (W automatically), probe/teach/test/grade (R when the
 event is relevant evidence), distill (R then MOVE). The event recorder writes
 this table without waiting for an agent. On OWNED/PARK, the guarded distill
@@ -191,12 +196,14 @@ these live rows only after the archive write succeeds.
 │
 └── projects/<target>/                 ← per-codebase file artifacts
     ├── workspace/
-    │   └── <display-name>             ← one visible logical learner document
+    │   ├── <display-name>             ← one visible logical learner document
+    │   └── .revisions/<document-id>/  ← hidden test-linked checkpoints (stone 11)
     ├── archive/
     │   ├── <unit-slug>/              ← one titled artifact per finished/parked unit
     │   │   ├── manifest.json
     │   │   ├── events.jsonl
-    │   │   └── workspace-snapshot.<ext>
+    │   │   ├── workspace-snapshot.<ext>
+    │   │   └── workspace-revisions/   ← only revisions that tests actually ran
     │   └── ...
 ```
 (There is no `codebase-map/` folder — the ladder lives in the `units`+`axes`

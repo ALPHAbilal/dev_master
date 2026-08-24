@@ -1,0 +1,234 @@
+<title>Tutor — Variation C · Cockpit (telemetry)</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#141b24; --panel-2:#1b2530; --line:#25313d;
+    --ink:#e6edf3; --ink-dim:#93a3b3; --ink-faint:#5f7183;
+    --teal:#37c2b6; --teal-soft:#66e0d4; --blue:#4a9bd4;
+    --good:#4bbd7a; --warn:#e0b24a; --crit:#e0674a;
+    --sans:"Inter var",-apple-system,"Segoe UI",system-ui,sans-serif;
+    --mono:"SF Mono","JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13.5px;
+    line-height:1.5;-webkit-font-smoothing:antialiased;overflow:hidden}
+  .app{display:grid;grid-template-columns:1fr 340px;grid-template-rows:56px 1fr;height:100vh}
+
+  header{grid-column:1/3;display:flex;align-items:center;gap:20px;padding:0 22px;
+    background:var(--panel);border-bottom:1px solid var(--line)}
+  .brand{font-weight:700;letter-spacing:.02em;display:flex;align-items:center;gap:10px}
+  .brand .lg{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--teal),var(--blue));
+    display:grid;place-items:center;color:#04121a;font-weight:800}
+  .flow{display:flex;align-items:center;gap:10px;margin-left:12px;font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .flow .node{padding:4px 11px;border-radius:6px;border:1px solid var(--line);color:var(--ink-dim)}
+  .flow .node.on{background:rgba(55,194,182,.14);border-color:var(--teal);color:var(--teal-soft)}
+  .flow .arw{color:var(--ink-faint)}
+  .metrics{margin-left:auto;display:flex;gap:22px;font-family:var(--mono)}
+  .metric{text-align:right}
+  .metric .v{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+  .metric .l{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)}
+  .metric .v.g{color:var(--good)} .metric .v.c{color:var(--crit)}
+
+  /* main grid of instruments */
+  .board{padding:18px;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;
+    grid-auto-rows:min-content;gap:16px;grid-template-areas:"radar code" "ladder code" "evidence evidence"}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .card h3{margin:0 0 14px;font-size:10px;letter-spacing:.15em;text-transform:uppercase;
+    color:var(--ink-faint);font-weight:700;display:flex;align-items:center;gap:8px}
+  .card h3 .pill{margin-left:auto;font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;
+    padding:2px 8px;border-radius:12px;background:var(--panel-2);color:var(--teal-soft);text-transform:none}
+
+  .radar-card{grid-area:radar} .code-card{grid-area:code;display:flex;flex-direction:column}
+  .ladder-card{grid-area:ladder} .evi-card{grid-area:evidence}
+
+  .radar-wrap{display:flex;gap:16px;align-items:center}
+  canvas{flex:none}
+  .legend{display:flex;flex-direction:column;gap:7px;font-size:11.5px;flex:1}
+  .lgi{display:flex;align-items:center;gap:9px}
+  .lgi .sw{width:9px;height:9px;border-radius:2px;flex:none}
+  .lgi .nm{color:var(--ink-dim);width:96px;font-family:var(--mono);font-size:10.5px}
+  .lgi .st{margin-left:auto;font-family:var(--mono);font-size:10px}
+  .st.solid{color:var(--good)} .st.shaky{color:var(--warn)} .st.now{color:var(--teal-soft)} .st.none{color:var(--ink-faint)}
+
+  /* code panel */
+  .code-head{font-family:var(--mono);font-size:11px;color:var(--ink-dim);margin-bottom:10px}
+  .code-head b{color:var(--teal-soft)}
+  .code{flex:1;overflow:auto;font-family:var(--mono);font-size:11.5px;line-height:1.65;
+    background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 0}
+  .ln{display:flex}
+  .ln .g{width:38px;flex:none;text-align:right;padding-right:12px;color:var(--ink-faint);font-variant-numeric:tabular-nums}
+  .ln .c{white-space:pre;padding-right:14px;color:var(--ink-dim)}
+  .ln.pin{background:rgba(55,194,182,.10);box-shadow:inset 2px 0 0 var(--teal)}
+  .kw{color:#c98bd0} .fn{color:var(--teal-soft)} .str{color:#8fcf8a} .cm{color:var(--ink-faint);font-style:italic} .nm{color:#e0a35a}
+
+  /* ladder */
+  .climb{display:flex;flex-direction:column-reverse;gap:0}
+  .step{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
+  .step:first-child{border-bottom:0}
+  .step .idx{font-family:var(--mono);font-size:10px;color:var(--ink-faint);width:20px}
+  .step .nm{font-family:var(--mono);font-size:12px}
+  .step .prog{margin-left:auto;display:flex;gap:3px}
+  .step .prog i{width:16px;height:5px;border-radius:2px;background:var(--line)}
+  .step .prog i.on{background:var(--good)} .step .prog i.cur{background:var(--teal)}
+  .step.now .nm{color:var(--teal-soft);font-weight:600}
+  .step.done .nm{color:var(--ink-dim)}
+  .step.lock{opacity:.45}
+  .badge{font-family:var(--mono);font-size:9px;padding:1px 7px;border-radius:10px}
+  .badge.owned{background:rgba(75,189,122,.15);color:var(--good)}
+  .badge.active{background:rgba(55,194,182,.15);color:var(--teal-soft)}
+
+  /* evidence log */
+  .log{display:flex;flex-direction:column;gap:0;font-size:12.5px}
+  .row{display:grid;grid-template-columns:52px 96px 1fr 84px;gap:12px;align-items:center;
+    padding:9px 0;border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:0}
+  .row .t{font-family:var(--mono);font-size:10px;color:var(--ink-faint)}
+  .row .ax{font-family:var(--mono);font-size:10px;color:var(--blue)}
+  .row .q{color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row .vd{font-family:var(--mono);font-size:10px;text-align:right;justify-self:end;padding:2px 9px;border-radius:11px}
+  .vd.solid{background:rgba(75,189,122,.14);color:var(--good)}
+  .vd.shaky{background:rgba(224,178,74,.14);color:var(--warn)}
+  .vd.miss{background:rgba(224,103,74,.14);color:var(--crit)}
+  .row.live{background:rgba(55,194,182,.05)} .row.live .q{color:var(--ink)}
+
+  /* right dock: the exchange */
+  .dock{grid-row:2;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column}
+  .dock-h{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+  .dock-h .dot{width:9px;height:9px;border-radius:50%;background:var(--teal);box-shadow:0 0 8px var(--teal)}
+  .dock-h b{font-size:13px} .dock-h .m{margin-left:auto;font-family:var(--mono);font-size:9px;
+    color:var(--crit);border:1px solid var(--crit);padding:2px 8px;border-radius:12px}
+  .exch{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:15px}
+  .mk{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal-soft)}
+  .m-ai{font-size:13.5px;line-height:1.6}
+  .m-ai code,.m-me code{font-family:var(--mono);font-size:11.5px;background:var(--panel-2);padding:1px 5px;border-radius:4px;color:var(--teal-soft)}
+  .m-me{font-size:13px;color:var(--ink-dim);background:var(--panel-2);border-radius:9px;padding:11px 13px}
+  .vtag{display:inline-flex;gap:7px;font-family:var(--mono);font-size:10.5px;padding:4px 11px;border-radius:14px;
+    background:rgba(224,178,74,.13);color:var(--warn)}
+  .comp{border-top:1px solid var(--line);padding:14px}
+  .box{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:11px;font-size:12.5px;color:var(--ink-dim);min-height:60px}
+  .comp .r{display:flex;align-items:center;gap:10px;margin-top:9px}
+  .comp .h{font-size:10px;color:var(--ink-faint)}
+  .send{margin-left:auto;background:var(--teal);color:#04121a;border:0;font-weight:700;padding:8px 16px;border-radius:7px;font-size:12px;cursor:pointer}
+</style>
+
+<div class="app">
+  <header>
+    <div class="brand"><span class="lg">▲</span>Tutor · Cockpit</div>
+    <div class="flow">
+      <span class="node">① wake</span><span class="arw">→</span>
+      <span class="node on">② return</span><span class="arw">→</span>
+      <span class="node">③ route</span>
+    </div>
+    <div class="metrics">
+      <div class="metric"><div class="v">ASSEMBLE</div><div class="l">phase</div></div>
+      <div class="metric"><div class="v g">6</div><div class="l">can</div></div>
+      <div class="metric"><div class="v c">21</div><div class="l">cant</div></div>
+      <div class="metric"><div class="v">0</div><div class="l">review due</div></div>
+    </div>
+  </header>
+
+  <div class="board">
+    <div class="card radar-card">
+      <h3>Axis telemetry · _pinned_qa_group <span class="pill">2 / 4 firing solid</span></h3>
+      <div class="radar-wrap">
+        <canvas id="radar" width="200" height="200"></canvas>
+        <div class="legend">
+          <div class="lgi"><span class="sw" style="background:var(--good)"></span><span class="nm">COMPREHEND</span><span class="st solid">SOLID</span></div>
+          <div class="lgi"><span class="sw" style="background:var(--teal)"></span><span class="nm">RATIONALE</span><span class="st now">▶ NOW</span></div>
+          <div class="lgi"><span class="sw" style="background:var(--line)"></span><span class="nm">ROBUSTNESS</span><span class="st none">queued</span></div>
+          <div class="lgi"><span class="sw" style="background:var(--line)"></span><span class="nm">INTEGRATION</span><span class="st none">queued</span></div>
+          <div class="lgi"><span class="sw" style="background:#2b3742"></span><span class="nm">MECHANISM</span><span class="st none">not firing</span></div>
+          <div class="lgi"><span class="sw" style="background:#2b3742"></span><span class="nm">JUDGMENT</span><span class="st none">not firing</span></div>
+          <div class="lgi"><span class="sw" style="background:#2b3742"></span><span class="nm">EVOLUTION</span><span class="st none">not firing</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card code-card">
+      <h3>Unit source <span class="pill">run_prompts.py:258</span></h3>
+      <div class="code-head">▸ <b>_pinned_qa_group()</b> — highlighted in your editor</div>
+      <div class="code">
+<div class="ln"><span class="g">263</span><span class="c">    props, req = {}, []</span></div>
+<div class="ln"><span class="g">264</span><span class="c">    <span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="nm">1</span>,<span class="nm">6</span>):</span></div>
+<div class="ln pin"><span class="g">265</span><span class="c">        props[<span class="str">f'question_{i}'</span>]={<span class="str">'enum'</span>:[questions[i-<span class="nm">1</span>]]}</span></div>
+<div class="ln"><span class="g">266</span><span class="c">        props[<span class="str">f'reponse_{i}'</span>]={<span class="str">'type'</span>:<span class="str">'string'</span>}</span></div>
+<div class="ln"><span class="g">267</span><span class="c">        req += [<span class="str">f'question_{i}'</span>,<span class="str">f'reponse_{i}'</span>]</span></div>
+<div class="ln"><span class="g">268</span><span class="c">    <span class="kw">return</span> {..., <span class="str">'additionalProperties'</span>:<span class="kw">False</span>}</span></div>
+      </div>
+    </div>
+
+    <div class="card ladder-card">
+      <h3>The climb <span class="pill">depth 0</span></h3>
+      <div class="climb">
+        <div class="step lock"><span class="idx">06</span><span class="nm">main</span></div>
+        <div class="step lock"><span class="idx">05</span><span class="nm">build_request</span></div>
+        <div class="step lock"><span class="idx">04</span><span class="nm">_pinned_schema</span></div>
+        <div class="step now"><span class="idx">03</span><span class="nm">_pinned_qa_group</span><span class="badge active">GRADING</span><span class="prog"><i class="on"></i><i class="cur"></i><i></i><i></i></span></div>
+        <div class="step done"><span class="idx">02</span><span class="nm">_qa_group</span><span class="badge owned">OWNED</span></div>
+        <div class="step done"><span class="idx">01</span><span class="nm">load_config</span><span class="badge owned">OWNED</span></div>
+      </div>
+    </div>
+
+    <div class="card evi-card">
+      <h3>Evidence log · this unit <span class="pill">stone 5 · probes</span></h3>
+      <div class="log">
+        <div class="row"><span class="t">t·3</span><span class="ax">COMPREHEND</span><span class="q">What does this function return, in one sentence?</span><span class="vd solid">SOLID</span></div>
+        <div class="row"><span class="t">t·4</span><span class="ax">COMPREHEND</span><span class="q">Why <code>range(1,6)</code> and not <code>range(5)</code>?</span><span class="vd solid">SOLID</span></div>
+        <div class="row live"><span class="t">t·5</span><span class="ax">RATIONALE</span><span class="q">Why single-value <code>enum</code> vs a free string?</span><span class="vd shaky">SHAKY</span></div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="dock">
+    <div class="dock-h"><span class="dot"></span><b>Senior Engineer</b><span class="m">ADVERSARY</span></div>
+    <div class="exch">
+      <div class="mk">Probe · RATIONALE</div>
+      <div class="m-ai">Why a single-value <code>enum</code> on <code>question_N</code> instead of a plain <code>'type':'string'</code>? What breaks without the pin?</div>
+      <div class="m-me">Strict mode forces the schema, and enum limits it to those values, so it can't reword the question.</div>
+      <div class="mk">Grade → route</div>
+      <div class="m-ai"><span class="vtag">◑ SHAKY · route → re-probe (narrower)</span></div>
+      <div class="m-ai">You named the mechanism, not the failure. With a free string the model could return a reworded or wrong-list question — why does that then corrupt <code>reponse_N</code>?</div>
+    </div>
+    <div class="comp">
+      <div class="box">Generation is sequential, so reponse_N follows question_N — if the question drifts the answer attaches to the wrong one…</div>
+      <div class="r"><span class="h">Attempt first.</span><button class="send">Send ↩</button></div>
+    </div>
+  </aside>
+</div>
+
+<script>
+  const c = document.getElementById('radar'), x = c.getContext('2d');
+  const cx=100, cy=100, R=78;
+  const axes=[
+    {name:'COMP', v:1.0, on:true},{name:'RAT', v:0.55, on:true, now:true},
+    {name:'ROB', v:0.0, on:true},{name:'INT', v:0.0, on:true},
+    {name:'MECH', v:0.0, on:false},{name:'JUD', v:0.0, on:false},{name:'EVO', v:0.0, on:false}
+  ];
+  const N=axes.length, step=(Math.PI*2)/N, start=-Math.PI/2;
+  // rings
+  x.strokeStyle='#25313d'; x.lineWidth=1;
+  for(let r=1;r<=4;r++){x.beginPath();
+    for(let i=0;i<=N;i++){const a=start+i*step, rr=R*r/4;
+      const px=cx+Math.cos(a)*rr, py=cy+Math.sin(a)*rr; i?x.lineTo(px,py):x.moveTo(px,py);}
+    x.stroke();}
+  // spokes + labels
+  x.fillStyle='#5f7183'; x.font='8px ui-monospace, monospace'; x.textAlign='center';
+  axes.forEach((ax,i)=>{const a=start+i*step;
+    x.strokeStyle=ax.on?'#33414f':'#1c2731'; x.beginPath();
+    x.moveTo(cx,cy); x.lineTo(cx+Math.cos(a)*R, cy+Math.sin(a)*R); x.stroke();
+    x.fillStyle=ax.on?'#93a3b3':'#3a4652';
+    x.fillText(ax.name, cx+Math.cos(a)*(R+13), cy+Math.sin(a)*(R+13)+3);
+  });
+  // data polygon
+  x.beginPath();
+  axes.forEach((ax,i)=>{const a=start+i*step, rr=R*ax.v;
+    const px=cx+Math.cos(a)*rr, py=cy+Math.sin(a)*rr; i?x.lineTo(px,py):x.moveTo(px,py);});
+  x.closePath();
+  x.fillStyle='rgba(55,194,182,.16)'; x.fill();
+  x.strokeStyle='#37c2b6'; x.lineWidth=1.5; x.stroke();
+  // vertices
+  axes.forEach((ax,i)=>{if(!ax.on)return;const a=start+i*step, rr=R*ax.v;
+    const px=cx+Math.cos(a)*rr, py=cy+Math.sin(a)*rr;
+    x.beginPath(); x.arc(px,py,ax.now?4:3,0,7);
+    x.fillStyle=ax.now?'#66e0d4':(ax.v>=1?'#4bbd7a':'#e0b24a'); x.fill();});
+</script>

@@ -174,7 +174,7 @@ question. The three full structured stamps below are map, grade, and distill.
 ┌─ return.grade ───────────────────────────────────── from: JUDGE ─────────┐
 │ STAMP    { axis, verdict: SOLID|SHAKY|MISSING,                            │
 │            category: <learner route signal; one of the 15 in Catalog C>,  │
-│            evidence_ref, hidden_gap?: {slug, why} }                       │
+│            evidence_ref, hidden_gap?: {slug, why, axis, anchor} }         │
 │ WRITES   (2 axes: this axis + shaky_count) (5 probes: append one Q&A row) │
 │          (6 learner: append a misconception if found)                    │
 │ THEN     code reads `category` → Catalog C picks the next wakeup          │
@@ -193,6 +193,11 @@ question. The three full structured stamps below are map, grade, and distill.
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
+`hidden_gap.axis` is always required: it is the one axis the child must prove
+before the parent can resume. `hidden_gap.anchor` is either
+`{kind:"code",file,lo,hi}` (point/highlight that code) or `{kind:"conceptual"}`
+(no fabricated child highlight; retain the parent code only as context).
+
 ---
 
 ## CATALOG C — ROUTING TABLE  (code → code, step ③)
@@ -201,6 +206,13 @@ Code reads the learner route signal currently named `category` off return.grade
 and fires the next wakeup. Verdicts are the assessment; categories are learner
 signals; pure-code facts are deterministic policy. This is where the stack moves
 (branch down / climb up). Invariant: every category has a next — NONE dead-ends.
+
+The strict v1 machine enum is the hyphenated form of the table labels:
+`correct-deep`, `pattern-matched`, `shaky`, `misconception`, `different-prereq`,
+`sibling-hole`, `confused-question`, `different-axis`, `off-topic`, `gives-up`,
+`silent-stuck`, `disputes-verdict`, `skip-request`, `fatigue-switch`, and
+`working-code-wrong-reasoning`. The display wording may improve; these values
+are the stable agent→code contract until a versioned migration changes them.
 
 ```
  CATEGORY (what the learner did)     STACK MOVE        NEXT WAKEUP

@@ -95,6 +95,7 @@ Design calls taken (recommended, reversible):
 {
   "unit": "pinned_qa_group",
   "title": "Pinned Q&A grouping — first working lookup",
+  "logical_document": {"id":"learner-main", "display_name":"solution.py"},
   "final_verdict": "OWNED",
   "axes_tested": ["COMPREHEND","RATIONALE","ROBUSTNESS","INTEGRATION"],
   "tests": [

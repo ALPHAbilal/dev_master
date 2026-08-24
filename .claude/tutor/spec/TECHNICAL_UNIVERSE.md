@@ -21,6 +21,8 @@ agent emits SAY and/or a stamp; code routes the result.
 ## 2. CAPABILITY POLICY
 
 ```text
+DEFAULT: `claude-haiku-4-5-20251001`; no turn or cost ceiling in v1.
+
 DEFAULT: expose no broad Claude Code toolset.
 
 ALLOW:   narrow custom MCP tools with explicit schema, scope, and policy.
@@ -59,7 +61,6 @@ LIVE WORK / ACTIONS
   tutor.observe_learner_action  command, edit, test output, UI event; recorder
                                  appends to events before policy handling
   tutor.read_workspace           read the one logical learner document
-  tutor.write_workspace          guarded edit to the same logical document
   tutor.log_question            records a probe/test question
   tutor.save_resume_question    saves the interrupted parent question
   tutor.record_action_event     persists an allowed observable event
@@ -137,7 +138,8 @@ Native Read/Glob/Grep: can be introduced for repository analysis if custom
                          read tools become too limiting.
 Bash:                  only a sandboxed, allowlisted test-runner capability.
 WebSearch/WebFetch:    only a sourced research step, never default tutoring.
-Write/Edit:            only a separate learner-workspace capability; never the
-                         target codebase or tutor state directly.
+Write/Edit:            deferred. The learner alone writes the one visible
+                         workspace document in v1; never grant target-codebase
+                         or tutor-state write access.
 Task/subagents:        defer; the Tutor already has explicit roles and routing.
 ```
