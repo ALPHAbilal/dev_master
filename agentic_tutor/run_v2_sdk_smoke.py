@@ -43,6 +43,7 @@ async def main() -> None:
             packet = WakeupBuilder(db, config).build(
                 step="wakeup.probe", unit_id=decision.unit_id, axis=decision.axis,
             )
+            print("SDK_SMOKE_STARTED", flush=True)
             text = await ClaudeAgentAdapter(
                 config, workspace, EventRecorder(db, config, workspace),
             ).run(
@@ -50,7 +51,7 @@ async def main() -> None:
                 "You are a connectivity smoke test. Call read_code_slice before replying. "
                 "Then reply with exactly: SDK_SMOKE_OK",
             )
-            print("MODEL_TEXT:", repr(text))
+            print("MODEL_TEXT:", repr(text), flush=True)
         finally:
             db.close()
 
