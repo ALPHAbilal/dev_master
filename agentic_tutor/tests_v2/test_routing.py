@@ -113,3 +113,50 @@ def test_parent_cannot_be_graded_while_child_is_top():
     finally:
         db.close()
         temp.cleanup()
+
+
+def test_park_moves_full_stack_to_handoff_then_resume_restores_top_frame():
+    temp, db, config, router = _setup()
+    try:
+        # Dive one level so the parked stack has a parent frame plus a live child.
+        parent = router.commit_map(_map([_unit("main", ["RATIONALE"])]))
+        router.record_resume_question(unit_id=parent.unit_id, question="Why this structure?")
+        gap = {"slug": "child", "why": "Need a prerequisite.", "axis": "COMPREHEND", "anchor": {"kind": "conceptual"}}
+        child = router.route_grade(unit_id=parent.unit_id, stamp=_grade("RATIONALE", "MISSING", "misconception", gap))
+        # Fatigue-switch parks the live child; the engine only sets state + returns distill.
+        parked = router.route_grade(unit_id=child.unit_id, stamp=_grade("COMPREHEND", "SHAKY", "fatigue-switch", gap))
+        assert parked.next_step == "wakeup.distill"
+
+        handoff = router.park_current_stack()
+        assert handoff.parked_stack is True
+        assert {frame["unit_id"] for frame in handoff.payload["frames"]} == {parent.unit_id, child.unit_id}
+        # Stack is now empty and the parked flag lives in handoff, not the live stack.
+        assert db.query("SELECT id FROM stack WHERE session_id=?", (config.session_id,)) == []
+        assert db.one("SELECT parked_stack FROM handoff WHERE session_id=?", (config.session_id,)) == {"parked_stack": 1}
+        assert db.one("SELECT current_unit_id FROM meta WHERE session_id=?", (config.session_id,)) == {"current_unit_id": None}
+
+        resumed = router.restore_parked_stack()
+        assert resumed.next_step == "wakeup.probe" and resumed.unit_id == child.unit_id
+        assert resumed.axis == "COMPREHEND"
+        # The rebuilt stack has exactly one top frame and the parked flag is cleared.
+        tops = db.query("SELECT unit_id FROM stack WHERE session_id=? AND is_top=1", (config.session_id,))
+        assert tops == [{"unit_id": child.unit_id}]
+        assert db.one("SELECT parked_stack FROM handoff WHERE session_id=?", (config.session_id,)) == {"parked_stack": 0}
+        assert db.one("SELECT current_unit_id FROM meta WHERE session_id=?", (config.session_id,)) == {"current_unit_id": child.unit_id}
+    finally:
+        db.close()
+        temp.cleanup()
+
+
+def test_restore_without_parked_handoff_is_rejected():
+    temp, db, _, router = _setup()
+    try:
+        router.commit_map(_map([_unit("main", ["RATIONALE"])]))
+        try:
+            router.restore_parked_stack()
+            assert False, "restore requires a parked handoff"
+        except Exception as error:
+            assert "parked" in str(error)
+    finally:
+        db.close()
+        temp.cleanup()

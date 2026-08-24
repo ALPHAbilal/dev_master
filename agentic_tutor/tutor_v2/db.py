@@ -9,7 +9,7 @@ from typing import Iterator
 
 from .errors import InvariantError
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 
 
@@ -61,6 +61,10 @@ class Database:
             return
         if version == 3:
             self._migrate_routing_order_and_anchors()
+            return
+        if version == 4:
+            # The additive journey-layer tables are created idempotently by schema.sql
+            # (executescript runs on every init), so no transform is required here.
             return
         raise RuntimeError(f"no migration implementation for schema {version}")
 

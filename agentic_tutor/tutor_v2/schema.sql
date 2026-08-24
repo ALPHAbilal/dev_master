@@ -111,7 +111,109 @@ CREATE TABLE IF NOT EXISTS events (
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Journey layer (additive): the durable, learner-facing root-unit journey and its
+-- conversation, lifecycle facts, semantic graph, and learner notes. The engine above
+-- is unchanged; these tables are written only by orchestrator-owned recorders.
+
+CREATE TABLE IF NOT EXISTS journeys (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id    TEXT NOT NULL,
+    root_unit_id  INTEGER NOT NULL REFERENCES units(id),
+    state         TEXT NOT NULL DEFAULT 'LIVE'
+                      CHECK (state IN ('LIVE','PARKED','OWNED')),
+    projection_revision INTEGER NOT NULL DEFAULT 0 CHECK (projection_revision >= 0),
+    started_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    completed_at  TEXT,
+    UNIQUE(session_id, root_unit_id)
+);
+
+CREATE TABLE IF NOT EXISTS conversation_messages (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    journey_id     INTEGER NOT NULL REFERENCES journeys(id) ON DELETE CASCADE,
+    unit_id        INTEGER NOT NULL REFERENCES units(id),
+    axis           TEXT,
+    role           TEXT NOT NULL CHECK (role IN ('learner','tutor','tool','system')),
+    message_kind   TEXT NOT NULL,
+    content        TEXT NOT NULL,
+    turn_id        TEXT NOT NULL,
+    sequence       INTEGER NOT NULL,
+    status         TEXT NOT NULL DEFAULT 'RECORDED'
+                       CHECK (status IN ('RECORDED','AWAITING_EVALUATION','EVALUATED')),
+    source_wakeup_step    TEXT,
+    archived_artifact_ref TEXT,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(journey_id, sequence)
+);
+
+CREATE TABLE IF NOT EXISTS journey_events (
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    journey_id             INTEGER NOT NULL REFERENCES journeys(id) ON DELETE CASCADE,
+    unit_id                INTEGER NOT NULL REFERENCES units(id),
+    parent_unit_id         INTEGER REFERENCES units(id),
+    axis                   TEXT,
+    event_type             TEXT NOT NULL,
+    payload_json           TEXT NOT NULL DEFAULT '{}',
+    message_refs_json      TEXT NOT NULL DEFAULT '[]',
+    probe_refs_json        TEXT NOT NULL DEFAULT '[]',
+    action_event_refs_json TEXT NOT NULL DEFAULT '[]',
+    source_ref_json        TEXT,
+    workspace_revision     INTEGER,
+    workspace_hash         TEXT,
+    created_at             TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS semantic_nodes (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    journey_id         INTEGER NOT NULL REFERENCES journeys(id) ON DELETE CASCADE,
+    unit_id            INTEGER REFERENCES units(id),
+    kind               TEXT NOT NULL,
+    title              TEXT NOT NULL,
+    summary            TEXT,
+    source_ref_json    TEXT,
+    status             TEXT NOT NULL DEFAULT 'active',
+    provenance         TEXT NOT NULL CHECK (provenance IN ('parser','agent','system')),
+    evidence_refs_json TEXT NOT NULL DEFAULT '[]',
+    created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS semantic_edges (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    journey_id         INTEGER NOT NULL REFERENCES journeys(id) ON DELETE CASCADE,
+    from_node_id       INTEGER NOT NULL REFERENCES semantic_nodes(id) ON DELETE CASCADE,
+    to_node_id         INTEGER NOT NULL REFERENCES semantic_nodes(id) ON DELETE CASCADE,
+    relationship_type  TEXT NOT NULL,
+    label              TEXT,
+    explanation        TEXT,
+    provenance         TEXT NOT NULL CHECK (provenance IN ('parser','agent','system')),
+    evidence_refs_json TEXT NOT NULL DEFAULT '[]',
+    created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS learner_notes (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    journey_id   INTEGER NOT NULL REFERENCES journeys(id) ON DELETE CASCADE,
+    target_kind  TEXT NOT NULL CHECK (target_kind IN ('node','edge','message','journey')),
+    target_id    TEXT NOT NULL,
+    content      TEXT NOT NULL,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_units_session_state ON units(session_id, state);
 CREATE INDEX IF NOT EXISTS idx_axes_unit ON axes(unit_id);
 CREATE INDEX IF NOT EXISTS idx_events_session_unit ON events(session_id, unit_id, id);
 CREATE INDEX IF NOT EXISTS idx_probes_session_unit ON probes(session_id, unit_id, id);
+CREATE INDEX IF NOT EXISTS idx_journeys_session ON journeys(session_id, root_unit_id);
+CREATE INDEX IF NOT EXISTS idx_messages_journey ON conversation_messages(journey_id, sequence);
+CREATE INDEX IF NOT EXISTS idx_messages_turn ON conversation_messages(journey_id, turn_id);
+-- Idempotency backstop: one learner answer per (journey, turn). A replayed grade turn
+-- reuses the existing answer instead of inserting a duplicate.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_learner_answer_per_turn
+    ON conversation_messages(journey_id, turn_id) WHERE role='learner';
+CREATE INDEX IF NOT EXISTS idx_journey_events_journey ON journey_events(journey_id, id);
+CREATE INDEX IF NOT EXISTS idx_semantic_nodes_journey ON semantic_nodes(journey_id, id);
+CREATE INDEX IF NOT EXISTS idx_semantic_edges_journey ON semantic_edges(journey_id, id);
+CREATE INDEX IF NOT EXISTS idx_learner_notes_journey ON learner_notes(journey_id, id);

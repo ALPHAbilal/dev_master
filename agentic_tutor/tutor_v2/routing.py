@@ -13,6 +13,7 @@ from typing import Any
 from .config import TutorConfig
 from .contracts import validate_return
 from .db import Database
+from .domain import Handoff
 from .errors import InvariantError, ValidationError
 
 
@@ -183,6 +184,98 @@ class Router:
                 (self.config.session_id,),
             )
             return self._point_next_root_locked()
+
+    def park_current_stack(self) -> Handoff:
+        """Move the entire live subhole stack into handoff so the journey can resume.
+
+        ``route_grade`` leaves a fatigue-switched unit PARKED and returns
+        ``wakeup.distill``; this is the "Stage 9" move the DISTILLER's read of the
+        still-live stack depends on. After distillation the orchestrator calls this
+        to serialize every live frame into the single handoff record and clear the
+        live stack, so a parked stack never lives in both homes at once.
+        """
+        with self.db.transaction():
+            frames = self.db.connection.execute(
+                "SELECT unit_id,depth,resume_q,pending_json,hop_budget,is_top "
+                "FROM stack WHERE session_id=? ORDER BY depth",
+                (self.config.session_id,),
+            ).fetchall()
+            if not frames:
+                raise InvariantError("cannot park a session with no live stack frame")
+            meta = self._meta()
+            payload = {
+                "current_unit_id": meta["current_unit_id"],
+                "frames": [
+                    {
+                        "unit_id": frame["unit_id"], "depth": frame["depth"],
+                        "resume_q": frame["resume_q"], "pending": json.loads(frame["pending_json"]),
+                        "hop_budget": frame["hop_budget"], "is_top": frame["is_top"],
+                    }
+                    for frame in frames
+                ],
+            }
+            self.db.connection.execute(
+                "INSERT INTO handoff(session_id,payload_json,parked_stack) VALUES(?,?,1) "
+                "ON CONFLICT(session_id) DO UPDATE SET payload_json=excluded.payload_json,"
+                "parked_stack=1,updated_at=datetime('now')",
+                (self.config.session_id, json.dumps(payload, sort_keys=True)),
+            )
+            self.db.connection.execute("DELETE FROM stack WHERE session_id=?", (self.config.session_id,))
+            self.db.connection.execute(
+                "UPDATE meta SET current_unit_id=NULL,updated_at=datetime('now') WHERE session_id=?",
+                (self.config.session_id,),
+            )
+            return Handoff(payload, True)
+
+    def restore_parked_stack(self) -> RouteDecision:
+        """Rebuild the live stack from a parked handoff and resume its top frame.
+
+        The inverse of :meth:`park_current_stack`. It recreates every frame, clears
+        the parked flag in the same transaction (so the one-home invariant holds once
+        the stack is live again), and returns the ordinary wakeup that resumes the
+        deepest frame at its next unsolid axis, carrying the parent's exact question.
+        """
+        with self.db.transaction():
+            row = self.db.connection.execute(
+                "SELECT payload_json,parked_stack FROM handoff WHERE session_id=?",
+                (self.config.session_id,),
+            ).fetchone()
+            if not row or not row["parked_stack"]:
+                raise InvariantError("no parked stack is available to restore")
+            if self.db.connection.execute(
+                "SELECT 1 FROM stack WHERE session_id=? LIMIT 1", (self.config.session_id,)
+            ).fetchone():
+                raise InvariantError("cannot restore a parked stack over a live stack")
+            payload = json.loads(row["payload_json"])
+            top_unit_id: int | None = None
+            top_resume_q: str | None = None
+            for frame in sorted(payload["frames"], key=lambda item: item["depth"]):
+                self.db.connection.execute(
+                    "INSERT INTO stack(session_id,unit_id,depth,resume_q,pending_json,hop_budget,is_top) "
+                    "VALUES(?,?,?,?,?,?,?)",
+                    (self.config.session_id, frame["unit_id"], frame["depth"], frame["resume_q"],
+                     json.dumps(frame["pending"], sort_keys=True), frame["hop_budget"], frame["is_top"]),
+                )
+                if frame["is_top"]:
+                    top_unit_id = frame["unit_id"]
+                    top_resume_q = frame["resume_q"]
+            if top_unit_id is None:
+                raise InvariantError("parked stack payload has no top frame")
+            self.db.connection.execute(
+                "UPDATE handoff SET parked_stack=0,updated_at=datetime('now') WHERE session_id=?",
+                (self.config.session_id,),
+            )
+            self.db.connection.execute(
+                "UPDATE meta SET current_unit_id=?,updated_at=datetime('now') WHERE session_id=?",
+                (top_unit_id, self.config.session_id),
+            )
+            axis = self._next_unsolid_axis_locked(top_unit_id)
+            if not axis:
+                raise InvariantError("restored unit has no firing axis")
+            return RouteDecision(
+                "wakeup.probe", top_unit_id, axis["axis"], "resume parked journey",
+                resume_question=top_resume_q,
+            )
 
     def _advance_after_solid_locked(self, unit_id: int) -> RouteDecision:
         unresolved_child = self.db.connection.execute(

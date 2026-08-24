@@ -28,7 +28,9 @@ def test_fresh_database_has_authoritative_mutable_stones_and_version():
     db = Database()
     tables = {row["name"] for row in db.query("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"schema_migrations", "units", "axes", "stack", "meta", "probes", "learner", "handoff", "events"} <= tables
-    assert db.one("SELECT MAX(version) AS version FROM schema_migrations") == {"version": 3}
+    assert {"journeys", "conversation_messages", "journey_events",
+            "semantic_nodes", "semantic_edges", "learner_notes"} <= tables
+    assert db.one("SELECT MAX(version) AS version FROM schema_migrations") == {"version": 4}
 
 
 def test_file_database_enables_wal_and_reopens_cleanly():
@@ -38,7 +40,7 @@ def test_file_database_enables_wal_and_reopens_cleanly():
         assert db.one("PRAGMA journal_mode")["journal_mode"] == "wal"
         db.close()
         reopened = Database(path)
-        assert reopened.one("SELECT MAX(version) AS version FROM schema_migrations") == {"version": 3}
+        assert reopened.one("SELECT MAX(version) AS version FROM schema_migrations") == {"version": 4}
         reopened.close()
 
 
@@ -72,7 +74,7 @@ def test_v1_events_migrate_to_monotonic_ids_without_losing_rows():
         legacy.connection.commit()
         legacy.close()
         db = Database(path)
-        assert db.one("SELECT MAX(version) AS version FROM schema_migrations") == {"version": 3}
+        assert db.one("SELECT MAX(version) AS version FROM schema_migrations") == {"version": 4}
         assert db.one("SELECT id FROM events") == {"id": 7}
         assert "AUTOINCREMENT" in db.one(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='events'"
@@ -154,3 +156,55 @@ def test_only_one_live_top_frame_is_allowed():
     except InvariantError:
         pass
     assert db.query("SELECT id FROM stack") == []
+
+
+def test_journey_layer_enforces_state_and_cascades_on_journey_delete():
+    db = Database()
+    unit_id = _unit(db)
+    with db.transaction():
+        journey_id = db.connection.execute(
+            "INSERT INTO journeys(session_id,root_unit_id) VALUES(?,?)", ("s1", unit_id)
+        ).lastrowid
+        db.connection.execute(
+            "INSERT INTO conversation_messages(journey_id,unit_id,role,message_kind,content,turn_id,sequence) "
+            "VALUES(?,?,?,?,?,?,?)",
+            (journey_id, unit_id, "tutor", "question", "What does this do?", "t1", 1),
+        )
+        db.connection.execute(
+            "INSERT INTO journey_events(journey_id,unit_id,event_type) VALUES(?,?,?)",
+            (journey_id, unit_id, "journey_started"),
+        )
+    # Journey defaults to LIVE and rejects an unsupported state.
+    assert db.one("SELECT state FROM journeys WHERE id=?", (journey_id,)) == {"state": "LIVE"}
+    try:
+        db.execute("UPDATE journeys SET state='BOGUS' WHERE id=?", (journey_id,))
+        assert False, "journey state is constrained"
+    except sqlite3.IntegrityError:
+        pass
+    # Deleting the journey cascades to its conversation and lifecycle facts.
+    db.execute("DELETE FROM journeys WHERE id=?", (journey_id,))
+    assert db.query("SELECT id FROM conversation_messages") == []
+    assert db.query("SELECT id FROM journey_events") == []
+
+
+def test_conversation_sequence_is_unique_per_journey():
+    db = Database()
+    unit_id = _unit(db)
+    with db.transaction():
+        journey_id = db.connection.execute(
+            "INSERT INTO journeys(session_id,root_unit_id) VALUES(?,?)", ("s1", unit_id)
+        ).lastrowid
+    db.execute(
+        "INSERT INTO conversation_messages(journey_id,unit_id,role,message_kind,content,turn_id,sequence) "
+        "VALUES(?,?,?,?,?,?,?)",
+        (journey_id, unit_id, "tutor", "question", "first", "t1", 1),
+    )
+    try:
+        db.execute(
+            "INSERT INTO conversation_messages(journey_id,unit_id,role,message_kind,content,turn_id,sequence) "
+            "VALUES(?,?,?,?,?,?,?)",
+            (journey_id, unit_id, "learner", "answer", "dup", "t2", 1),
+        )
+        assert False, "sequence must be unique within a journey"
+    except sqlite3.IntegrityError:
+        pass

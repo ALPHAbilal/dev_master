@@ -15,6 +15,17 @@ from .errors import (
 )
 from .routing import RouteDecision, Router
 from .packets import CapabilityPolicy, WakeupBuilder
+from .parsing import ReturnStampParser
+from .recorders import ConversationRecorder, JourneyRecorder, ProbeRecorder
+from .orchestrator import TurnOrchestrator, TurnResult
+from .structure import StructuralEdge, StructuralNode, StructureExtraction, StructureExtractor, reconcile_range
+from .semantics import SemanticGraphService
+from .journey_reader import AXIS_WORDING, JourneyReader, SNAPSHOT_VERSION
+from .journey_archive import (
+    ARCHIVE_FORMAT_VERSION, ArchiveReader, EpisodeReceipt, JourneyArchiveReceipt, JourneyArchiveService,
+)
+from .transport import PollingProjectionFeed, ProjectionUpdate
+from .session import DEFAULT_INSTRUCTIONS, SessionRunner, agent_run_from_adapter
 from .services import ArchiveReceipt, ArchiveService, EventRecorder, HandoffService, StateReader, WorkspaceService, WorkspaceWrite
 from .sdk_runtime import (
     DEFAULT_MODEL, AgentSdkUnavailableError, ClaudeAgentAdapter, LaunchSpec,
@@ -32,6 +43,16 @@ __all__ = [
     "validate_archive_manifest",
     "Router", "RouteDecision",
     "CapabilityPolicy", "WakeupBuilder",
+    "ReturnStampParser",
+    "ConversationRecorder", "JourneyRecorder", "ProbeRecorder",
+    "TurnOrchestrator", "TurnResult",
+    "StructuralEdge", "StructuralNode", "StructureExtraction", "StructureExtractor", "reconcile_range",
+    "SemanticGraphService",
+    "JourneyReader", "AXIS_WORDING", "SNAPSHOT_VERSION",
+    "JourneyArchiveService", "ArchiveReader", "EpisodeReceipt", "JourneyArchiveReceipt",
+    "ARCHIVE_FORMAT_VERSION",
+    "PollingProjectionFeed", "ProjectionUpdate",
+    "SessionRunner", "DEFAULT_INSTRUCTIONS", "agent_run_from_adapter",
     "DEFAULT_MODEL", "AgentSdkUnavailableError", "RuntimeSettings", "LaunchSpec",
     "TutorToolGateway", "ClaudeAgentAdapter",
 ]
