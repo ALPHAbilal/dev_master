@@ -72,57 +72,52 @@ textarea { border: none; outline: none; }
 .view { display:none; flex:1; min-height:0; }
 .view.on { display:flex; flex-direction:column; }
 .map-scroll { flex:1; overflow:auto; }
-.dag { position:relative; min-width:760px; padding:8px 20px 24px; }
-.dag svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; z-index:0; }
-.dag-cols { position:relative; z-index:1; display:grid; grid-template-columns:repeat(4,1fr); gap:0 34px; }
-.col-head { padding:0 0 4px; text-align:center; display:flex; flex-direction:column; gap:2px; }
-.col-head span { font-size:10px; font-weight:700; letter-spacing:0.14em; color:var(--text-secondary); }
-.col-head em { font-size:9.5px; font-style:normal; color:var(--text-disabled); letter-spacing:0.02em; }
-.col-rule { height:12px; }
-.col { display:flex; flex-direction:column; gap:30px; align-items:stretch; }
-.edge { stroke:rgba(198,194,179,0.28); stroke-width:1.5; fill:none; transition:stroke 200ms ease,opacity 200ms ease; }
-.edge.proven { stroke:var(--accent); }
-.edge.gap { stroke:#cf8f5a; stroke-dasharray:6 4; }
-.edge.first { stroke:var(--text-muted); stroke-dasharray:2 5; }
-.edge.code { stroke:rgba(198,194,179,0.18); stroke-dasharray:1 4; }
-.edge.lit { stroke-width:2.5; }
-.edge.dim { opacity:0.12; }
-.edge-label { font-size:9px; fill:var(--text-primary); font-family:var(--font-ui); font-weight:600; opacity:0; paint-order:stroke; stroke:var(--bg-app); stroke-width:3px; transition:opacity 160ms ease; }
-.edge-label.show { opacity:1; }
-.edge-label.dim { opacity:0; }
-.node { position:relative; background:var(--bg-card); border-radius:var(--radius-md); padding:10px 12px; cursor:pointer; transition:transform 150ms ease,background 150ms ease,box-shadow 150ms ease; }
-.node:hover { background:var(--bg-elevated); transform:translateY(-1px); }
-.node .n-kind { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-muted); display:flex; align-items:center; gap:6px; }
-.node .n-kind::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--text-disabled); flex-shrink:0; }
-.node .n-title { font-size:13px; line-height:1.35; color:var(--text-primary); margin-top:6px; }
-.node .n-prov { font-size:9px; color:var(--text-disabled); margin-top:7px; }
-.node[data-kind="concept-system"] { box-shadow:inset 3px 0 0 var(--accent); }
-.node[data-kind="concept-system"] .n-kind { color:var(--text-secondary); }
-.node[data-kind="concept-system"] .n-kind::before { background:var(--accent); }
-.node[data-kind="concept-system"] .n-title { font-family:var(--font-code); font-weight:600; }
-.node[data-kind="concept-agent"] .n-kind::before { background:var(--text-secondary); border-radius:2px; }
-.node[data-kind="takeaway"] { box-shadow:inset 3px 0 0 var(--accent); }
-.node[data-kind="takeaway"] .n-kind { color:var(--accent); }
-.node[data-kind="takeaway"] .n-kind::before { background:var(--accent); }
-.node[data-kind="misconception"] { box-shadow:inset 3px 0 0 #cf8f5a; }
-.node[data-kind="misconception"] .n-kind { color:#e0a56f; }
-.node[data-kind="misconception"] .n-kind::before { background:#cf8f5a; }
-.node[data-kind="prerequisite"] .n-kind::before { background:var(--text-muted); border-radius:2px; transform:rotate(45deg); }
-.node[data-kind="function"] { background:var(--bg-surface); }
-.node[data-kind="function"] .n-title { font-family:var(--font-code); font-size:12px; }
-.node[data-kind="function"] .n-kind::before { background:var(--text-disabled); border-radius:2px; }
-/* map top: next-step banner + legend */
-.map-top { padding:12px 20px 4px; display:flex; flex-direction:column; gap:12px; }
-.next-step { display:flex; align-items:center; gap:10px; background:var(--accent-soft); border-radius:10px; padding:10px 14px; }
-.next-step .badge { font-size:9px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--bg-deepest); background:var(--accent); border-radius:9999px; padding:3px 9px; flex-shrink:0; }
-.next-step .txt { font-size:13px; color:var(--text-primary); }
-.next-step .txt b { color:#e0a56f; }
-.legend { display:flex; flex-wrap:wrap; gap:16px; }
-.legend .item { display:flex; align-items:center; gap:7px; font-size:11px; color:var(--text-muted); }
-.legend .swatch { width:22px; height:0; border-top-width:2px; border-top-style:solid; }
-.legend .swatch.proven { border-color:var(--accent); }
-.legend .swatch.gap { border-color:#cf8f5a; border-top-style:dashed; }
-.legend .swatch.first { border-color:var(--text-muted); border-top-style:dotted; }
+.route-wrap { max-width:600px; margin:0 auto; padding:16px 22px 32px; }
+
+/* GPS next-turn card = the tutor's live action */
+.gps { display:flex; gap:13px; align-items:center; background:var(--accent-soft); border-radius:14px; padding:14px 16px; }
+.gps .turn-ico { width:40px; height:40px; border-radius:11px; background:var(--accent); color:var(--bg-deepest); display:grid; place-items:center; flex-shrink:0; }
+.gps .g-kicker { font-size:9px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--accent); }
+.gps .g-main { font-size:15px; color:var(--text-primary); font-weight:600; margin-top:2px; }
+.gps .g-sub { font-size:12px; color:var(--text-muted); margin-top:3px; }
+.gps .g-sub b { color:#e0a56f; font-weight:600; }
+
+/* trip stats */
+.trip { display:flex; gap:16px; align-items:center; padding:14px 4px 18px; font-size:11.5px; color:var(--text-muted); }
+.trip b { color:var(--text-primary); font-weight:700; }
+.trip .prog { flex:1; min-width:70px; height:5px; border-radius:3px; background:var(--bg-surface); overflow:hidden; }
+.trip .prog i { display:block; height:100%; background:var(--accent); border-radius:3px; }
+
+/* territory: 2-D map — axis lanes (X) × time (Y), a winding trail */
+.territory { position:relative; width:100%; }
+.lane-guide { position:absolute; top:34px; bottom:14px; width:0; border-left:1px dashed rgba(255,255,255,0.10); transform:translateX(-50%); z-index:0; }
+.lane-guide.untrod { border-left-style:dotted; opacity:0.5; }
+.lane-head { position:absolute; top:0; transform:translateX(-50%); text-align:center; z-index:2; }
+.lane-head .l-name { font-size:11px; font-weight:600; color:var(--text-secondary); white-space:nowrap; }
+.lane-head .l-axis { font-size:8.5px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-disabled); margin-top:1px; }
+.lane-head.untrod .l-name { color:var(--text-disabled); }
+.trail-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:1; overflow:visible; }
+
+.act { position:absolute; transform:translate(-50%,-50%); z-index:3; cursor:pointer; }
+.act-card { background:var(--bg-card); border-radius:9px; padding:7px 11px; transition:transform 150ms ease,background 150ms ease,box-shadow 150ms ease; box-shadow:var(--shadow-card); }
+.act:hover .act-card { background:var(--bg-elevated); transform:translateY(-2px); }
+.act .a-kind { font-size:8.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); display:flex; align-items:center; gap:6px; }
+.act .a-kind::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--text-disabled); flex-shrink:0; }
+.act .a-title { font-size:11.5px; color:var(--text-primary); margin-top:3px; white-space:nowrap; }
+.act[data-kind="taught"] .a-kind { color:var(--text-secondary); } .act[data-kind="taught"] .a-kind::before { background:var(--text-secondary); border-radius:2px; }
+.act[data-kind="proven"] .act-card { box-shadow:inset 3px 0 0 var(--accent), var(--shadow-card); } .act[data-kind="proven"] .a-kind { color:var(--accent); } .act[data-kind="proven"] .a-kind::before { background:var(--accent); }
+.act[data-kind="probe"] .a-kind::before { background:var(--text-muted); }
+.act[data-kind="gap"] .act-card { box-shadow:inset 3px 0 0 #cf8f5a, 0 0 22px 2px rgba(207,143,90,0.25); background:radial-gradient(90px 50px at 12% 50%, rgba(207,143,90,0.22), var(--bg-card) 72%); }
+.act[data-kind="gap"] .a-kind { color:#e0a56f; } .act[data-kind="gap"] .a-kind::before { background:#cf8f5a; box-shadow:0 0 8px 2px rgba(207,143,90,0.6); }
+.act.selected .act-card { box-shadow:0 0 0 1.5px var(--accent); background:var(--bg-elevated); }
+.act.current .act-card { box-shadow:0 0 0 2px var(--accent); }
+/* current position pin */
+.pin { position:absolute; transform:translate(-50%,-50%); width:16px; height:16px; z-index:4; }
+.pin::before { content:""; position:absolute; inset:0; border-radius:50%; background:var(--accent); }
+.pin::after { content:""; position:absolute; inset:-6px; border-radius:50%; border:2px solid var(--accent); animation:pulse 1.9s ease-out infinite; }
+.pin-label { position:absolute; transform:translate(-50%,-50%); z-index:4; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--accent); white-space:nowrap; }
+.trail-glow { stroke:var(--accent); stroke-width:8; fill:none; opacity:0.12; stroke-linecap:round; }
+.trail-line { stroke:var(--accent); stroke-width:2.5; fill:none; stroke-linecap:round; }
 .node.is-active { animation:pulse 1.9s ease-out infinite; }
 .node.selected { background:var(--bg-elevated); box-shadow:0 0 0 1.5px var(--accent); }
 .node.faded { opacity:0.32; }
@@ -217,24 +212,10 @@ textarea { border: none; outline: none; }
 
     <div class="view on" id="view-map">
       <div class="map-scroll">
-        <div class="map-top">
-          <div class="next-step">
-            <span class="badge">Next</span>
-            <span class="txt">Close your open gap — <b>ids can collide across groups</b>. Learn <i>dict identity vs value</i> first.</span>
-          </div>
-          <div class="legend">
-            <span class="item"><span class="swatch proven"></span>Proven</span>
-            <span class="item"><span class="swatch gap"></span>Open gap</span>
-            <span class="item"><span class="swatch first"></span>Learn first</span>
-            <span class="item">Click any card → see the exact conversation</span>
-          </div>
-        </div>
-        <div class="dag" id="dag">
-          <svg id="edges"><defs>
-            <marker id="ah" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="rgba(198,194,179,0.5)"/></marker>
-            <marker id="ahLit" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#d8b24d"/></marker>
-          </defs></svg>
-          <div class="dag-cols" id="dagCols"></div>
+        <div class="route-wrap">
+          <div class="gps" id="gps"></div>
+          <div class="trip" id="trip"></div>
+          <div class="territory" id="territory"></div>
         </div>
       </div>
     </div>
@@ -356,63 +337,98 @@ CODEBASES.forEach(cb=>{
   tree.appendChild(wrap);
 });
 
-/* ── MAP: pipeline DAG (role columns, left→right) ──────────────────────────
- * Column is derived from the node kind, exactly as the backend classifies it. */
-const COLUMNS=[
-  {key:'anchor',  label:'FOCUS',         hint:'what you’re on',   kinds:['concept-system','function']},
-  {key:'concept', label:'WHAT TO MASTER',hint:'the ideas',           kinds:['concept-agent']},
-  {key:'verdict', label:'PROVEN / MISSED',hint:'where you stand',     kinds:['takeaway','misconception']},
-  {key:'gap',     label:'UNBLOCK FIRST', hint:'clear this next',     kinds:['prerequisite']},
+/* ── MAP: the journey as a GPS route ───────────────────────────────────────
+ * Stops = units in order. Trail behind the marker = past (OWNED); the pulsing
+ * marker = the agent's live position (ACTIVE); dim road ahead = QUEUED. The
+ * current unit unfolds its semantic overlay (proven / gap / learn-first), and
+ * the open gap glows as a hotspot. Every card → the exact conversation. */
+/* Lanes = the axes of understanding (X dimension). Time = Y. */
+const LANES = [
+  { axis:'COMPREHEND', label:'What it does' },
+  { axis:'IMPLEMENT',  label:'Build it' },
+  { axis:'EDGE',       label:'What breaks' },
 ];
-const colOf=k=>COLUMNS.findIndex(c=>c.kinds.includes(k));
-const svg=document.getElementById('edges'), dag=document.getElementById('dag'), dagCols=document.getElementById('dagCols');
-COLUMNS.forEach((c,ci)=>{
-  const col=document.createElement('div'); col.className='col-wrap';
-  col.innerHTML=`<div class="col-head"><span>${c.label}</span><em>${c.hint}</em></div><div class="col-rule"></div>`;
-  const stack=document.createElement('div'); stack.className='col'; stack.dataset.col=ci;
-  NODES.filter(n=>colOf(n.kind)===ci).forEach(n=>{
-    const el=document.createElement('div'); el.className='node'; el.dataset.kind=n.kind;
-    if(n.active) el.classList.add('is-active');
-    el.innerHTML=`<div class="n-kind">${n.label}</div><div class="n-title">${n.title}</div><div class="n-prov">${n.prov}</div>`;
-    el.addEventListener('click',()=>selectNode(n.id));
-    stack.appendChild(el); n._el=el; n._col=ci;
-  });
-  col.appendChild(stack); dagCols.appendChild(col);
+const laneX = axis => (LANES.findIndex(l=>l.axis===axis)+0.5)/LANES.length*100; // % across
+const trodden = new Set();  // which lanes the trail has actually entered
+
+/* ACTIONS = the agent's live+past actions, each tied to an axis and a moment.
+ * ev → the conversation messages that are its evidence (click to focus). */
+const ACTIONS = [
+  { id:'a1', axis:'COMPREHEND', kind:'taught', label:'Taught', title:'grouping rule', ev:[2] },
+  { id:'a2', axis:'COMPREHEND', kind:'proven', label:'Proven', title:'pinned-first order', ev:[3,'f2'] },
+  { id:'a3', axis:'EDGE',       kind:'probe',  label:'Probed', title:'collision trace', ev:[5] },
+  { id:'a4', axis:'EDGE',       kind:'gap',    label:'Open gap', title:'ids collide', ev:[5,6,'f6'], current:true },
+];
+const ROW_TOP=70, ROW_GAP=92;
+const territory=document.getElementById('territory');
+territory.style.height=(ROW_TOP+ROW_GAP*(ACTIONS.length-1)+70)+'px';
+ACTIONS.forEach(a=>trodden.add(a.axis));
+
+/* lane guides + headers */
+LANES.forEach(l=>{
+  const untrod = trodden.has(l.axis)?'':' untrod';
+  const g=document.createElement('div'); g.className='lane-guide'+untrod; g.style.left=laneX(l.axis)+'%'; territory.appendChild(g);
+  const h=document.createElement('div'); h.className='lane-head'+untrod; h.style.left=laneX(l.axis)+'%';
+  h.innerHTML=`<div class="l-name">${l.label}</div><div class="l-axis">${l.axis}</div>`; territory.appendChild(h);
 });
 
-/* draw orthogonal edges from measured DOM positions */
-const edgeEls=[];
-function drawEdges(){
-  svg.querySelectorAll('path.edge, text.edge-label').forEach(e=>e.remove());
-  edgeEls.length=0;
-  const base=dag.getBoundingClientRect();
-  svg.setAttribute('viewBox',`0 0 ${dag.scrollWidth} ${dag.scrollHeight}`);
-  EDGES.forEach(e=>{
-    const a=byId[e.from], b=byId[e.to]; if(!a._el||!b._el) return;
-    const ra=a._el.getBoundingClientRect(), rb=b._el.getBoundingClientRect();
-    const fwd=b._col>a._col;
-    let x1,y1,x2,y2,d;
-    if(fwd){ // right edge → left edge, elbow at mid-x
-      x1=ra.right-base.left; y1=ra.top+ra.height/2-base.top;
-      x2=rb.left-base.left;  y2=rb.top+rb.height/2-base.top;
-      const mx=(x1+x2)/2; d=`M ${x1} ${y1} H ${mx} V ${y2} H ${x2}`;
-    } else { // same column (e.g. contains): bottom → top
-      x1=ra.left+ra.width/2-base.left; y1=ra.bottom-base.top;
-      x2=rb.left+rb.width/2-base.left; y2=rb.top-base.top;
-      const my=(y1+y2)/2; d=`M ${x1} ${y1} V ${my} H ${x2} V ${y2}`;
-    }
-    const m=MEANING[e.rel]||{cls:'needs',word:e.rel};
-    const path=document.createElementNS(SVGNS,'path');
-    path.setAttribute('d',d); path.setAttribute('class','edge '+m.cls); path.setAttribute('marker-end','url(#ah)');
-    svg.appendChild(path);
-    const lbl=document.createElementNS(SVGNS,'text');
-    lbl.setAttribute('x',(x1+x2)/2+4); lbl.setAttribute('y',(y1+y2)/2-4);
-    lbl.setAttribute('class','edge-label'); lbl.textContent=m.word; svg.appendChild(lbl);
-    edgeEls.push({e,path,lbl});
-  });
+/* trail svg (drawn after layout) */
+const trailSvg=document.createElementNS(SVGNS,'svg'); trailSvg.setAttribute('class','trail-svg'); territory.appendChild(trailSvg);
+
+/* action nodes */
+ACTIONS.forEach((a,i)=>{
+  const el=document.createElement('div'); el.className='act'+(a.current?' current':''); el.dataset.kind=a.kind; el.dataset.id=a.id;
+  a._x=laneX(a.axis); a._y=ROW_TOP+ROW_GAP*i;
+  el.style.left=a._x+'%'; el.style.top=a._y+'px';
+  el.innerHTML=`<div class="act-card"><div class="a-kind">${a.label}</div><div class="a-title">${a.title}</div></div>`;
+  el.addEventListener('click',()=>focusAction(a,el));
+  territory.appendChild(el); a._el=el;
+});
+
+/* current position pin + label at the last action */
+const last=ACTIONS[ACTIONS.length-1];
+const pin=document.createElement('div'); pin.className='pin'; pin.style.left=last._x+'%'; pin.style.top=(last._y+34)+'px'; territory.appendChild(pin);
+const pinLbl=document.createElement('div'); pinLbl.className='pin-label'; pinLbl.textContent='you are here'; pinLbl.style.left=last._x+'%'; pinLbl.style.top=(last._y+54)+'px'; territory.appendChild(pinLbl);
+
+/* draw the winding trail through the actions in order (smooth cubic S-curves) */
+function drawTrail(){
+  trailSvg.querySelectorAll('path').forEach(p=>p.remove());
+  const W=territory.clientWidth;
+  const pts=ACTIONS.map(a=>({x:a._x/100*W, y:a._y}));
+  let d=`M ${pts[0].x} ${pts[0].y}`;
+  for(let i=1;i<pts.length;i++){ const p0=pts[i-1], p1=pts[i], my=(p0.y+p1.y)/2;
+    d+=` C ${p0.x} ${my}, ${p1.x} ${my}, ${p1.x} ${p1.y}`; }
+  const glow=document.createElementNS(SVGNS,'path'); glow.setAttribute('d',d); glow.setAttribute('class','trail-glow'); trailSvg.appendChild(glow);
+  const line=document.createElementNS(SVGNS,'path'); line.setAttribute('d',d); line.setAttribute('class','trail-line'); trailSvg.appendChild(line);
 }
-requestAnimationFrame(drawEdges);
-window.addEventListener('resize',drawEdges);
+requestAnimationFrame(drawTrail);
+window.addEventListener('resize',drawTrail);
+
+/* focus the conversation on an action's evidence */
+function focusAction(a,el){
+  showMid('conversation');
+  const ev=new Set(a.ev.map(String));
+  convo.classList.add('focused');
+  convo.querySelectorAll('[data-id]').forEach(x=>x.classList.toggle('ev',ev.has(x.dataset.id)));
+  document.querySelectorAll('.act.selected').forEach(x=>x.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('focusBar').classList.add('on');
+  document.getElementById('focusName').textContent=a.label+' · '+a.title;
+  const first=convo.querySelector('.ev'); if(first) first.scrollIntoView({block:'center',behavior:'smooth'});
+}
+
+/* GPS next-maneuver card (the tutor's live action) + trip stats */
+const owned=CODEBASES[0].units.filter(u=>u.state==='OWNED').length, total=CODEBASES[0].units.length;
+document.getElementById('gps').innerHTML=`
+  <div class="turn-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20V10a4 4 0 0 1 4-4h6"/><path d="M15 2l4 4-4 4"/></svg></div>
+  <div><div class="g-kicker">Next maneuver</div>
+    <div class="g-main">Close the open gap — id collisions across groups</div>
+    <div class="g-sub">then prove <b>IMPLEMENT</b> · learn <i>dict identity vs value</i> first</div></div>`;
+document.getElementById('trip').innerHTML=`
+  <span><b>${owned}</b>/${total} owned</span>
+  <span class="prog"><i style="width:${Math.round(owned/total*100)}%"></i></span>
+  <span>ETA <b>${total-owned}</b> units</span>
+  <span>axis · <b>What it does</b></span>`;
 
 /* conversation */
 const convo=document.getElementById('convo');
@@ -438,31 +454,13 @@ function showMid(v){
   midSeg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
   document.getElementById('view-map').classList.toggle('on',v==='map');
   document.getElementById('view-conversation').classList.toggle('on',v==='conversation');
-  if(v==='map') requestAnimationFrame(drawEdges);
+  if(v==='map') requestAnimationFrame(drawTrail);
 }
 
-/* node → focused conversation */
-function selectNode(id){
-  const n=byId[id];
-  const nbr=new Set([id]);
-  EDGES.forEach(e=>{ if(e.from===id||e.to===id){ nbr.add(e.from); nbr.add(e.to); } });
-  NODES.forEach(x=>{ x._el.classList.toggle('selected',x.id===id); x._el.classList.toggle('faded',!nbr.has(x.id)); });
-  edgeEls.forEach(({e,path,lbl})=>{ const on=e.from===id||e.to===id;
-    path.classList.toggle('lit',on); path.setAttribute('marker-end',on?'url(#ahLit)':'url(#ah)');
-    path.classList.toggle('dim',!on); lbl.classList.toggle('show',on); lbl.classList.toggle('dim',!on); });
-  showMid('conversation');
-  const ev=new Set(n.ev.map(String));
-  convo.classList.add('focused');
-  convo.querySelectorAll('[data-id]').forEach(el=>el.classList.toggle('ev',ev.has(el.dataset.id)));
-  document.getElementById('focusBar').classList.add('on');
-  document.getElementById('focusName').textContent=n.title;
-  const first=convo.querySelector('.ev'); if(first) first.scrollIntoView({block:'center',behavior:'smooth'});
-}
 function clearFocus(){
   convo.classList.remove('focused');
   convo.querySelectorAll('.ev').forEach(el=>el.classList.remove('ev'));
-  NODES.forEach(x=>x._el.classList.remove('selected','faded'));
-  edgeEls.forEach(({path,lbl})=>{ path.classList.remove('lit','dim'); path.setAttribute('marker-end','url(#ah)'); lbl.classList.remove('show','dim'); });
+  document.querySelectorAll('.act.selected').forEach(x=>x.classList.remove('selected'));
   document.getElementById('focusBar').classList.remove('on');
 }
 document.getElementById('focusClear').addEventListener('click',clearFocus);
@@ -499,7 +497,7 @@ function applyGrid(){
   document.getElementById('right').style.visibility=rightOpen?'visible':'hidden';
   document.getElementById('reopenLeft').classList.toggle('show',!leftOpen);
   document.getElementById('reopenRight').classList.toggle('show',!rightOpen);
-  setTimeout(()=>requestAnimationFrame(drawEdges),240);
+  setTimeout(()=>requestAnimationFrame(drawTrail),240);
 }
 document.getElementById('collapseLeft').addEventListener('click',()=>{leftOpen=false;applyGrid();});
 document.getElementById('reopenLeft').addEventListener('click',()=>{leftOpen=true;applyGrid();});
