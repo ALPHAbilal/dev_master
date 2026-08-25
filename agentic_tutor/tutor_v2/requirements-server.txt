@@ -1,0 +1,6 @@
+# Server-only dependencies for the FastAPI surface (app.py). The engine itself and the
+# ApiHandlers seam have no third-party dependency; install these only on the persistent host
+# that serves HTTP to the React/Vercel client.
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.6

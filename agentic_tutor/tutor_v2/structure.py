@@ -29,7 +29,7 @@ class StructuralNode:
 class StructuralEdge:
     from_qualname: str
     to_qualname: str
-    relationship: str  # "contains"
+    relationship: str  # "contains" | "calls" | "imports"
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,24 +60,63 @@ class StructureExtractor:
         module = StructuralNode("module", file_relpath, file_relpath, file_relpath, 1, total_lines)
         nodes: list[StructuralNode] = [module]
         edges: list[StructuralEdge] = []
-        self._walk(tree.body, parent=module, file_relpath=file_relpath, nodes=nodes, edges=edges)
+        # Module-level callables (simple name -> qualname) are the only ``calls`` targets we
+        # resolve; a call to a name defined outside this file has no structural node, so the
+        # ingester would drop the edge anyway. Precomputed so a caller can call a callee that
+        # is defined later in the file.
+        callables = {
+            statement.name: statement.name
+            for statement in tree.body
+            if isinstance(statement, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        seen: set[tuple[str, str, str]] = set()
+        self._walk(tree.body, parent=module, file_relpath=file_relpath, nodes=nodes, edges=edges,
+                   callables=callables, seen=seen)
         return StructureExtraction(tuple(nodes), tuple(edges))
 
     def _walk(self, body: list[ast.stmt], *, parent: StructuralNode, file_relpath: str,
-              nodes: list[StructuralNode], edges: list[StructuralEdge]) -> None:
+              nodes: list[StructuralNode], edges: list[StructuralEdge],
+              callables: dict[str, str], seen: set[tuple[str, str, str]]) -> None:
         for statement in body:
             if isinstance(statement, ast.ClassDef):
                 node = self._node("class", statement, parent, file_relpath)
                 nodes.append(node)
                 edges.append(StructuralEdge(parent.qualname, node.qualname, "contains"))
-                self._walk(statement.body, parent=node, file_relpath=file_relpath, nodes=nodes, edges=edges)
+                self._walk(statement.body, parent=node, file_relpath=file_relpath, nodes=nodes,
+                           edges=edges, callables=callables, seen=seen)
             elif isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 kind = "method" if parent.kind == "class" else "function"
                 node = self._node(kind, statement, parent, file_relpath)
                 nodes.append(node)
                 edges.append(StructuralEdge(parent.qualname, node.qualname, "contains"))
                 # Nested defs are captured under their enclosing function.
-                self._walk(statement.body, parent=node, file_relpath=file_relpath, nodes=nodes, edges=edges)
+                self._walk(statement.body, parent=node, file_relpath=file_relpath, nodes=nodes,
+                           edges=edges, callables=callables, seen=seen)
+            else:
+                # A non-def statement's calls/imports belong to the nearest enclosing scope
+                # (``parent``). Defs open their own scope and are handled by the branches above.
+                self._collect_refs(statement, scope=parent, edges=edges, callables=callables, seen=seen)
+
+    def _collect_refs(self, statement: ast.stmt, *, scope: StructuralNode,
+                      edges: list[StructuralEdge], callables: dict[str, str],
+                      seen: set[tuple[str, str, str]]) -> None:
+        def add(to_qualname: str, relationship: str) -> None:
+            key = (scope.qualname, to_qualname, relationship)
+            if to_qualname and key not in seen:
+                seen.add(key)
+                edges.append(StructuralEdge(scope.qualname, to_qualname, relationship))
+
+        for sub in ast.walk(statement):
+            if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Name):
+                target = callables.get(sub.func.id)
+                if target is not None:
+                    add(target, "calls")
+            elif isinstance(sub, ast.Import):
+                for alias in sub.names:
+                    add(alias.asname or alias.name.split(".")[0], "imports")
+            elif isinstance(sub, ast.ImportFrom):
+                for alias in sub.names:
+                    add(alias.asname or alias.name, "imports")
 
     @staticmethod
     def _node(kind: str, statement: ast.stmt, parent: StructuralNode, file_relpath: str) -> StructuralNode:

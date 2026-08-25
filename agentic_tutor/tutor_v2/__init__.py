@@ -17,7 +17,12 @@ from .routing import RouteDecision, Router
 from .packets import CapabilityPolicy, WakeupBuilder
 from .parsing import ReturnStampParser
 from .recorders import ConversationRecorder, JourneyRecorder, ProbeRecorder
+from .graph_projection import GraphProjection
+from .learner_model import LearnerModelService
 from .orchestrator import TurnOrchestrator, TurnResult
+from .driver import DriverState, TurnDriver
+from .factory import AppContext, build_session
+from .api import ApiHandlers
 from .structure import StructuralEdge, StructuralNode, StructureExtraction, StructureExtractor, reconcile_range
 from .semantics import SemanticGraphService
 from .journey_reader import AXIS_WORDING, JourneyReader, SNAPSHOT_VERSION
@@ -45,7 +50,10 @@ __all__ = [
     "CapabilityPolicy", "WakeupBuilder",
     "ReturnStampParser",
     "ConversationRecorder", "JourneyRecorder", "ProbeRecorder",
+    "LearnerModelService", "GraphProjection",
     "TurnOrchestrator", "TurnResult",
+    "TurnDriver", "DriverState",
+    "AppContext", "build_session", "ApiHandlers",
     "StructuralEdge", "StructuralNode", "StructureExtraction", "StructureExtractor", "reconcile_range",
     "SemanticGraphService",
     "JourneyReader", "AXIS_WORDING", "SNAPSHOT_VERSION",

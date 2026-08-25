@@ -100,7 +100,18 @@
       "Bash(python3 .claude/tutor/tutor_db.py session \"claude-opus-4-8\" \"READ phase continuation\")",
       "Bash(python3 -c \"import sqlite3;c=sqlite3.connect\\('.claude/tutor/tutor.db'\\);[print\\(r\\) for r in c.execute\\('select * from targets'\\)]\")",
       "Bash(python3 -c \"import sqlite3;c=sqlite3.connect\\('.claude/tutor/tutor.db'\\);[print\\(r[0]\\) for r in c.execute\\(\\\\\"select name from sqlite_master where type='table'\\\\\"\\)]\")",
-      "Bash(python3 .claude/tutor/tutor_db.py probe merge-replace --result HIT --note \"read-predict on merger loop: gave exact merged dict, response inserted in-place at prompt's position, order preserved\")"
+      "Bash(python3 .claude/tutor/tutor_db.py probe merge-replace --result HIT --note \"read-predict on merger loop: gave exact merged dict, response inserted in-place at prompt's position, order preserved\")",
+      "Bash(python3 -m pytest tests_v2/ -q)",
+      "Bash(python3 -c \"import sys;print\\(sys.version\\)\")",
+      "Bash(python3 -c \"import tutor_v2\")",
+      "Bash(python3 run_v2_tests.py)",
+      "Bash(pip3 install *)",
+      "Bash(python3 -m venv /tmp/claude-1000/-mnt-c-Users-dell-Desktop-next-level-dev-master/441d1dd2-d98d-459c-8a2a-967eba8b3b85/scratchpad/venv)",
+      "Bash(/tmp/claude-1000/-mnt-c-Users-dell-Desktop-next-level-dev-master/441d1dd2-d98d-459c-8a2a-967eba8b3b85/scratchpad/venv/bin/pip install *)",
+      "Bash(python3 -m pytest tests_v2/test_driver.py -q)",
+      "Read(//home/kingbilal/.claude/skills/**)",
+      "Read(//home/kingbilal/.claude/plugins/**)",
+      "Read(//home/kingbilal/.claude/**)"
     ]
   }
 }

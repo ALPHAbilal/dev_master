@@ -108,6 +108,29 @@ class SessionRunner:
             question=question, answer=answer, grade_blocks=blocks, step=step,
         )
 
+    # -- distill (agent call, then seal) ------------------------------------------
+
+    def run_distill(self, *, unit_id: int, axis: str | None = None) -> TurnResult:
+        """Run the DISTILLER for a finished unit and commit its sealed proof.
+
+        The Router's all-solid exit carries ``axis=None`` (distill is not axis-scoped, and the
+        DISTILLER's capabilities do not include axis evidence); a fatigue-switch exit carries
+        the current axis. Either way the wakeup packet still needs some firing axis to build its
+        context, so a representative one is resolved when the caller does not supply it.
+        """
+        resolved_axis = axis or self._representative_axis(unit_id)
+        wakeup = self.wakeups.build(step="wakeup.distill", unit_id=unit_id, axis=resolved_axis)
+        blocks = self._invoke("wakeup.distill", wakeup)
+        return self.orchestrator.commit_distill(blocks, unit_id=unit_id)
+
+    def _representative_axis(self, unit_id: int) -> str:
+        row = self.orchestrator.db.one(
+            "SELECT axis FROM axes WHERE unit_id=? ORDER BY ordinal LIMIT 1", (unit_id,)
+        )
+        if not row:
+            raise ValidationError("cannot distill a unit that has no axes")
+        return str(row["axis"])
+
     # -- lifecycle pass-throughs (no agent call) ----------------------------------
 
     def finish_child(self, *, child_unit_id: int) -> TurnResult:

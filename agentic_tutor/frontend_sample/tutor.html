@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tutor — platform</title>
+<style>
+/* Spacing/radii/fonts/feel from devmind .theme-notebook. Palette: gray + white. Borderless. */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.12) transparent; }
+body { line-height: 1.6; -webkit-font-smoothing: antialiased; height: 100vh; overflow: hidden; }
+button { font: inherit; color: inherit; cursor: pointer; background: none; border: none; }
+textarea { border: none; outline: none; }
+::selection { background: rgba(216,178,77,0.30); color: #fff; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 3px; }
+:root {
+  --bg-deepest:#171b1f; --bg-app:#20252a; --bg-surface:#2b3138; --bg-card:#333a42; --bg-elevated:#3f474f; --bg-hover:#4a535c;
+  --text-primary:#f4f1e6; --text-secondary:#c6c2b3; --text-muted:#8d8b7e; --text-disabled:#5e5d54;
+  --accent:#d8b24d; --accent-dim:#a98f3c; --accent-soft:rgba(216,178,77,0.15);
+  --radius-sm:8px; --radius-md:12px; --radius-lg:16px;
+  --font-ui:"Segoe UI",Tahoma,sans-serif; --font-code:"Cascadia Code","JetBrains Mono","SF Mono","Consolas",monospace;
+  --transition-fast:150ms ease; --transition-normal:250ms ease;
+  background:var(--bg-deepest); color:var(--text-primary); font-family:var(--font-ui);
+}
+@keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(255,255,255,0.28);} 70%{box-shadow:0 0 0 7px rgba(255,255,255,0);} }
+.shell { display:grid; height:100vh; transition:grid-template-columns 220ms cubic-bezier(0.4,0,0.2,1); }
+
+/* segmented mode toggle — centered per view */
+.seg { display:inline-flex; gap:2px; background:var(--bg-surface); border-radius:10px; padding:3px; }
+.seg button { font-size:11.5px; font-weight:600; color:var(--text-muted); padding:5px 14px; border-radius:7px; transition:var(--transition-fast); }
+.seg button:hover { color:var(--text-secondary); }
+.seg button.on { color:var(--bg-deepest); background:var(--accent); }
+.view-head { display:flex; justify-content:center; padding:12px; }
+
+/* collapse handles */
+.collapse-btn { width:26px; height:26px; border-radius:7px; display:grid; place-items:center; color:var(--text-muted); transition:var(--transition-fast); }
+.collapse-btn:hover { background:var(--bg-surface); color:var(--text-secondary); }
+.reopen { position:fixed; top:14px; z-index:40; width:30px; height:30px; border-radius:8px; background:var(--bg-surface); display:none; place-items:center; color:var(--text-secondary); box-shadow:0 2px 8px rgba(0,0,0,0.4); }
+.reopen.show { display:grid; }
+#reopenLeft { left:12px; } #reopenRight { right:12px; }
+
+/* ─── LEFT — codebase tree ───────────────────────────────────────────────── */
+.left { background:var(--bg-app); display:flex; flex-direction:column; overflow:hidden; }
+.left-head { padding:14px 14px 10px; display:flex; align-items:center; gap:9px; }
+.logo { width:26px; height:26px; border-radius:7px; background:linear-gradient(140deg,#4a4a4a,#2a2a2a); display:grid; place-items:center; box-shadow:inset 0 1px 0 rgba(255,255,255,0.1); flex-shrink:0; }
+.left-head .t { font-size:13px; font-weight:600; }
+.left-head .collapse-btn { margin-left:auto; }
+.tree { flex:1; overflow-y:auto; padding:6px 8px; }
+.cb { margin-bottom:2px; }
+.cb-row { display:flex; align-items:center; gap:7px; padding:7px 8px; border-radius:7px; cursor:pointer; transition:var(--transition-fast); }
+.cb-row:hover { background:var(--bg-surface); }
+.cb-caret { color:var(--text-muted); transition:transform 150ms ease; font-size:9px; width:10px; }
+.cb.open .cb-caret { transform:rotate(90deg); }
+.cb-name { font-size:12.5px; font-weight:600; color:var(--text-secondary); font-family:var(--font-code); }
+.cb-count { margin-left:auto; font-size:10px; color:var(--text-disabled); background:var(--bg-surface); border-radius:9999px; padding:1px 7px; }
+.units { display:none; padding:2px 0 4px 20px; }
+.cb.open .units { display:block; }
+.unit { display:flex; align-items:center; gap:8px; padding:5px 8px; border-radius:6px; cursor:pointer; transition:var(--transition-fast); }
+.unit:hover { background:var(--bg-surface); }
+.unit.current { background:var(--accent-soft); }
+.u-state { width:7px; height:7px; border-radius:50%; flex-shrink:0; background:var(--text-disabled); }
+.u-state.OWNED { background:var(--accent); }
+.u-state.ACTIVE { background:var(--accent); box-shadow:0 0 0 3px rgba(255,255,255,0.12); }
+.u-state.PARKED { background:transparent; box-shadow:inset 0 0 0 1.5px var(--text-muted); }
+.u-name { font-size:12px; color:var(--text-secondary); font-family:var(--font-code); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.unit.current .u-name { color:var(--text-primary); }
+.u-here { margin-left:auto; font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--bg-deepest); background:var(--accent); border-radius:4px; padding:1px 5px; }
+
+/* ─── MIDDLE — map / conversation ────────────────────────────────────────── */
+.mid { background:var(--bg-app); display:flex; flex-direction:column; min-width:0; }
+.view { display:none; flex:1; min-height:0; }
+.view.on { display:flex; flex-direction:column; }
+.map-scroll { flex:1; overflow:auto; }
+.dag { position:relative; min-width:760px; padding:8px 20px 24px; }
+.dag svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; z-index:0; }
+.dag-cols { position:relative; z-index:1; display:grid; grid-template-columns:repeat(4,1fr); gap:0 34px; }
+.col-head { padding:0 0 4px; text-align:center; display:flex; flex-direction:column; gap:2px; }
+.col-head span { font-size:10px; font-weight:700; letter-spacing:0.14em; color:var(--text-secondary); }
+.col-head em { font-size:9.5px; font-style:normal; color:var(--text-disabled); letter-spacing:0.02em; }
+.col-rule { height:12px; }
+.col { display:flex; flex-direction:column; gap:30px; align-items:stretch; }
+.edge { stroke:rgba(198,194,179,0.28); stroke-width:1.5; fill:none; transition:stroke 200ms ease,opacity 200ms ease; }
+.edge.proven { stroke:var(--accent); }
+.edge.gap { stroke:#cf8f5a; stroke-dasharray:6 4; }
+.edge.first { stroke:var(--text-muted); stroke-dasharray:2 5; }
+.edge.code { stroke:rgba(198,194,179,0.18); stroke-dasharray:1 4; }
+.edge.lit { stroke-width:2.5; }
+.edge.dim { opacity:0.12; }
+.edge-label { font-size:9px; fill:var(--text-primary); font-family:var(--font-ui); font-weight:600; opacity:0; paint-order:stroke; stroke:var(--bg-app); stroke-width:3px; transition:opacity 160ms ease; }
+.edge-label.show { opacity:1; }
+.edge-label.dim { opacity:0; }
+.node { position:relative; background:var(--bg-card); border-radius:var(--radius-md); padding:10px 12px; cursor:pointer; transition:transform 150ms ease,background 150ms ease,box-shadow 150ms ease; }
+.node:hover { background:var(--bg-elevated); transform:translateY(-1px); }
+.node .n-kind { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-muted); display:flex; align-items:center; gap:6px; }
+.node .n-kind::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--text-disabled); flex-shrink:0; }
+.node .n-title { font-size:13px; line-height:1.35; color:var(--text-primary); margin-top:6px; }
+.node .n-prov { font-size:9px; color:var(--text-disabled); margin-top:7px; }
+.node[data-kind="concept-system"] { box-shadow:inset 3px 0 0 var(--accent); }
+.node[data-kind="concept-system"] .n-kind { color:var(--text-secondary); }
+.node[data-kind="concept-system"] .n-kind::before { background:var(--accent); }
+.node[data-kind="concept-system"] .n-title { font-family:var(--font-code); font-weight:600; }
+.node[data-kind="concept-agent"] .n-kind::before { background:var(--text-secondary); border-radius:2px; }
+.node[data-kind="takeaway"] { box-shadow:inset 3px 0 0 var(--accent); }
+.node[data-kind="takeaway"] .n-kind { color:var(--accent); }
+.node[data-kind="takeaway"] .n-kind::before { background:var(--accent); }
+.node[data-kind="misconception"] { box-shadow:inset 3px 0 0 #cf8f5a; }
+.node[data-kind="misconception"] .n-kind { color:#e0a56f; }
+.node[data-kind="misconception"] .n-kind::before { background:#cf8f5a; }
+.node[data-kind="prerequisite"] .n-kind::before { background:var(--text-muted); border-radius:2px; transform:rotate(45deg); }
+.node[data-kind="function"] { background:var(--bg-surface); }
+.node[data-kind="function"] .n-title { font-family:var(--font-code); font-size:12px; }
+.node[data-kind="function"] .n-kind::before { background:var(--text-disabled); border-radius:2px; }
+/* map top: next-step banner + legend */
+.map-top { padding:12px 20px 4px; display:flex; flex-direction:column; gap:12px; }
+.next-step { display:flex; align-items:center; gap:10px; background:var(--accent-soft); border-radius:10px; padding:10px 14px; }
+.next-step .badge { font-size:9px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--bg-deepest); background:var(--accent); border-radius:9999px; padding:3px 9px; flex-shrink:0; }
+.next-step .txt { font-size:13px; color:var(--text-primary); }
+.next-step .txt b { color:#e0a56f; }
+.legend { display:flex; flex-wrap:wrap; gap:16px; }
+.legend .item { display:flex; align-items:center; gap:7px; font-size:11px; color:var(--text-muted); }
+.legend .swatch { width:22px; height:0; border-top-width:2px; border-top-style:solid; }
+.legend .swatch.proven { border-color:var(--accent); }
+.legend .swatch.gap { border-color:#cf8f5a; border-top-style:dashed; }
+.legend .swatch.first { border-color:var(--text-muted); border-top-style:dotted; }
+.node.is-active { animation:pulse 1.9s ease-out infinite; }
+.node.selected { background:var(--bg-elevated); box-shadow:0 0 0 1.5px var(--accent); }
+.node.faded { opacity:0.32; }
+
+/* conversation */
+.focus-bar { display:none; align-items:center; gap:10px; padding:8px 14px; margin:10px 18px 0; background:var(--bg-surface); border-radius:9px; font-size:11.5px; color:var(--text-secondary); }
+.focus-bar.on { display:flex; }
+.focus-bar .clr { margin-left:auto; color:var(--text-muted); font-weight:600; }
+.focus-bar .clr:hover { color:var(--text-primary); }
+.convo-scroll { flex:1; overflow-y:auto; padding:16px 24px 8px; display:flex; flex-direction:column; gap:15px; }
+.turn { display:flex; flex-direction:column; gap:5px; max-width:640px; transition:opacity 200ms ease; }
+.turn.learner { align-self:flex-end; align-items:flex-end; }
+.turn .who { font-size:9.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); }
+.turn .say { font-size:14px; line-height:1.65; color:var(--text-secondary); }
+.turn.tutor .say { color:var(--text-primary); }
+.turn.learner .say { background:var(--bg-card); border-radius:var(--radius-md); padding:10px 14px; }
+.turn .say code { font-family:var(--font-code); font-size:12.5px; background:var(--bg-surface); color:#fff; padding:1px 5px; border-radius:4px; }
+.feedback { align-self:flex-start; max-width:640px; display:flex; flex-direction:column; gap:5px; padding:9px 13px; border-radius:var(--radius-sm); background:var(--bg-surface); box-shadow:inset 3px 0 0 var(--accent-dim); }
+.feedback .fb-top { display:flex; align-items:center; gap:8px; }
+.verdict { font-size:9.5px; font-weight:700; letter-spacing:0.06em; padding:2px 8px; border-radius:9999px; }
+.verdict.SOLID { background:var(--accent); color:var(--bg-deepest); }
+.verdict.SHAKY { background:var(--bg-elevated); color:var(--text-primary); }
+.verdict.MISSING { background:var(--bg-card); color:var(--text-primary); }
+.feedback .cat { font-size:10.5px; color:var(--text-muted); font-family:var(--font-code); }
+.feedback .fb-body { font-size:13px; color:var(--text-secondary); line-height:1.55; }
+.feedback .agent { margin-left:auto; font-size:9px; color:var(--text-disabled); font-family:var(--font-code); }
+.convo-scroll.focused .turn:not(.ev), .convo-scroll.focused .feedback:not(.ev) { opacity:0.22; }
+/* chat input (conversation mode) */
+.chatbar-wrap { padding:12px 24px 18px; display:flex; justify-content:center; }
+.chatbar { width:100%; max-width:660px; background:var(--bg-surface); border-radius:16px; padding:8px 8px 8px 16px; display:flex; align-items:flex-end; gap:8px; transition:box-shadow 200ms ease; }
+.chatbar:focus-within { box-shadow:0 0 0 1.5px var(--accent-soft); }
+.chat-input { flex:1; background:transparent; color:var(--text-primary); font-family:var(--font-ui); font-size:13.5px; line-height:1.5; resize:none; min-height:26px; max-height:140px; padding:4px 0; }
+.chat-input::placeholder { color:var(--text-disabled); }
+.chat-send { width:34px; height:34px; border-radius:50%; background:var(--accent); color:var(--bg-deepest); display:grid; place-items:center; flex-shrink:0; transition:var(--transition-fast); }
+.chat-send:hover { background:#e8c565; }
+
+/* ─── RIGHT — editor / codebase / metadata ───────────────────────────────── */
+.right { background:var(--bg-deepest); display:flex; flex-direction:column; min-width:0; overflow:hidden; }
+.right-head { display:flex; align-items:center; gap:8px; padding:12px; }
+.right-head .seg { margin:0 auto; }
+.rview { display:none; flex:1; min-height:0; overflow:auto; }
+.rview.on { display:block; }
+.editor, .codebase { font-family:var(--font-code); font-size:12.5px; line-height:1.7; padding:8px 0 12px; }
+.code-line { display:flex; padding-right:16px; }
+.code-line.hl { background:rgba(255,255,255,0.06); box-shadow:inset 2px 0 0 var(--accent); }
+.code-line.dimfile { opacity:0.5; }
+.ln { width:44px; flex-shrink:0; text-align:right; padding-right:14px; color:var(--text-disabled); user-select:none; }
+.code { color:var(--text-secondary); white-space:pre; }
+.file-sep { font-family:var(--font-ui); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); padding:4px 16px 6px; }
+.k { color:#d4d4d4; font-weight:600; } .s { color:#c8c8c8; } .f { color:#fff; } .c { color:var(--text-disabled); font-style:italic; }
+.editbox { padding:0 12px; height:calc(100% - 60px); }
+.editbox textarea { width:100%; height:100%; background:var(--bg-app); border-radius:var(--radius-md); color:var(--text-primary); font-family:var(--font-code); font-size:12.5px; line-height:1.7; padding:14px 16px; resize:none; }
+.run-row { display:flex; padding:12px; }
+.btn { font-size:12px; font-weight:600; padding:9px 20px; border-radius:9px; }
+.btn.primary { background:var(--accent); color:var(--bg-deepest); width:100%; }
+.btn.primary:hover { background:#e8c565; }
+.meta { padding:8px 16px 16px; }
+.meta-label { font-size:9.5px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin:0 0 10px; }
+.meta-row { margin-bottom:15px; }
+.meta-k { font-size:10.5px; color:var(--text-muted); }
+.meta-v { font-size:12.5px; color:var(--text-primary); margin-top:3px; font-family:var(--font-code); }
+.axis-chip { display:inline-flex; font-size:10px; font-weight:500; padding:2px 8px; border-radius:9999px; background:var(--bg-surface); color:var(--text-secondary); margin:2px 3px 0 0; }
+.axis-chip.done { background:var(--accent-soft); color:var(--accent); }
+.breadcrumb { font-size:12px; color:var(--text-secondary); font-family:var(--font-code); line-height:1.7; }
+.breadcrumb b { color:var(--text-primary); }
+</style>
+</head>
+<body>
+<button class="reopen" id="reopenLeft" title="Show sidebar"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+<button class="reopen" id="reopenRight" title="Show panel"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+
+<div class="shell" id="shell">
+
+  <!-- LEFT: codebase tree -->
+  <nav class="left" id="left">
+    <div class="left-head">
+      <span class="logo"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#dcdcdc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8c2.2 2 3 5.2 3 8-3 0-6-.8-8-3-2.2-2.4-3-5.5-3-8.5 3.2 0 6 1 8 3.5z"/></svg></span>
+      <span class="t">Tutor</span>
+      <button class="collapse-btn" id="collapseLeft" title="Collapse"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+    </div>
+    <div class="tree" id="tree"></div>
+  </nav>
+
+  <!-- MIDDLE: map / conversation -->
+  <section class="mid">
+    <div class="view-head">
+      <div class="seg" id="midSeg">
+        <button data-view="map" class="on">Map</button>
+        <button data-view="conversation">Conversation</button>
+      </div>
+    </div>
+
+    <div class="view on" id="view-map">
+      <div class="map-scroll">
+        <div class="map-top">
+          <div class="next-step">
+            <span class="badge">Next</span>
+            <span class="txt">Close your open gap — <b>ids can collide across groups</b>. Learn <i>dict identity vs value</i> first.</span>
+          </div>
+          <div class="legend">
+            <span class="item"><span class="swatch proven"></span>Proven</span>
+            <span class="item"><span class="swatch gap"></span>Open gap</span>
+            <span class="item"><span class="swatch first"></span>Learn first</span>
+            <span class="item">Click any card → see the exact conversation</span>
+          </div>
+        </div>
+        <div class="dag" id="dag">
+          <svg id="edges"><defs>
+            <marker id="ah" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="rgba(198,194,179,0.5)"/></marker>
+            <marker id="ahLit" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#d8b24d"/></marker>
+          </defs></svg>
+          <div class="dag-cols" id="dagCols"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="view" id="view-conversation">
+      <div class="focus-bar" id="focusBar">
+        <span>Focused on node — <b id="focusName"></b>. Rest of the transcript dimmed.</span>
+        <button class="clr" id="focusClear">show all</button>
+      </div>
+      <div class="convo-scroll" id="convo"></div>
+      <div class="chatbar-wrap">
+        <div class="chatbar">
+          <textarea class="chat-input" rows="1" placeholder="Write your answer…"></textarea>
+          <button class="chat-send" title="Send"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT: editor / codebase / metadata -->
+  <aside class="right" id="right">
+    <div class="right-head">
+      <button class="collapse-btn" id="collapseRight" title="Collapse"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+      <div class="seg" id="rightSeg">
+        <button data-rview="editor" class="on">Editor</button>
+        <button data-rview="codebase">Codebase</button>
+        <button data-rview="metadata">Metadata</button>
+      </div>
+    </div>
+
+    <div class="rview on" id="rview-editor">
+      <div class="editbox">
+        <textarea spellcheck="false">def _pinned_qa_group(questions):
+    pinned = [q for q in questions if q["pin"]]
+    rest   = [q for q in questions if not q["pin"]]
+    # TODO: id collisions across groups?
+    return pinned + rest
+</textarea>
+      </div>
+      <div class="run-row"><button class="btn primary">Submit</button></div>
+    </div>
+
+    <div class="rview" id="rview-codebase"><div class="codebase" id="codebase"></div></div>
+
+    <div class="rview" id="rview-metadata">
+      <div class="meta">
+        <p class="meta-label">Where you are</p>
+        <div class="meta-row"><div class="meta-k">Breadcrumb</div>
+          <div class="breadcrumb">dev_master ›<br>run_prompts.py ›<br><b>_pinned_qa_group</b></div></div>
+        <div class="meta-row"><div class="meta-k">Range</div><div class="meta-v">L42–46</div></div>
+        <div class="meta-row"><div class="meta-k">Phase · Mode</div><div class="meta-v">ASSEMBLE · ADVERSARY</div></div>
+        <div class="meta-row"><div class="meta-k">Dive depth</div><div class="meta-v">1 (child of run_prompts)</div></div>
+        <div class="meta-row"><div class="meta-k">Axes</div>
+          <div style="margin-top:5px"><span class="axis-chip done">COMPREHEND</span><span class="axis-chip">IMPLEMENT</span><span class="axis-chip">EDGE</span></div></div>
+        <div class="meta-row"><div class="meta-k">Live verdict</div><div class="meta-v">PARTIAL — 1 gap open</div></div>
+        <div class="meta-row"><div class="meta-k">Position</div><div class="meta-v">CAN 6 · CANT 21</div></div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script>
+const CODEBASES = [
+  { name:'run_prompts.py', open:true, units:[
+    { slug:'load_prompts', state:'OWNED' }, { slug:'normalize_row', state:'OWNED' },
+    { slug:'_pinned_qa_group', state:'ACTIVE', current:true }, { slug:'_dedupe_by_id', state:'QUEUED' },
+    { slug:'build_prompt_batch', state:'QUEUED' }, { slug:'run_prompts', state:'QUEUED' },
+  ]},
+  { name:'schema_loader.py', open:false, units:[
+    { slug:'read_schema', state:'PARKED' }, { slug:'validate_row', state:'QUEUED' },
+  ]},
+];
+/* label/title are the LEARNER-FACING copy layer over the raw backend kind.
+ * (backend kind is preserved in `kind`; nothing here changes the engine.) */
+const NODES = [
+  { id:'u1', kind:'concept-system', label:'The function', title:'_pinned_qa_group', prov:'the code you own', x:310, y:70, ev:[1] },
+  { id:'c1', kind:'concept-agent', label:'What it does', title:'Group pinned Qs first, keep order', prov:'taught by tutor', x:150, y:230, ev:[2,3] },
+  { id:'t1', kind:'takeaway', label:'Proven', title:'You can read pinned-first ordering', prov:'you got this', x:150, y:400, ev:[3,'f2'] },
+  { id:'m1', kind:'misconception', label:'You missed', title:'ids can collide across groups', prov:'open gap', x:470, y:230, ev:[5,6,'f6'], active:true },
+  { id:'p1', kind:'prerequisite', label:'Learn first', title:'dict identity vs value', prov:'blocks the gap', x:470, y:400, ev:[6] },
+  { id:'f1', kind:'function', label:'It calls', title:'build_prompt_batch()', prov:'in the code', x:310, y:520, ev:[] },
+];
+const EDGES = [
+  { from:'u1', to:'c1', rel:'requires_understanding' }, { from:'c1', to:'t1', rel:'proved_by' },
+  { from:'u1', to:'m1', rel:'revealed_gap_in' }, { from:'m1', to:'p1', rel:'depends_on' },
+  { from:'u1', to:'f1', rel:'contains' },
+];
+/* relationship_type → learner meaning + plain word (edge styling + on-focus label) */
+const MEANING = {
+  requires_understanding:{ cls:'needs',  word:'you must get' },
+  proved_by:            { cls:'proven', word:'✓ proven by' },
+  revealed_gap_in:      { cls:'gap',    word:'✗ gap in' },
+  depends_on:           { cls:'first',  word:'learn first' },
+  contains:             { cls:'code',   word:'contains' },
+};
+const STREAM = [
+  { t:'msg', id:1, role:'system', text:'Unit opened — <code>_pinned_qa_group</code> (L42–46), phase ASSEMBLE.' },
+  { t:'msg', id:2, role:'tutor', text:'Before you write it — what does the caller expect back? Shape and order.' },
+  { t:'msg', id:3, role:'learner', text:'A list of question dicts, pinned first, preserving the passed order.' },
+  { t:'fb', id:'f2', for:[2,3], verdict:'SOLID', category:'correct-deep', agent:'JUDGE', text:'Order within the pinned group is right — COMPREHEND proved.' },
+  { t:'msg', id:5, role:'tutor', text:'Now trace one input where a pinned <code>id</code> also appears unpinned. What comes out?' },
+  { t:'msg', id:6, role:'learner', text:'…it would appear twice. I didn’t dedupe across the two groups.' },
+  { t:'fb', id:'f6', for:[5,6], verdict:'MISSING', category:'sibling-hole', agent:'JUDGE', text:'Gap: no de-duplication across groups. Prerequisite uncovered — dict identity vs value.' },
+];
+const SVGNS='http://www.w3.org/2000/svg';
+const byId=Object.fromEntries(NODES.map(n=>[n.id,n]));
+
+/* tree */
+const tree=document.getElementById('tree');
+CODEBASES.forEach(cb=>{
+  const wrap=document.createElement('div'); wrap.className='cb'+(cb.open?' open':'');
+  const owned=cb.units.filter(u=>u.state==='OWNED').length;
+  wrap.innerHTML=`<div class="cb-row"><span class="cb-caret">▶</span>
+    <span class="cb-name">${cb.name}</span><span class="cb-count">${owned}/${cb.units.length}</span></div>
+    <div class="units">${cb.units.map(u=>`<div class="unit${u.current?' current':''}">
+      <span class="u-state ${u.state}"></span><span class="u-name">${u.slug}</span>
+      ${u.current?'<span class="u-here">here</span>':''}</div>`).join('')}</div>`;
+  wrap.querySelector('.cb-row').addEventListener('click',()=>wrap.classList.toggle('open'));
+  tree.appendChild(wrap);
+});
+
+/* ── MAP: pipeline DAG (role columns, left→right) ──────────────────────────
+ * Column is derived from the node kind, exactly as the backend classifies it. */
+const COLUMNS=[
+  {key:'anchor',  label:'FOCUS',         hint:'what you’re on',   kinds:['concept-system','function']},
+  {key:'concept', label:'WHAT TO MASTER',hint:'the ideas',           kinds:['concept-agent']},
+  {key:'verdict', label:'PROVEN / MISSED',hint:'where you stand',     kinds:['takeaway','misconception']},
+  {key:'gap',     label:'UNBLOCK FIRST', hint:'clear this next',     kinds:['prerequisite']},
+];
+const colOf=k=>COLUMNS.findIndex(c=>c.kinds.includes(k));
+const svg=document.getElementById('edges'), dag=document.getElementById('dag'), dagCols=document.getElementById('dagCols');
+COLUMNS.forEach((c,ci)=>{
+  const col=document.createElement('div'); col.className='col-wrap';
+  col.innerHTML=`<div class="col-head"><span>${c.label}</span><em>${c.hint}</em></div><div class="col-rule"></div>`;
+  const stack=document.createElement('div'); stack.className='col'; stack.dataset.col=ci;
+  NODES.filter(n=>colOf(n.kind)===ci).forEach(n=>{
+    const el=document.createElement('div'); el.className='node'; el.dataset.kind=n.kind;
+    if(n.active) el.classList.add('is-active');
+    el.innerHTML=`<div class="n-kind">${n.label}</div><div class="n-title">${n.title}</div><div class="n-prov">${n.prov}</div>`;
+    el.addEventListener('click',()=>selectNode(n.id));
+    stack.appendChild(el); n._el=el; n._col=ci;
+  });
+  col.appendChild(stack); dagCols.appendChild(col);
+});
+
+/* draw orthogonal edges from measured DOM positions */
+const edgeEls=[];
+function drawEdges(){
+  svg.querySelectorAll('path.edge, text.edge-label').forEach(e=>e.remove());
+  edgeEls.length=0;
+  const base=dag.getBoundingClientRect();
+  svg.setAttribute('viewBox',`0 0 ${dag.scrollWidth} ${dag.scrollHeight}`);
+  EDGES.forEach(e=>{
+    const a=byId[e.from], b=byId[e.to]; if(!a._el||!b._el) return;
+    const ra=a._el.getBoundingClientRect(), rb=b._el.getBoundingClientRect();
+    const fwd=b._col>a._col;
+    let x1,y1,x2,y2,d;
+    if(fwd){ // right edge → left edge, elbow at mid-x
+      x1=ra.right-base.left; y1=ra.top+ra.height/2-base.top;
+      x2=rb.left-base.left;  y2=rb.top+rb.height/2-base.top;
+      const mx=(x1+x2)/2; d=`M ${x1} ${y1} H ${mx} V ${y2} H ${x2}`;
+    } else { // same column (e.g. contains): bottom → top
+      x1=ra.left+ra.width/2-base.left; y1=ra.bottom-base.top;
+      x2=rb.left+rb.width/2-base.left; y2=rb.top-base.top;
+      const my=(y1+y2)/2; d=`M ${x1} ${y1} V ${my} H ${x2} V ${y2}`;
+    }
+    const m=MEANING[e.rel]||{cls:'needs',word:e.rel};
+    const path=document.createElementNS(SVGNS,'path');
+    path.setAttribute('d',d); path.setAttribute('class','edge '+m.cls); path.setAttribute('marker-end','url(#ah)');
+    svg.appendChild(path);
+    const lbl=document.createElementNS(SVGNS,'text');
+    lbl.setAttribute('x',(x1+x2)/2+4); lbl.setAttribute('y',(y1+y2)/2-4);
+    lbl.setAttribute('class','edge-label'); lbl.textContent=m.word; svg.appendChild(lbl);
+    edgeEls.push({e,path,lbl});
+  });
+}
+requestAnimationFrame(drawEdges);
+window.addEventListener('resize',drawEdges);
+
+/* conversation */
+const convo=document.getElementById('convo');
+STREAM.forEach(item=>{
+  if(item.t==='msg'){
+    const d=document.createElement('div'); d.className='turn '+item.role; d.dataset.id=item.id;
+    const who=item.role==='tutor'?'Tutor':item.role==='learner'?'You':'System';
+    d.innerHTML=`<div class="who">${who}</div><div class="say">${item.text}</div>`;
+    convo.appendChild(d);
+  } else {
+    const d=document.createElement('div'); d.className='feedback'; d.dataset.id=item.id;
+    d.innerHTML=`<div class="fb-top"><span class="verdict ${item.verdict}">${item.verdict}</span>
+      <span class="cat">${item.category}</span><span class="agent">${item.agent}</span></div>
+      <div class="fb-body">${item.text}</div>`;
+    convo.appendChild(d);
+  }
+});
+
+/* middle toggle */
+const midSeg=document.getElementById('midSeg');
+midSeg.addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) showMid(b.dataset.view); });
+function showMid(v){
+  midSeg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
+  document.getElementById('view-map').classList.toggle('on',v==='map');
+  document.getElementById('view-conversation').classList.toggle('on',v==='conversation');
+  if(v==='map') requestAnimationFrame(drawEdges);
+}
+
+/* node → focused conversation */
+function selectNode(id){
+  const n=byId[id];
+  const nbr=new Set([id]);
+  EDGES.forEach(e=>{ if(e.from===id||e.to===id){ nbr.add(e.from); nbr.add(e.to); } });
+  NODES.forEach(x=>{ x._el.classList.toggle('selected',x.id===id); x._el.classList.toggle('faded',!nbr.has(x.id)); });
+  edgeEls.forEach(({e,path,lbl})=>{ const on=e.from===id||e.to===id;
+    path.classList.toggle('lit',on); path.setAttribute('marker-end',on?'url(#ahLit)':'url(#ah)');
+    path.classList.toggle('dim',!on); lbl.classList.toggle('show',on); lbl.classList.toggle('dim',!on); });
+  showMid('conversation');
+  const ev=new Set(n.ev.map(String));
+  convo.classList.add('focused');
+  convo.querySelectorAll('[data-id]').forEach(el=>el.classList.toggle('ev',ev.has(el.dataset.id)));
+  document.getElementById('focusBar').classList.add('on');
+  document.getElementById('focusName').textContent=n.title;
+  const first=convo.querySelector('.ev'); if(first) first.scrollIntoView({block:'center',behavior:'smooth'});
+}
+function clearFocus(){
+  convo.classList.remove('focused');
+  convo.querySelectorAll('.ev').forEach(el=>el.classList.remove('ev'));
+  NODES.forEach(x=>x._el.classList.remove('selected','faded'));
+  edgeEls.forEach(({path,lbl})=>{ path.classList.remove('lit','dim'); path.setAttribute('marker-end','url(#ah)'); lbl.classList.remove('show','dim'); });
+  document.getElementById('focusBar').classList.remove('on');
+}
+document.getElementById('focusClear').addEventListener('click',clearFocus);
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') clearFocus(); });
+
+/* right toggle */
+const rightSeg=document.getElementById('rightSeg');
+rightSeg.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return;
+  rightSeg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+  ['editor','codebase','metadata'].forEach(v=>document.getElementById('rview-'+v).classList.toggle('on',v===b.dataset.rview));
+});
+
+/* full-codebase view */
+const FILE=['# assemble-pinned-qa','','def load_prompts(path):','    return json.load(open(path))','',
+'def normalize_row(r):','    return {**r, "pin": bool(r.get("pin"))}','',
+'def _pinned_qa_group(questions):','    pinned = [q for q in questions if q["pin"]]',
+'    rest   = [q for q in questions if not q["pin"]]','    # TODO: id collisions across groups?',
+'    return pinned + rest','','def build_prompt_batch(rows):','    grouped = _pinned_qa_group(rows)','    return [render(r) for r in grouped]'];
+const HL=new Set([9,10,11,12,13]);
+const cbEl=document.getElementById('codebase');
+cbEl.innerHTML=`<div class="file-sep">run_prompts.py</div>`+FILE.map((line,i)=>{
+  const ln=i+1; const hl=HL.has(ln)?' hl':(HL.size?' dimfile':'');
+  const esc=line.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  return `<div class="code-line${hl}"><span class="ln">${ln}</span><span class="code">${esc||' '}</span></div>`;
+}).join('');
+
+/* ── collapsible sidebars ─────────────────────────────────────────────────── */
+const shell=document.getElementById('shell');
+const LEFT_W='246px', RIGHT_W='36%';
+let leftOpen=true, rightOpen=true;
+function applyGrid(){
+  shell.style.gridTemplateColumns=`${leftOpen?LEFT_W:'0px'} 1fr ${rightOpen?RIGHT_W:'0px'}`;
+  document.getElementById('left').style.visibility=leftOpen?'visible':'hidden';
+  document.getElementById('right').style.visibility=rightOpen?'visible':'hidden';
+  document.getElementById('reopenLeft').classList.toggle('show',!leftOpen);
+  document.getElementById('reopenRight').classList.toggle('show',!rightOpen);
+  setTimeout(()=>requestAnimationFrame(drawEdges),240);
+}
+document.getElementById('collapseLeft').addEventListener('click',()=>{leftOpen=false;applyGrid();});
+document.getElementById('reopenLeft').addEventListener('click',()=>{leftOpen=true;applyGrid();});
+document.getElementById('collapseRight').addEventListener('click',()=>{rightOpen=false;applyGrid();});
+document.getElementById('reopenRight').addEventListener('click',()=>{rightOpen=true;applyGrid();});
+applyGrid();
+</script>
+</body>
+</html>

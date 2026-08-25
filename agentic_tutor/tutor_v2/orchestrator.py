@@ -19,11 +19,14 @@ from typing import Any
 from .config import TutorConfig
 from .db import Database
 from .errors import InvariantError, ValidationError
+from .graph_projection import GraphProjection
 from .journey_archive import JourneyArchiveService
+from .learner_model import LearnerModelService
 from .parsing import ReturnStampParser
 from .recorders import ConversationRecorder, JourneyRecorder, ProbeRecorder
 from .routing import RouteDecision, Router
 from .semantics import SemanticGraphService
+from .services import ArchiveService
 from .structure import StructureExtractor
 
 
@@ -51,6 +54,9 @@ class TurnOrchestrator:
         journeys: JourneyRecorder | None = None,
         graph: SemanticGraphService | None = None,
         archive: JourneyArchiveService | None = None,
+        unit_archive: ArchiveService | None = None,
+        learner_model: LearnerModelService | None = None,
+        graph_projection: GraphProjection | None = None,
     ) -> None:
         self.db = db
         self.config = config
@@ -64,6 +70,16 @@ class TurnOrchestrator:
         # journey archive. When omitted, behavior is byte-for-byte the prior version.
         self.graph = graph
         self.archive = archive
+        # DISTILL wiring (Stage 10). ``unit_archive`` seals the per-unit proof artifact;
+        # ``learner_model`` applies the distill learner_diff. Both optional: when omitted,
+        # commit_distill only records the lifecycle fact, changing no prior behavior.
+        self.unit_archive = unit_archive
+        self.learner_model = learner_model
+        # LIVE map (Step 4a). When present, each teach/grade turn additionally mirrors its
+        # validated result into agent-provenance semantic nodes/edges, inside the same
+        # transaction as the tutoring write. When omitted, no graph rows are produced and
+        # behavior is byte-for-byte the prior version.
+        self.graph_projection = graph_projection
 
     # -- Stage 9: initial map + journey start -------------------------------------
 
@@ -124,6 +140,9 @@ class TurnOrchestrator:
             self.journeys.record_event(journey_id=journey_id, unit_id=unit_id,
                                        event_type="teaching_presented", axis=axis,
                                        message_refs=message_ids)
+            if self.graph_projection is not None:
+                self.graph_projection.on_teaching(
+                    journey_id=journey_id, unit_id=unit_id, axis=axis, message_ids=message_ids)
             self.journeys.bump_revision(journey_id)
         return message_ids
 
@@ -182,12 +201,68 @@ class TurnOrchestrator:
                 probe_refs=[probe_id],
             )
             self._record_route_transition(journey_id, unit_id, graded_before, decision, stamp)
+            if self.graph_projection is not None:
+                self.graph_projection.on_grade(
+                    journey_id=journey_id, unit_id=unit_id, axis=axis, turn_id=turn_id,
+                    category=stamp["category"], hidden_gap=stamp["hidden_gap"], probe_id=probe_id)
             self.conversation.set_turn_status(journey_id=journey_id, turn_id=turn_id, status="EVALUATED")
             revision = self.journeys.bump_revision(journey_id)
         # Additive, post-commit: if the route opened a child detour, graph that child.
         if decision.unit_id is not None and decision.unit_id != unit_id:
             self.attach_unit_structure(journey_id=journey_id, unit_id=decision.unit_id)
         return TurnResult(journey_id, decision, revision)
+
+    # -- Stage 10: distill a finished unit (seal proof + apply learner diff) -------
+
+    def commit_distill(self, distill_blocks: list[str], *, unit_id: int) -> TurnResult:
+        """Parse a DISTILLER return, seal the unit's proof, and apply the learner diff.
+
+        Runs only for a unit the Router already finished: OWNED (all firing axes solid) or
+        PARKED (fatigue-switch). Parsing happens outside the transaction; the seal, the
+        learner-model merge, and the lifecycle fact then commit together. It does NOT change
+        the unit's engine state — the existing ``finish_*``/``park`` steps still pop the stack.
+
+        Idempotent: a second distill for the same unit is a no-op that returns the current
+        revision, so a replay never double-records or double-applies the diff. (``seal`` and
+        ``apply_diff`` are themselves idempotent; the guard avoids a duplicate event.)
+        """
+        stamp = self.parser.parse(distill_blocks, expected_kind="return.distill")
+        journey_id = self.journeys.journey_for_unit(unit_id)
+        already = self.db.one(
+            "SELECT id FROM journey_events WHERE journey_id=? AND unit_id=? AND event_type='unit_distilled'",
+            (journey_id, unit_id),
+        )
+        if already:
+            return TurnResult(journey_id, None, self.journeys.get(journey_id)["projection_revision"])
+        with self.db.transaction():
+            unit = self.db.one(
+                "SELECT slug,state FROM units WHERE id=? AND session_id=?",
+                (unit_id, self.config.session_id),
+            )
+            if not unit:
+                raise ValidationError("unit does not belong to this session")
+            if unit["state"] not in {"OWNED", "PARKED"}:
+                raise InvariantError("only an OWNED or PARKED unit may be distilled")
+            if stamp["unit"] != unit["slug"]:
+                raise ValidationError("distill unit slug does not match the target unit")
+            expected_verdict = "OWNED" if unit["state"] == "OWNED" else "PARKED"
+            if stamp["final_verdict"] != expected_verdict:
+                raise ValidationError("distill final_verdict does not match the unit state")
+            if self.unit_archive is not None:
+                self.unit_archive.seal(
+                    unit_id=unit_id, unit_slug=stamp["unit"], title=stamp["title"],
+                    final_verdict=stamp["final_verdict"], axes_tested=stamp["axes_tested"],
+                    tests=stamp["tests"], evidence=stamp["evidence"], resume_at=stamp["resume_at"],
+                )
+            if self.learner_model is not None:
+                self.learner_model.apply_diff(stamp["learner_diff"])
+            self.journeys.record_event(
+                journey_id=journey_id, unit_id=unit_id, event_type="unit_distilled",
+                payload={"final_verdict": stamp["final_verdict"], "unit": stamp["unit"],
+                         "axes_tested": stamp["axes_tested"]},
+            )
+            revision = self.journeys.bump_revision(journey_id)
+        return TurnResult(journey_id, None, revision)
 
     # -- Stage 11: child completion / parent return -------------------------------
 
