@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tutor — ladder map</title>
+<style>
+/* Palette + feel carried from tutor.html (gold accent, dark, borderless). */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{font-size:16px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.12) transparent;}
+body{line-height:1.6;-webkit-font-smoothing:antialiased;min-height:100vh;}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:none;}
+::selection{background:rgba(216,178,77,0.30);color:#fff;}
+::-webkit-scrollbar{width:7px;height:7px;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.14);border-radius:3px;}
+:root{
+  --bg-deepest:#171b1f;--bg-app:#20252a;--bg-surface:#2b3138;--bg-card:#333a42;--bg-elevated:#3f474f;--bg-hover:#4a535c;
+  --text-primary:#f4f1e6;--text-secondary:#c6c2b3;--text-muted:#8d8b7e;--text-disabled:#5e5d54;
+  --accent:#d8b24d;--accent-dim:#a98f3c;--accent-soft:rgba(216,178,77,0.15);
+  --gap:#cf8f5a;--gap-soft:rgba(207,143,90,0.22);
+  --shaky:#c9a24b;--missing:#b96a5a;--solid:#d8b24d;
+  --radius-sm:8px;--radius-md:12px;--radius-lg:16px;
+  --font-ui:"Segoe UI",Tahoma,sans-serif;--font-code:"Cascadia Code","JetBrains Mono","SF Mono","Consolas",monospace;
+  --tf:150ms ease;
+  background:var(--bg-deepest);color:var(--text-primary);font-family:var(--font-ui);
+}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(216,178,77,0.42);}70%{box-shadow:0 0 0 8px rgba(216,178,77,0);}100%{box-shadow:0 0 0 0 rgba(216,178,77,0);}}
+@keyframes gapglow{0%,100%{box-shadow:inset 3px 0 0 var(--gap),0 0 14px 0 rgba(207,143,90,0.20);}50%{box-shadow:inset 3px 0 0 var(--gap),0 0 22px 3px rgba(207,143,90,0.34);}}
+
+.wrap{max-width:760px;margin:0 auto;padding:26px 20px 80px;}
+.hd{display:flex;align-items:baseline;gap:12px;padding:2px 6px 20px;}
+.hd h1{font-size:16px;font-weight:600;}
+.hd .sub{font-size:12px;color:var(--text-muted);}
+.hd .rev{margin-left:auto;font-size:10.5px;color:var(--text-disabled);font-family:var(--font-code);}
+
+/* ─── SECTION (file) ─────────────────────────────────────────────── */
+.sec{margin-bottom:10px;}
+.sec-row{display:flex;align-items:center;gap:11px;padding:12px 12px;border-radius:12px;cursor:pointer;transition:var(--tf);}
+.sec-row:hover{background:var(--bg-surface);}
+.sec-caret{color:var(--text-muted);font-size:11px;width:12px;transition:transform 160ms ease;}
+.sec.open>.sec-row .sec-caret{transform:rotate(90deg);}
+.sec-title{font-size:15px;font-weight:600;color:var(--text-primary);font-family:var(--font-code);}
+.sec-desc{font-size:12px;color:var(--text-muted);margin-top:2px;}
+.sec-meta{margin-left:auto;display:flex;align-items:center;gap:9px;}
+.pill{font-size:10.5px;color:var(--text-secondary);background:var(--bg-surface);border-radius:9999px;padding:2px 9px;white-space:nowrap;}
+.pill.dur{color:var(--text-disabled);}
+.sec-body{display:none;position:relative;padding:4px 0 8px 0;}
+.sec.open>.sec-body{display:block;}
+
+/* ─── the spine ──────────────────────────────────────────────────── */
+.branch{position:relative;padding-left:34px;}
+.branch::before{content:"";position:absolute;left:16px;top:-2px;bottom:14px;width:2px;
+  background:linear-gradient(var(--accent-dim),rgba(255,255,255,0.06));border-radius:2px;}
+.branch.dim::before{background:repeating-linear-gradient(rgba(255,255,255,0.14) 0 4px,transparent 4px 9px);}
+/* nested dive: a second spine, offset + tinted like the gap trail */
+.branch.dive::before{background:repeating-linear-gradient(var(--gap) 0 6px,transparent 6px 11px);opacity:.75;}
+
+/* ─── UNIT row ───────────────────────────────────────────────────── */
+.unit{position:relative;margin:2px 0;}
+.u-row{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;cursor:pointer;transition:var(--tf);}
+.u-row:hover{background:var(--bg-surface);}
+.unit.current>.u-row{background:var(--accent-soft);}
+/* connector nub from spine to marker */
+.u-row::before{content:"";position:absolute;left:-18px;top:50%;width:16px;height:2px;background:rgba(255,255,255,0.10);}
+.branch.dive>.unit>.u-row::before{background:var(--gap);opacity:.6;}
+
+/* marker */
+.mk{width:26px;height:26px;border-radius:50%;flex-shrink:0;display:grid;place-items:center;background:var(--bg-elevated);color:var(--text-muted);position:relative;}
+.mk svg{width:13px;height:13px;}
+.mk.OWNED{background:var(--accent);color:var(--bg-deepest);}
+.mk.CURRENT{background:var(--accent);color:var(--bg-deepest);animation:pulse 1.9s ease-out infinite;}
+.mk.PARKED{background:transparent;box-shadow:inset 0 0 0 2px var(--accent-dim);color:var(--accent-dim);}
+.mk.PROGRESS{background:conic-gradient(var(--accent) var(--p,50%),var(--bg-elevated) 0);color:var(--bg-deepest);}
+.mk.QUEUED{background:var(--bg-card);color:var(--text-disabled);}
+.mk.LOCKED{background:var(--bg-card);color:var(--text-disabled);}
+
+.u-title{font-size:13.5px;color:var(--text-secondary);}
+.unit.current>.u-row .u-title,.u-row:hover .u-title{color:var(--text-primary);}
+.u-title .slug{font-family:var(--font-code);}
+.here{font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--bg-deepest);background:var(--accent);border-radius:4px;padding:2px 6px;margin-left:2px;}
+.tag{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-radius:4px;padding:2px 6px;}
+.tag.dive{color:var(--gap);background:var(--gap-soft);}
+.tag.sib{color:var(--text-muted);background:var(--bg-surface);}
+.tag.park{color:var(--accent-dim);background:var(--accent-soft);}
+.u-meta{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.axprog{font-size:10.5px;color:var(--text-muted);font-family:var(--font-code);}
+.u-caret{color:var(--text-disabled);font-size:10px;width:11px;transition:transform 160ms ease;}
+.unit.open>.u-row .u-caret{transform:rotate(90deg);}
+
+/* resume-to-parent note */
+.resume{font-size:11px;color:var(--accent-dim);font-style:italic;padding:2px 0 8px 8px;display:flex;gap:6px;align-items:flex-start;}
+.resume svg{width:12px;height:12px;flex-shrink:0;margin-top:2px;}
+.resume q{color:var(--text-secondary);}
+
+/* ─── UNIT expanded detail ───────────────────────────────────────── */
+.u-detail{display:none;padding:4px 12px 12px 12px;}
+.unit.open>.u-detail{display:block;}
+.axes{display:flex;flex-wrap:wrap;gap:5px;margin:2px 0 12px;}
+.ax{font-size:10px;font-weight:600;padding:3px 9px;border-radius:9999px;background:var(--bg-surface);color:var(--text-disabled);display:inline-flex;align-items:center;gap:5px;}
+.ax .dot{width:6px;height:6px;border-radius:50%;background:var(--text-disabled);}
+.ax.SOLID{color:var(--accent);background:var(--accent-soft);} .ax.SOLID .dot{background:var(--accent);}
+.ax.SHAKY{color:var(--shaky);box-shadow:inset 0 0 0 1px rgba(201,162,75,0.45);} .ax.SHAKY .dot{background:var(--shaky);}
+.ax.MISSING{color:var(--missing);box-shadow:inset 0 0 0 1px rgba(185,106,90,0.45);} .ax.MISSING .dot{background:var(--missing);}
+.ax .esc{font-family:var(--font-code);opacity:.7;}
+
+/* interaction timeline (past → now) */
+.tl{position:relative;padding-left:16px;}
+.tl::before{content:"";position:absolute;left:4px;top:4px;bottom:8px;width:2px;background:rgba(255,255,255,0.07);}
+.ev{position:relative;padding:6px 0 6px 2px;display:flex;gap:9px;align-items:flex-start;cursor:pointer;border-radius:7px;transition:var(--tf);}
+.ev:hover{background:var(--bg-surface);}
+.ev::before{content:"";position:absolute;left:-12px;top:12px;width:8px;height:8px;border-radius:50%;background:var(--text-disabled);box-shadow:0 0 0 3px var(--bg-app);}
+.ev .k{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);min-width:56px;padding-top:1px;}
+.ev .txt{font-size:12.5px;color:var(--text-secondary);}
+.ev .ln{margin-left:auto;color:var(--text-disabled);font-size:10px;display:flex;align-items:center;gap:4px;}
+.ev.taught::before{background:var(--text-secondary);border-radius:2px;}
+.ev.proven::before{background:var(--accent);} .ev.proven .k{color:var(--accent);}
+.ev.probe::before{background:var(--text-muted);}
+.ev.test::before{background:var(--bg-hover);box-shadow:0 0 0 3px var(--bg-app),inset 0 0 0 2px var(--text-muted);}
+.ev.gap{animation:gapglow 2.4s ease-in-out infinite;background:radial-gradient(120px 40px at 6% 50%,var(--gap-soft),transparent 70%);}
+.ev.gap::before{background:var(--gap);box-shadow:0 0 8px 2px rgba(207,143,90,0.6),0 0 0 3px var(--bg-app);}
+.ev.gap .k{color:var(--gap);}
+.ev.next{opacity:.6;} .ev.next::before{background:transparent;box-shadow:inset 0 0 0 2px var(--text-disabled),0 0 0 3px var(--bg-app);}
+
+/* seal ribbon (distill / owned) */
+.seal{margin-top:10px;display:flex;align-items:center;gap:10px;background:var(--accent-soft);border-radius:9px;padding:8px 12px;font-size:11.5px;color:var(--text-secondary);}
+.seal b{color:var(--accent);} .seal .diff{margin-left:auto;font-family:var(--font-code);font-size:10.5px;}
+.seal .can{color:var(--accent);} .seal .cant{color:var(--gap);}
+
+/* legend */
+.legend{margin-top:34px;padding:16px 18px;background:var(--bg-app);border-radius:14px;}
+.legend h2{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:12px;}
+.legend .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:9px 18px;}
+.lg{display:flex;gap:9px;align-items:flex-start;font-size:11.5px;color:var(--text-secondary);}
+.lg .m{flex-shrink:0;margin-top:1px;}
+.lg .b{font-weight:600;color:var(--text-primary);}
+.lg .d{color:var(--text-muted);font-size:10.5px;}
+.sw{width:14px;height:14px;border-radius:50%;display:inline-block;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hd">
+    <h1>Learning ladder</h1>
+    <span class="sub">past → you are here → what's ahead · live</span>
+    <span class="rev" id="rev"></span>
+  </div>
+  <div id="ladder"></div>
+
+  <div class="legend">
+    <h2>How the loop is drawn — every Router behavior has a mark</h2>
+    <div class="grid" id="legendGrid"></div>
+  </div>
+</div>
+
+<script>
+/* ── DATA ─────────────────────────────────────────────────────────────────
+ * Shape mirrors the backend read model (JourneyReader.read):
+ *   file → units[]  (units carry state, axes[], a timeline[], and nested children[])
+ * `children` = child subhole dives (Router._push_child_locked). Recursive.
+ * `siblings` = queued non-blocking gaps (Router._queue_sibling_locked).
+ * Everything here is mock; wiring to /journey/{id} swaps this object only.       */
+
+const AX = { COMPREHEND:"What it does", MECHANISM:"How it works", RATIONALE:"Why designed so",
+  JUDGMENT:"When to use", ROBUSTNESS:"What breaks", INTEGRATION:"How it connects", EVOLUTION:"How to improve" };
+
+const FILES = [
+{
+  name:"run_prompts.py", desc:"Prompt assembly + batching pipeline.", open:true,
+  units:[
+    { slug:"load_prompts", title:"Read the prompt file", state:"OWNED",
+      axes:[["COMPREHEND","SOLID"],["MECHANISM","SOLID"],["ROBUSTNESS","SOLID"]],
+      timeline:[
+        {k:"Taught",kind:"taught",txt:"json.load returns the raw rows",ev:1},
+        {k:"Proven",kind:"proven",txt:"You traced the load path",ev:2},
+      ],
+      seal:{verdict:"OWNED",can:2,cant:0,note:"sealed — file I/O ownership"} },
+
+    { slug:"normalize_row", title:"Coerce each row's shape", state:"OWNED",
+      axes:[["COMPREHEND","SOLID"],["MECHANISM","SOLID"],["RATIONALE","SOLID"]],
+      timeline:[
+        {k:"Taught",kind:"taught",txt:"bool(r.get('pin')) defaults missing pins",ev:3},
+        {k:"Tested",kind:"test",txt:"Harder proof — missing key case",ev:4},
+        {k:"Proven",kind:"proven",txt:"Handled the absent-key path",ev:5},
+      ],
+      seal:{verdict:"OWNED",can:1,cant:0,note:"sealed — normalization"} },
+
+    /* THE LIVE UNIT — carries a child dive (recursive), a queued sibling, an open gap */
+    { slug:"_pinned_qa_group", title:"Group pinned questions first", state:"PROBED",
+      here_parent:true,  /* the loop is inside its child right now */
+      resume:"Now trace one input where a pinned id also appears unpinned. What comes out?",
+      axes:[["COMPREHEND","SOLID"],["MECHANISM","SHAKY",1],["ROBUSTNESS","MISSING"]],
+      timeline:[
+        {k:"Taught",kind:"taught",txt:"Grouping rule: pinned kept in passed order",ev:6},
+        {k:"Proven",kind:"proven",txt:"You can read pinned-first ordering",ev:7},
+        {k:"Probe",kind:"probe",txt:"Mechanism reasoning — why '+' preserves order",ev:8},
+        {k:"Gap",kind:"gap",txt:"ids can collide across the two groups — no dedupe",ev:9},
+      ],
+      /* non-blocking sibling queued (sibling-hole) */
+      siblings:[ {slug:"dedupe_across_groups", title:"De-dupe ids across groups", why:"queued while the dive resolves"} ],
+      /* blocking child dive (missing prerequisite) — RECURSIVE: it has its own child */
+      children:[
+        { slug:"dict_identity", title:"Dict identity vs value", state:"CURRENT", tag:"dive",
+          dive_reason:"missing prerequisite for the collision gap",
+          axes:[["COMPREHEND","SHAKY",1],["MECHANISM","MISSING"]],
+          timeline:[
+            {k:"Taught",kind:"taught",txt:"`is` compares identity, `==` compares value",ev:10},
+            {k:"Probe",kind:"probe",txt:"Which do two equal dicts share?",ev:11},
+            {k:"Next",kind:"next",txt:"awaiting your answer",ev:null},
+          ],
+          /* deeper recursion to show it nests arbitrarily */
+          children:[
+            { slug:"hashing_keys", title:"Why dict keys must hash", state:"QUEUED", tag:"dive",
+              dive_reason:"would open only if identity proves shaky again",
+              axes:[["COMPREHEND","UNGRADED"]], timeline:[] },
+          ] },
+      ] },
+
+    { slug:"_dedupe_by_id", title:"Drop duplicate ids", state:"QUEUED",
+      axes:[["COMPREHEND","UNGRADED"],["MECHANISM","UNGRADED"],["ROBUSTNESS","UNGRADED"]], timeline:[] },
+    { slug:"build_prompt_batch", title:"Assemble the batch", state:"LOCKED",
+      axes:[["COMPREHEND","UNGRADED"],["INTEGRATION","UNGRADED"]], timeline:[] },
+    { slug:"run_prompts", title:"Drive the whole run", state:"LOCKED",
+      axes:[["COMPREHEND","UNGRADED"],["INTEGRATION","UNGRADED"],["JUDGMENT","UNGRADED"]], timeline:[] },
+  ]
+},
+{
+  name:"schema_loader.py", desc:"Schema read + row validation.", open:false,
+  units:[
+    { slug:"read_schema", title:"Load the schema", state:"PARKED", tag:"park",
+      resume:"You paused here — resume picks up at ROBUSTNESS.",
+      axes:[["COMPREHEND","SOLID"],["MECHANISM","SOLID"],["ROBUSTNESS","SHAKY",1]],
+      timeline:[
+        {k:"Taught",kind:"taught",txt:"Reads + caches the JSON schema",ev:20},
+        {k:"Proven",kind:"proven",txt:"Traced the cache hit path",ev:21},
+        {k:"Probe",kind:"probe",txt:"What if the schema file is malformed?",ev:22},
+      ] },
+    { slug:"validate_row", title:"Validate one row", state:"QUEUED",
+      axes:[["COMPREHEND","UNGRADED"],["MECHANISM","UNGRADED"]], timeline:[] },
+  ]
+},
+];
+
+/* ── RENDER ───────────────────────────────────────────────────────────── */
+const el = (t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e;};
+const ICON = {
+  play:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+  lock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+  pause:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>',
+  dot:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4"/></svg>',
+  ret:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14l-4-4 4-4"/><path d="M5 10h11a4 4 0 0 1 0 8h-1"/></svg>',
+};
+function markerFor(u){
+  if(u.state==="OWNED") return ["OWNED",ICON.check];
+  if(u.state==="CURRENT") return ["CURRENT",ICON.play];
+  if(u.state==="PARKED") return ["PARKED",ICON.pause];
+  if(u.state==="LOCKED") return ["LOCKED",ICON.lock];
+  if(u.state==="QUEUED") return ["QUEUED",ICON.dot];
+  return ["PROGRESS",ICON.play]; /* PROBED/TAUGHT/TESTED/JUDGED — in progress */
+}
+const solid = u => u.axes.filter(a=>a[1]==="SOLID").length;
+
+function renderUnit(u){
+  const unit = el("div","unit"+(u.state==="CURRENT"||u.here_parent?" current":""));
+  const [mkCls,mkIco] = markerFor(u);
+  const row = el("div","u-row");
+  const mk = el("div","mk "+mkCls,mkIco);
+  if(mkCls==="PROGRESS") mk.style.setProperty("--p", Math.round(solid(u)/u.axes.length*100)+"%");
+  row.appendChild(mk);
+
+  let title = `<span class="u-title"><span class="slug">${u.slug}</span> — ${u.title}</span>`;
+  if(u.state==="CURRENT") title += `<span class="here">here</span>`;
+  if(u.tag==="dive") title += `<span class="tag dive">dive</span>`;
+  if(u.tag==="park") title += `<span class="tag park">parked</span>`;
+  const titleWrap = el("div",null,title); titleWrap.style.display="flex"; titleWrap.style.alignItems="center"; titleWrap.style.gap="7px";
+  row.appendChild(titleWrap);
+
+  const meta = el("div","u-meta");
+  meta.appendChild(el("span","axprog",`${solid(u)}/${u.axes.length}`));
+  const hasDetail = u.timeline.length || u.axes.length;
+  if(hasDetail) meta.appendChild(el("span","u-caret","▶"));
+  row.appendChild(meta);
+  unit.appendChild(row);
+
+  /* dive reason line */
+  if(u.dive_reason){ const d=el("div","resume",`${ICON.ret}<span>opened: ${u.dive_reason}</span>`); d.style.paddingLeft="8px"; unit.appendChild(d); }
+
+  /* expanded detail */
+  const detail = el("div","u-detail");
+  const axes = el("div","axes");
+  u.axes.forEach(a=>{
+    const [name,verdict,shaky] = a;
+    const chip = el("span","ax "+verdict);
+    chip.innerHTML = `<span class="dot"></span>${AX[name]||name}`+
+      (verdict==="SHAKY"&&shaky?` <span class="esc">${"·".repeat(shaky)}${shaky>=2?"→miss":""}</span>`:"");
+    chip.title = name+" · "+verdict;
+    axes.appendChild(chip);
+  });
+  detail.appendChild(axes);
+
+  if(u.timeline.length){
+    const tl = el("div","tl");
+    u.timeline.forEach(t=>{
+      const e = el("div","ev "+t.kind);
+      e.innerHTML = `<span class="k">${t.k}</span><span class="txt">${t.txt}</span>`+
+        (t.ev!=null?`<span class="ln">msg ${t.ev}</span>`:"");
+      tl.appendChild(e);
+    });
+    detail.appendChild(tl);
+  }
+
+  /* queued non-blocking siblings */
+  if(u.siblings) u.siblings.forEach(s=>{
+    const sib = el("div","unit");
+    sib.innerHTML = `<div class="u-row"><div class="mk QUEUED">${ICON.dot}</div>
+      <div style="display:flex;align-items:center;gap:7px">
+        <span class="u-title"><span class="slug">${s.slug}</span> — ${s.title}</span>
+        <span class="tag sib">sibling</span></div>
+      <div class="u-meta"><span class="axprog">queued</span></div></div>
+      <div class="resume">${ICON.ret}<span>${s.why}</span></div>`;
+    detail.appendChild(sib);
+  });
+
+  if(u.seal){
+    const s = el("div","seal");
+    s.innerHTML = `${ICON.check} <span>Distilled &amp; <b>${u.seal.verdict}</b> — ${u.seal.note}</span>
+      <span class="diff"><span class="can">can +${u.seal.can}</span>${u.seal.cant?` · <span class="cant">cant −${u.seal.cant}</span>`:""}</span>`;
+    detail.appendChild(s);
+  }
+  unit.appendChild(detail);
+
+  /* resume-to-parent (exact paused question) */
+  if(u.resume && u.state!=="PARKED"){
+    const r = el("div","resume",`${ICON.ret}<span>resumes here: <q>${u.resume}</q></span>`);
+    unit.appendChild(r);
+  }
+
+  /* recursive children (dives) */
+  if(u.children && u.children.length){
+    const br = el("div","branch dive");
+    u.children.forEach(c=>br.appendChild(renderUnit(c)));
+    unit.appendChild(br);
+  }
+
+  /* open by default if current or on the active path */
+  if(u.state==="CURRENT"||u.here_parent) unit.classList.add("open");
+  row.addEventListener("click",()=>unit.classList.toggle("open"));
+  return unit;
+}
+
+const ladder = document.getElementById("ladder");
+FILES.forEach(f=>{
+  const sec = el("div","sec"+(f.open?" open":""));
+  const owned = f.units.filter(u=>u.state==="OWNED").length;
+  const secRow = el("div","sec-row");
+  secRow.innerHTML = `<span class="sec-caret">▶</span>
+    <div><div class="sec-title">${f.name}</div><div class="sec-desc">${f.desc}</div></div>
+    <div class="sec-meta"><span class="pill">${owned}/${f.units.length} owned</span></div>`;
+  sec.appendChild(secRow);
+  const body = el("div","sec-body");
+  const br = el("div","branch");
+  f.units.forEach(u=>br.appendChild(renderUnit(u)));
+  body.appendChild(br);
+  sec.appendChild(body);
+  secRow.addEventListener("click",()=>sec.classList.toggle("open"));
+  ladder.appendChild(sec);
+});
+document.getElementById("rev").textContent = "projection_revision 47";
+
+/* legend — the behavior→mark vocabulary, spelled out */
+const LEGEND = [
+  {sw:'<span class="mk CURRENT" style="width:20px;height:20px">'+ICON.play+'</span>', b:"You are here", d:"top stack frame (is_top) · pulses"},
+  {sw:'<span class="mk OWNED" style="width:20px;height:20px">'+ICON.check+'</span>', b:"Owned", d:"all firing axes SOLID → distilled"},
+  {sw:'<span class="mk PROGRESS" style="width:20px;height:20px;--p:60%">'+ICON.play+'</span>', b:"In progress", d:"PROBED/TAUGHT/TESTED/JUDGED"},
+  {sw:'<span class="mk PARKED" style="width:20px;height:20px">'+ICON.pause+'</span>', b:"Parked", d:"fatigue-switch → stack to handoff"},
+  {sw:'<span class="mk QUEUED" style="width:20px;height:20px">'+ICON.dot+'</span>', b:"Queued", d:"mapped, next on the ladder"},
+  {sw:'<span class="mk LOCKED" style="width:20px;height:20px">'+ICON.lock+'</span>', b:"Not yet reachable", d:"appears live as MAPPER extends"},
+  {sw:'<span class="tag dive">dive</span>', b:"Child dive", d:"misconception/prereq → push_child (recursive)"},
+  {sw:'<span class="tag sib">sibling</span>', b:"Queued sibling", d:"sibling-hole → non-blocking gap"},
+  {sw:'<span class="sw" style="background:var(--gap)"></span>', b:"Open gap", d:"glowing timeline row · the live hole"},
+  {sw:'<span class="sw" style="background:var(--accent)"></span>', b:"Proven", d:"correct-deep + SOLID"},
+  {sw:'<span class="ax SHAKY" style="padding:1px 6px"><span class="dot"></span>·</span>', b:"Shaky", d:"2× shaky escalates → MISSING"},
+  {sw:'<span class="sw" style="background:var(--accent-dim)"></span>', b:"Resume ↩", d:"parent's exact paused question replayed"},
+];
+const lg = document.getElementById("legendGrid");
+LEGEND.forEach(x=>{
+  const d = el("div","lg");
+  d.innerHTML = `<span class="m">${x.sw}</span><span><span class="b">${x.b}</span><br><span class="d">${x.d}</span></span>`;
+  lg.appendChild(d);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tutor — map variations</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{font-size:16px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.12) transparent;}
+body{line-height:1.55;-webkit-font-smoothing:antialiased;min-height:100vh;}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:none;}
+::selection{background:rgba(216,178,77,0.30);color:#fff;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.14);border-radius:3px;}
+:root{
+  --bg-deepest:#171b1f;--bg-app:#20252a;--bg-surface:#2b3138;--bg-card:#333a42;--bg-elevated:#3f474f;
+  --text-primary:#f4f1e6;--text-secondary:#c6c2b3;--text-muted:#8d8b7e;--text-disabled:#5e5d54;
+  --accent:#d8b24d;--accent-dim:#a98f3c;--accent-soft:rgba(216,178,77,0.12);
+  --gap:#cf8f5a;--line:rgba(255,255,255,0.10);
+  --font-ui:"Segoe UI",Tahoma,sans-serif;--font-code:"Cascadia Code","JetBrains Mono","Consolas",monospace;
+  --tf:130ms ease;
+  background:var(--bg-deepest);color:var(--text-primary);font-family:var(--font-ui);
+}
+/* top switcher */
+.top{position:sticky;top:0;z-index:10;background:var(--bg-deepest);padding:16px 20px 12px;display:flex;align-items:center;gap:14px;}
+.top h1{font-size:14px;font-weight:600;}
+.top .note{font-size:11.5px;color:var(--text-muted);}
+.seg{margin-left:auto;display:inline-flex;gap:2px;background:var(--bg-surface);border-radius:9px;padding:3px;}
+.seg button{font-size:11.5px;font-weight:600;color:var(--text-muted);padding:6px 13px;border-radius:6px;transition:var(--tf);}
+.seg button:hover{color:var(--text-secondary);}
+.seg button.on{color:var(--bg-deepest);background:var(--accent);}
+.stage{max-width:820px;margin:0 auto;padding:8px 20px 90px;}
+.variant{display:none;} .variant.on{display:block;}
+.vhead{font-size:11px;color:var(--text-muted);padding:6px 2px 16px;line-height:1.5;}
+.vhead b{color:var(--text-secondary);font-weight:600;}
+
+/* shared: state marker (flat, no glow, no icon) */
+.mk{width:11px;height:11px;border-radius:50%;flex-shrink:0;background:var(--bg-elevated);position:relative;}
+.mk.OWNED{background:var(--accent);}
+.mk.CURRENT{background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+.mk.PARKED{background:transparent;box-shadow:inset 0 0 0 2px var(--accent-dim);}
+.mk.PROGRESS{background:var(--accent-dim);}
+.mk.QUEUED{background:transparent;box-shadow:inset 0 0 0 1.5px var(--text-disabled);}
+.mk.LOCKED{background:var(--bg-card);}
+.mk.sq{border-radius:3px;}
+.here{font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--bg-deepest);background:var(--accent);border-radius:3px;padding:2px 5px;}
+.tag{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-radius:3px;padding:2px 6px;color:var(--text-muted);background:var(--bg-surface);}
+.tag.dive{color:var(--gap);background:rgba(207,143,90,0.12);}
+.tag.sib{color:var(--text-muted);}
+.slug{font-family:var(--font-code);}
+.axp{font-size:10.5px;color:var(--text-disabled);font-family:var(--font-code);}
+
+/* ══════════ V1 — NESTED OUTLINE (indent + depth rail) ══════════ */
+.v1 .sec{margin-bottom:6px;}
+.v1 .sec-row{display:flex;align-items:center;gap:10px;padding:10px 10px;border-radius:9px;cursor:pointer;}
+.v1 .sec-row:hover{background:var(--bg-surface);}
+.v1 .sec-title{font-size:14px;font-weight:600;font-family:var(--font-code);}
+.v1 .caret{color:var(--text-disabled);font-size:9px;width:10px;transition:transform 150ms;}
+.v1 .open>.sec-row .caret,.v1 .unit.open>.u-row .caret{transform:rotate(90deg);}
+.v1 .sec-body{display:none;} .v1 .sec.open>.sec-body{display:block;}
+.v1 .lvl{position:relative;margin-left:15px;padding-left:16px;border-left:1.5px solid var(--line);}
+.v1 .lvl.dive{border-left:1.5px dashed var(--accent-dim);}
+.v1 .unit{position:relative;}
+.v1 .u-row{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:7px;cursor:pointer;}
+.v1 .u-row:hover{background:var(--bg-surface);}
+.v1 .unit.cur>.u-row{background:var(--accent-soft);}
+.v1 .u-row::before{content:"";position:absolute;left:-16px;top:50%;width:14px;height:1.5px;background:var(--line);}
+.v1 .u-title{font-size:13px;color:var(--text-secondary);}
+.v1 .unit.cur>.u-row .u-title{color:var(--text-primary);}
+.v1 .u-meta{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.v1 .kids{display:none;} .v1 .unit.open>.kids{display:block;}
+.v1 .depth{font-size:8.5px;color:var(--text-disabled);font-family:var(--font-code);}
+
+/* ══════════ V2 — COLUMN STACK (drill-in, one level per column) ══════════ */
+.v2 .crumbs{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px;color:var(--text-muted);padding:4px 2px 14px;font-family:var(--font-code);}
+.v2 .crumbs .c{cursor:pointer;padding:2px 7px;border-radius:6px;background:var(--bg-surface);color:var(--text-secondary);}
+.v2 .crumbs .c.on{background:var(--accent);color:var(--bg-deepest);font-weight:600;}
+.v2 .crumbs .sep{color:var(--text-disabled);}
+.v2 .cols{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;}
+.v2 .col{flex:0 0 300px;background:var(--bg-app);border-radius:12px;padding:8px;}
+.v2 .col-head{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);padding:8px 8px 10px;display:flex;gap:7px;align-items:center;}
+.v2 .col-head .tag.dive{margin-left:auto;}
+.v2 .row{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:8px;cursor:pointer;}
+.v2 .row:hover{background:var(--bg-surface);}
+.v2 .row.sel{background:var(--accent-soft);}
+.v2 .row.cur{background:var(--accent-soft);}
+.v2 .r-title{font-size:12.5px;color:var(--text-secondary);}
+.v2 .row.sel .r-title,.v2 .row.cur .r-title{color:var(--text-primary);}
+.v2 .r-meta{margin-left:auto;display:flex;align-items:center;gap:7px;}
+.v2 .chev{color:var(--text-disabled);font-size:11px;}
+.v2 .empty{font-size:11px;color:var(--text-disabled);padding:14px 10px;}
+
+/* ══════════ V3 — LOOP TRACE (single stream, stepping rail) ══════════ */
+.v3 .trace{position:relative;}
+.v3 .step{display:flex;gap:0;align-items:stretch;}
+.v3 .rail{flex:0 0 auto;display:flex;}
+.v3 .seg-rail{width:20px;position:relative;}
+.v3 .seg-rail.on::before{content:"";position:absolute;left:9px;top:0;bottom:0;width:1.5px;background:var(--line);}
+.v3 .seg-rail.dive::before{background:var(--accent-dim);border-left:1px dashed transparent;}
+.v3 .body{flex:1;min-width:0;padding:6px 0 6px 6px;display:flex;align-items:center;gap:9px;border-radius:7px;cursor:pointer;}
+.v3 .body:hover{background:var(--bg-surface);}
+.v3 .k{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);min-width:74px;}
+.v3 .txt{font-size:12.5px;color:var(--text-secondary);}
+.v3 .step.cur .txt{color:var(--text-primary);}
+.v3 .k.dive{color:var(--gap);} .v3 .k.ret{color:var(--accent-dim);} .v3 .k.proven{color:var(--accent);}
+.v3 .k.gap{color:var(--gap);}
+.v3 .dot{width:9px;height:9px;border-radius:50%;background:var(--text-disabled);flex-shrink:0;}
+.v3 .dot.proven{background:var(--accent);} .v3 .dot.gap{background:var(--gap);}
+.v3 .dot.dive{background:transparent;box-shadow:inset 0 0 0 2px var(--accent-dim);}
+.v3 .dot.cur{background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+.v3 .unit-head{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;padding:14px 0 2px;font-family:var(--font-code);}
+.v3 .meta-r{margin-left:auto;font-size:10px;color:var(--text-disabled);font-family:var(--font-code);}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>Map — pick a structure</h1>
+  <span class="note">same data, dives 3 levels deep · flat, no icons yet</span>
+  <div class="seg" id="seg">
+    <button data-v="1" class="on">1 · Nested outline</button>
+    <button data-v="2">2 · Column stack</button>
+    <button data-v="3">3 · Loop trace</button>
+  </div>
+</div>
+<div class="stage">
+  <div class="variant on v1" id="v1"><div class="vhead"><b>Nested outline.</b> Dives indent under their parent with a dashed rail. Depth shown by indentation + a depth label. Deep nesting stays put; the active path is auto-open. Familiar, scannable — but very deep dives drift right.</div><div id="v1body"></div></div>
+  <div class="variant v2" id="v2"><div class="vhead"><b>Column stack.</b> The literal Router subhole-stack. Left column is the root ladder; click a unit that has a dive and its ladder opens as the next column. Breadcrumb across the top = the live stack frames. Depth is horizontal, so it never runs out of room — maps 1:1 to <span class="slug">stack</span>.</div><div id="v2body"></div></div>
+  <div class="variant v3" id="v3"><div class="vhead"><b>Loop trace.</b> One vertical stream in the exact order the loop ran: point → probe → gap → <span class="slug">dive into…</span> → … → <span class="slug">return to parent</span>. A stepping left rail shows depth in/out, like a call-stack trace. "Here" is the last live row. Best for "what actually happened."</div><div id="v3body"></div></div>
+</div>
+
+<script>
+const AX={COMPREHEND:"What it does",MECHANISM:"How it works",RATIONALE:"Why designed so",JUDGMENT:"When to use",ROBUSTNESS:"What breaks",INTEGRATION:"How it connects",EVOLUTION:"How to improve"};
+
+/* Data mirrors JourneyReader: file → units[]; units nest children[] (dives, unbounded). */
+const FILES=[
+{ name:"run_prompts.py", open:true, units:[
+  { slug:"load_prompts", title:"Read the prompt file", state:"OWNED",
+    axes:[["COMPREHEND","SOLID"],["MECHANISM","SOLID"],["ROBUSTNESS","SOLID"]],
+    timeline:[{k:"Taught",kind:"taught",txt:"json.load returns raw rows"},{k:"Proven",kind:"proven",txt:"traced the load path"}] },
+  { slug:"normalize_row", title:"Coerce each row's shape", state:"OWNED",
+    axes:[["COMPREHEND","SOLID"],["MECHANISM","SOLID"],["RATIONALE","SOLID"]],
+    timeline:[{k:"Taught",kind:"taught",txt:"bool(r.get('pin')) defaults pins"},{k:"Tested",kind:"test",txt:"missing-key case"},{k:"Proven",kind:"proven",txt:"handled absent key"}] },
+  { slug:"_pinned_qa_group", title:"Group pinned questions first", state:"PROBED", parent_of_here:true,
+    resume:"trace one input where a pinned id also appears unpinned",
+    axes:[["COMPREHEND","SOLID"],["MECHANISM","SHAKY",1],["ROBUSTNESS","MISSING"]],
+    timeline:[{k:"Taught",kind:"taught",txt:"pinned kept in passed order"},{k:"Proven",kind:"proven",txt:"read pinned-first ordering"},{k:"Probe",kind:"probe",txt:"why '+' preserves order"},{k:"Gap",kind:"gap",txt:"ids collide across groups — no dedupe"}],
+    siblings:[{slug:"dedupe_across_groups",title:"De-dupe ids across groups"}],
+    children:[
+      { slug:"dict_identity", title:"Dict identity vs value", state:"PROBED", tag:"dive", parent_of_here:true,
+        resume:"which do two equal dicts share — identity or value?",
+        axes:[["COMPREHEND","SOLID"],["MECHANISM","SHAKY",1]],
+        timeline:[{k:"Taught",kind:"taught",txt:"`is` vs `==`"},{k:"Probe",kind:"probe",txt:"equal dicts, same identity?"},{k:"Gap",kind:"gap",txt:"unsure why the set membership fails"}],
+        children:[
+          { slug:"hashing_keys", title:"Why keys must hash", state:"CURRENT", tag:"dive",
+            axes:[["COMPREHEND","SHAKY",1],["MECHANISM","MISSING"]],
+            timeline:[{k:"Taught",kind:"taught",txt:"membership uses __hash__ then __eq__"},{k:"Probe",kind:"probe",txt:"what makes a dict unhashable?"},{k:"Next",kind:"next",txt:"awaiting your answer"}] },
+        ] },
+    ] },
+  { slug:"_dedupe_by_id", title:"Drop duplicate ids", state:"QUEUED", axes:[["COMPREHEND","UNGRADED"],["MECHANISM","UNGRADED"]], timeline:[] },
+  { slug:"build_prompt_batch", title:"Assemble the batch", state:"LOCKED", axes:[["COMPREHEND","UNGRADED"],["INTEGRATION","UNGRADED"]], timeline:[] },
+  { slug:"run_prompts", title:"Drive the whole run", state:"LOCKED", axes:[["COMPREHEND","UNGRADED"],["JUDGMENT","UNGRADED"]], timeline:[] },
+]},
+{ name:"schema_loader.py", open:false, units:[
+  { slug:"read_schema", title:"Load the schema", state:"PARKED", tag:"park",
+    axes:[["COMPREHEND","SOLID"],["MECHANISM","SOLID"],["ROBUSTNESS","SHAKY",1]], timeline:[{k:"Probe",kind:"probe",txt:"what if the schema is malformed?"}] },
+  { slug:"validate_row", title:"Validate one row", state:"QUEUED", axes:[["COMPREHEND","UNGRADED"]], timeline:[] },
+]},
+];
+const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
+const solid=u=>u.axes.filter(a=>a[1]==="SOLID").length;
+const mkCls=u=>({OWNED:"OWNED",CURRENT:"CURRENT",PARKED:"PARKED",LOCKED:"LOCKED",QUEUED:"QUEUED"}[u.state]||"PROGRESS");
+const onPath=u=>u.state==="CURRENT"||u.parent_of_here;
+
+/* ─────────── V1: nested outline ─────────── */
+function v1unit(u){
+  const unit=el("div","unit"+(u.state==="CURRENT"?" cur":"")+(onPath(u)?" open":""));
+  const hasKids=(u.children&&u.children.length)||(u.siblings&&u.siblings.length);
+  const row=el("div","u-row");
+  let t=`<span class="mk ${mkCls(u)}"></span><span class="u-title"><span class="slug">${u.slug}</span> — ${u.title}</span>`;
+  if(u.state==="CURRENT")t+=`<span class="here">here</span>`;
+  if(u.tag==="dive")t+=`<span class="tag dive">dive</span>`;
+  if(u.tag==="park")t+=`<span class="tag">parked</span>`;
+  row.innerHTML=`<div style="display:flex;align-items:center;gap:9px">${t}</div>`+
+    `<span class="u-meta"><span class="axp">${solid(u)}/${u.axes.length}</span>${hasKids?'<span class="caret">▶</span>':''}</span>`;
+  unit.appendChild(row);
+  const kids=el("div","kids");
+  if(u.siblings)u.siblings.forEach(s=>{
+    const lvl=el("div","lvl");
+    lvl.innerHTML=`<div class="unit"><div class="u-row"><div style="display:flex;align-items:center;gap:9px">
+      <span class="mk QUEUED sq"></span><span class="u-title"><span class="slug">${s.slug}</span> — ${s.title}</span>
+      <span class="tag sib">sibling · non-blocking</span></div><span class="u-meta axp">queued</span></div></div>`;
+    kids.appendChild(lvl);
+  });
+  if(u.children)u.children.forEach(c=>{
+    const lvl=el("div","lvl dive");
+    const inner=v1unit(c);
+    inner.querySelector(".u-row").insertAdjacentHTML("beforeend",`<span class="depth" style="margin-left:6px">depth ${depthOf(c)}</span>`);
+    lvl.appendChild(inner); kids.appendChild(lvl);
+  });
+  unit.appendChild(kids);
+  row.addEventListener("click",()=>unit.classList.toggle("open"));
+  return unit;
+}
+let _d=new WeakMap();
+function depthOf(u){return _d.get(u)||0;}
+function tagDepth(u,d){_d.set(u,d);(u.children||[]).forEach(c=>tagDepth(c,d+1));}
+FILES.forEach(f=>f.units.forEach(u=>tagDepth(u,0)));
+(function(){const b=document.getElementById("v1body");
+  FILES.forEach(f=>{
+    const sec=el("div","sec"+(f.open?" open":""));
+    const owned=f.units.filter(u=>u.state==="OWNED").length;
+    sec.appendChild(el("div","sec-row",`<span class="caret">▶</span><span class="sec-title">${f.name}</span><span class="u-meta"><span class="axp">${owned}/${f.units.length} owned</span></span>`));
+    const body=el("div","sec-body"); const lvl=el("div","lvl");
+    f.units.forEach(u=>lvl.appendChild(v1unit(u))); body.appendChild(lvl); sec.appendChild(body);
+    sec.querySelector(".sec-row").addEventListener("click",()=>sec.classList.toggle("open"));
+    b.appendChild(sec);
+  });
+})();
+
+/* ─────────── V2: column stack (drill-in) ─────────── */
+const v2root=FILES[0].units;               /* the active journey's root ladder */
+function v2render(path){                    /* path = array of units, deepest last */
+  const body=document.getElementById("v2body"); body.innerHTML="";
+  const cr=el("div","crumbs"); cr.appendChild(crumb("run_prompts.py",path.length===0,()=>v2render([])));
+  path.forEach((u,i)=>{cr.insertAdjacentHTML("beforeend",'<span class="sep">›</span>');cr.appendChild(crumb(u.slug,i===path.length-1,()=>v2render(path.slice(0,i+1))));});
+  body.appendChild(cr);
+  const cols=el("div","cols");
+  cols.appendChild(v2col("Ladder",v2root,path[0],u=>v2render([u])));
+  path.forEach((u,i)=>{
+    const kids=u.children||[];
+    cols.appendChild(v2col((u.tag==="dive"?"Dive · ":"")+u.slug,kids,path[i+1],c=>v2render([...path.slice(0,i+1),c]),u));
+  });
+  body.appendChild(cols);
+  cols.scrollLeft=cols.scrollWidth;
+}
+function crumb(txt,on,fn){const c=el("span","c"+(on?" on":""),txt);c.onclick=fn;return c;}
+function v2col(head,units,selected,onPick,parent){
+  const col=el("div","col");
+  let hh=`<span class="mk ${parent?mkCls(parent):'QUEUED'}"></span>${head}`;
+  if(parent&&parent.tag==="dive")hh+=`<span class="tag dive">dive</span>`;
+  col.appendChild(el("div","col-head",hh));
+  if(!units.length){col.appendChild(el("div","empty","no dives from here — leaf of the stack"));return col;}
+  units.forEach(u=>{
+    const kids=(u.children||[]).length;
+    const r=el("div","row"+(u===selected?" sel":"")+(u.state==="CURRENT"?" cur":""));
+    let t=`<span class="mk ${mkCls(u)}"></span><span class="r-title"><span class="slug">${u.slug}</span> — ${u.title}</span>`;
+    if(u.state==="CURRENT")t+=`<span class="here">here</span>`;
+    r.innerHTML=`<div style="display:flex;align-items:center;gap:9px">${t}</div>`+
+      `<span class="r-meta"><span class="axp">${solid(u)}/${u.axes.length}</span>${kids?'<span class="chev">›</span>':''}</span>`;
+    if(kids)r.onclick=()=>onPick(u);
+    col.appendChild(r);
+  });
+  return col;
+}
+/* open at the live stack: _pinned_qa_group → dict_identity → hashing_keys */
+function livePath(){const p=[];let lvl=v2root;
+  while(true){const u=lvl.find(x=>x.state==="CURRENT"||x.parent_of_here);if(!u)break;p.push(u);if(u.state==="CURRENT")break;lvl=u.children||[];}
+  return p.slice(0,-0),p.length?p:[];}
+v2render(livePath().slice(0,-1).length?livePath():[]);
+
+/* ─────────── V3: loop trace (single stream, stepping rail) ─────────── */
+function v3build(){
+  const rows=[]; /* {depth, k, kind, txt, cur, unit, meta} */
+  function walk(u,depth){
+    rows.push({unit:true,depth,txt:u.slug+" — "+u.title,tag:u.tag,meta:solid(u)+"/"+u.axes.length,state:u.state});
+    (u.timeline||[]).forEach(t=>{
+      rows.push({depth,k:t.k,kind:t.kind,txt:t.txt,cur:t.kind==="next"});
+      /* at the gap that triggered a dive, step into the child */
+      if(t.kind==="gap"&&u.children&&u.children.length){
+        u.children.forEach(c=>{ rows.push({depth,k:"Dive into",kind:"dive",txt:c.slug+" — "+c.title}); walk(c,depth+1);
+          if(c.state!=="CURRENT") rows.push({depth,k:"Return to",kind:"ret",txt:u.slug+' · "'+ (u.resume||"") +'"'}); });
+      }
+    });
+    (u.siblings||[]).forEach(s=>rows.push({depth,k:"Queued",kind:"sib",txt:s.slug+" — "+s.title+" (non-blocking)"}));
+  }
+  FILES[0].units.forEach(u=>walk(u,0));
+  const wrap=el("div","trace");
+  rows.forEach(r=>{
+    if(r.unit){
+      const h=el("div","unit-head"); h.style.marginLeft=(r.depth*22)+"px";
+      h.innerHTML=`<span class="mk ${mkCls(r)}" style="display:inline-block;vertical-align:middle;margin-right:7px"></span>${r.txt}`+
+        (r.state==="CURRENT"?' <span class="here">here</span>':'')+(r.tag==="dive"?' <span class="tag dive">dive</span>':'')+(r.tag==="park"?' <span class="tag">parked</span>':'')+
+        `<span class="meta-r">${r.meta}</span>`;
+      wrap.appendChild(h); return;
+    }
+    const step=el("div","step"+(r.cur?" cur":""));
+    const rail=el("div","rail");
+    for(let i=0;i<=r.depth;i++){const s=el("div","seg-rail on"+(i>0?" dive":""));rail.appendChild(s);}
+    step.appendChild(rail);
+    const body=el("div","body");
+    body.innerHTML=`<span class="dot ${r.kind==='next'?'cur':r.kind}"></span><span class="k ${r.kind}">${r.k}</span><span class="txt">${r.txt}</span>`;
+    step.appendChild(body); wrap.appendChild(step);
+  });
+  document.getElementById("v3body").appendChild(wrap);
+}
+v3build();
+
+/* switcher */
+document.getElementById("seg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+  document.querySelectorAll("#seg button").forEach(x=>x.classList.toggle("on",x===b));
+  ["1","2","3"].forEach(v=>document.getElementById("v"+v).classList.toggle("on",v===b.dataset.v));
+});
+</script>
+</body>
+</html>
