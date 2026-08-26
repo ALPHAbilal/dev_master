@@ -74,53 +74,20 @@ textarea { border: none; outline: none; }
 .map-scroll { flex:1; overflow:auto; }
 .route-wrap { max-width:600px; margin:0 auto; padding:16px 22px 32px; }
 
-/* GPS next-turn card = the tutor's live action */
-.gps { display:flex; gap:13px; align-items:center; background:var(--accent-soft); border-radius:14px; padding:14px 16px; }
-.gps .turn-ico { width:40px; height:40px; border-radius:11px; background:var(--accent); color:var(--bg-deepest); display:grid; place-items:center; flex-shrink:0; }
-.gps .g-kicker { font-size:9px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--accent); }
-.gps .g-main { font-size:15px; color:var(--text-primary); font-weight:600; margin-top:2px; }
-.gps .g-sub { font-size:12px; color:var(--text-muted); margin-top:3px; }
-.gps .g-sub b { color:#e0a56f; font-weight:600; }
-
-/* trip stats */
-.trip { display:flex; gap:16px; align-items:center; padding:14px 4px 18px; font-size:11.5px; color:var(--text-muted); }
-.trip b { color:var(--text-primary); font-weight:700; }
-.trip .prog { flex:1; min-width:70px; height:5px; border-radius:3px; background:var(--bg-surface); overflow:hidden; }
-.trip .prog i { display:block; height:100%; background:var(--accent); border-radius:3px; }
-
-/* territory: 2-D map — axis lanes (X) × time (Y), a winding trail */
-.territory { position:relative; width:100%; }
-.lane-guide { position:absolute; top:34px; bottom:14px; width:0; border-left:1px dashed rgba(255,255,255,0.10); transform:translateX(-50%); z-index:0; }
-.lane-guide.untrod { border-left-style:dotted; opacity:0.5; }
-.lane-head { position:absolute; top:0; transform:translateX(-50%); text-align:center; z-index:2; }
-.lane-head .l-name { font-size:11px; font-weight:600; color:var(--text-secondary); white-space:nowrap; }
-.lane-head .l-axis { font-size:8.5px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-disabled); margin-top:1px; }
-.lane-head.untrod .l-name { color:var(--text-disabled); }
-.trail-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:1; overflow:visible; }
-
-.act { position:absolute; transform:translate(-50%,-50%); z-index:3; cursor:pointer; }
-.act-card { background:var(--bg-card); border-radius:9px; padding:7px 11px; transition:transform 150ms ease,background 150ms ease,box-shadow 150ms ease; box-shadow:var(--shadow-card); }
-.act:hover .act-card { background:var(--bg-elevated); transform:translateY(-2px); }
-.act .a-kind { font-size:8.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); display:flex; align-items:center; gap:6px; }
-.act .a-kind::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--text-disabled); flex-shrink:0; }
-.act .a-title { font-size:11.5px; color:var(--text-primary); margin-top:3px; white-space:nowrap; }
-.act[data-kind="taught"] .a-kind { color:var(--text-secondary); } .act[data-kind="taught"] .a-kind::before { background:var(--text-secondary); border-radius:2px; }
-.act[data-kind="proven"] .act-card { box-shadow:inset 3px 0 0 var(--accent), var(--shadow-card); } .act[data-kind="proven"] .a-kind { color:var(--accent); } .act[data-kind="proven"] .a-kind::before { background:var(--accent); }
-.act[data-kind="probe"] .a-kind::before { background:var(--text-muted); }
-.act[data-kind="gap"] .act-card { box-shadow:inset 3px 0 0 #cf8f5a, 0 0 22px 2px rgba(207,143,90,0.25); background:radial-gradient(90px 50px at 12% 50%, rgba(207,143,90,0.22), var(--bg-card) 72%); }
-.act[data-kind="gap"] .a-kind { color:#e0a56f; } .act[data-kind="gap"] .a-kind::before { background:#cf8f5a; box-shadow:0 0 8px 2px rgba(207,143,90,0.6); }
-.act.selected .act-card { box-shadow:0 0 0 1.5px var(--accent); background:var(--bg-elevated); }
-.act.current .act-card { box-shadow:0 0 0 2px var(--accent); }
-/* current position pin */
-.pin { position:absolute; transform:translate(-50%,-50%); width:16px; height:16px; z-index:4; }
-.pin::before { content:""; position:absolute; inset:0; border-radius:50%; background:var(--accent); }
-.pin::after { content:""; position:absolute; inset:-6px; border-radius:50%; border:2px solid var(--accent); animation:pulse 1.9s ease-out infinite; }
-.pin-label { position:absolute; transform:translate(-50%,-50%); z-index:4; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--accent); white-space:nowrap; }
-.trail-glow { stroke:var(--accent); stroke-width:8; fill:none; opacity:0.12; stroke-linecap:round; }
-.trail-line { stroke:var(--accent); stroke-width:2.5; fill:none; stroke-linecap:round; }
-.node.is-active { animation:pulse 1.9s ease-out infinite; }
-.node.selected { background:var(--bg-elevated); box-shadow:0 0 0 1.5px var(--accent); }
-.node.faded { opacity:0.32; }
+/* unit story — the single unit's journey, plain English, borderless.
+ * No terminal chrome, no title/rev, no axis header, no unit switcher:
+ * the units live in the left sidebar; this pane is only the story. */
+.unit-story { font-family:var(--font-code); font-size:13px; line-height:1.85; white-space:pre; color:var(--text-secondary); }
+.unit-story .o  { color:var(--accent); }
+.unit-story .od { color:var(--accent-dim); }
+.unit-story .g  { color:#e0a56f; }
+.unit-story .dm { color:var(--text-muted); }
+.unit-story .fa { color:var(--text-disabled); }
+.unit-story .gr { color:#8fbf87; }
+.unit-story .cy { color:#8ec1cf; }
+.unit-story .fg { color:var(--text-primary); }
+.unit-story .b  { font-weight:700; }
+.unit-story i   { font-style:italic; }
 
 /* conversation */
 .focus-bar { display:none; align-items:center; gap:10px; padding:8px 14px; margin:10px 18px 0; background:var(--bg-surface); border-radius:9px; font-size:11.5px; color:var(--text-secondary); }
@@ -213,9 +180,7 @@ textarea { border: none; outline: none; }
     <div class="view on" id="view-map">
       <div class="map-scroll">
         <div class="route-wrap">
-          <div class="gps" id="gps"></div>
-          <div class="trip" id="trip"></div>
-          <div class="territory" id="territory"></div>
+          <pre class="unit-story" id="story"></pre>
         </div>
       </div>
     </div>
@@ -288,29 +253,6 @@ const CODEBASES = [
     { slug:'read_schema', state:'PARKED' }, { slug:'validate_row', state:'QUEUED' },
   ]},
 ];
-/* label/title are the LEARNER-FACING copy layer over the raw backend kind.
- * (backend kind is preserved in `kind`; nothing here changes the engine.) */
-const NODES = [
-  { id:'u1', kind:'concept-system', label:'The function', title:'_pinned_qa_group', prov:'the code you own', x:310, y:70, ev:[1] },
-  { id:'c1', kind:'concept-agent', label:'What it does', title:'Group pinned Qs first, keep order', prov:'taught by tutor', x:150, y:230, ev:[2,3] },
-  { id:'t1', kind:'takeaway', label:'Proven', title:'You can read pinned-first ordering', prov:'you got this', x:150, y:400, ev:[3,'f2'] },
-  { id:'m1', kind:'misconception', label:'You missed', title:'ids can collide across groups', prov:'open gap', x:470, y:230, ev:[5,6,'f6'], active:true },
-  { id:'p1', kind:'prerequisite', label:'Learn first', title:'dict identity vs value', prov:'blocks the gap', x:470, y:400, ev:[6] },
-  { id:'f1', kind:'function', label:'It calls', title:'build_prompt_batch()', prov:'in the code', x:310, y:520, ev:[] },
-];
-const EDGES = [
-  { from:'u1', to:'c1', rel:'requires_understanding' }, { from:'c1', to:'t1', rel:'proved_by' },
-  { from:'u1', to:'m1', rel:'revealed_gap_in' }, { from:'m1', to:'p1', rel:'depends_on' },
-  { from:'u1', to:'f1', rel:'contains' },
-];
-/* relationship_type → learner meaning + plain word (edge styling + on-focus label) */
-const MEANING = {
-  requires_understanding:{ cls:'needs',  word:'you must get' },
-  proved_by:            { cls:'proven', word:'✓ proven by' },
-  revealed_gap_in:      { cls:'gap',    word:'✗ gap in' },
-  depends_on:           { cls:'first',  word:'learn first' },
-  contains:             { cls:'code',   word:'contains' },
-};
 const STREAM = [
   { t:'msg', id:1, role:'system', text:'Unit opened — <code>_pinned_qa_group</code> (L42–46), phase ASSEMBLE.' },
   { t:'msg', id:2, role:'tutor', text:'Before you write it — what does the caller expect back? Shape and order.' },
@@ -320,8 +262,6 @@ const STREAM = [
   { t:'msg', id:6, role:'learner', text:'…it would appear twice. I didn’t dedupe across the two groups.' },
   { t:'fb', id:'f6', for:[5,6], verdict:'MISSING', category:'sibling-hole', agent:'JUDGE', text:'Gap: no de-duplication across groups. Prerequisite uncovered — dict identity vs value.' },
 ];
-const SVGNS='http://www.w3.org/2000/svg';
-const byId=Object.fromEntries(NODES.map(n=>[n.id,n]));
 
 /* tree */
 const tree=document.getElementById('tree');
@@ -330,105 +270,115 @@ CODEBASES.forEach(cb=>{
   const owned=cb.units.filter(u=>u.state==='OWNED').length;
   wrap.innerHTML=`<div class="cb-row"><span class="cb-caret">▶</span>
     <span class="cb-name">${cb.name}</span><span class="cb-count">${owned}/${cb.units.length}</span></div>
-    <div class="units">${cb.units.map(u=>`<div class="unit${u.current?' current':''}">
+    <div class="units">${cb.units.map(u=>`<div class="unit${u.current?' current':''}" data-slug="${u.slug}">
       <span class="u-state ${u.state}"></span><span class="u-name">${u.slug}</span>
       ${u.current?'<span class="u-here">here</span>':''}</div>`).join('')}</div>`;
   wrap.querySelector('.cb-row').addEventListener('click',()=>wrap.classList.toggle('open'));
+  wrap.querySelectorAll('.unit').forEach(el=>el.addEventListener('click',()=>{
+    showMid('map'); renderStory(el.dataset.slug);
+  }));
   tree.appendChild(wrap);
 });
 
-/* ── MAP: the journey as a GPS route ───────────────────────────────────────
- * Stops = units in order. Trail behind the marker = past (OWNED); the pulsing
- * marker = the agent's live position (ACTIVE); dim road ahead = QUEUED. The
- * current unit unfolds its semantic overlay (proven / gap / learn-first), and
- * the open gap glows as a hotspot. Every card → the exact conversation. */
-/* Lanes = the axes of understanding (X dimension). Time = Y. */
-const LANES = [
-  { axis:'COMPREHEND', label:'What it does' },
-  { axis:'IMPLEMENT',  label:'Build it' },
-  { axis:'EDGE',       label:'What breaks' },
-];
-const laneX = axis => (LANES.findIndex(l=>l.axis===axis)+0.5)/LANES.length*100; // % across
-const trodden = new Set();  // which lanes the trail has actually entered
+/* ── MAP: one unit's journey, in plain English ─────────────────────────────
+ * The map pane renders the story of a single unit — what was learned, proved,
+ * where a gap opened, which dives it forced, and where you are now. No terminal
+ * chrome, no title/rev bar, no axis header, no unit switcher: the units already
+ * live in the left sidebar; clicking one there swaps this pane to its story.
+ * Each story line maps 1:1 to a real engine event (see kinds in `line`). */
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+function S(t,cls){return cls?`<span class="${cls}">${esc(t)}</span>`:esc(t);}
 
-/* ACTIONS = the agent's live+past actions, each tied to an axis and a moment.
- * ev → the conversation messages that are its evidence (click to focus). */
-const ACTIONS = [
-  { id:'a1', axis:'COMPREHEND', kind:'taught', label:'Taught', title:'grouping rule', ev:[2] },
-  { id:'a2', axis:'COMPREHEND', kind:'proven', label:'Proven', title:'pinned-first order', ev:[3,'f2'] },
-  { id:'a3', axis:'EDGE',       kind:'probe',  label:'Probed', title:'collision trace', ev:[5] },
-  { id:'a4', axis:'EDGE',       kind:'gap',    label:'Open gap', title:'ids collide', ev:[5,6,'f6'], current:true },
-];
-const ROW_TOP=70, ROW_GAP=92;
-const territory=document.getElementById('territory');
-territory.style.height=(ROW_TOP+ROW_GAP*(ACTIONS.length-1)+70)+'px';
-ACTIONS.forEach(a=>trodden.add(a.axis));
+/* plain-English axis names (learner-facing wording the backend already uses) */
+const AX={COMPREHEND:"What it does",MECHANISM:"How it works",RATIONALE:"Why it's built this way",JUDGMENT:"When to use it",ROBUSTNESS:"What can break",INTEGRATION:"How it connects",EVOLUTION:"How to improve it"};
 
-/* lane guides + headers */
-LANES.forEach(l=>{
-  const untrod = trodden.has(l.axis)?'':' untrod';
-  const g=document.createElement('div'); g.className='lane-guide'+untrod; g.style.left=laneX(l.axis)+'%'; territory.appendChild(g);
-  const h=document.createElement('div'); h.className='lane-head'+untrod; h.style.left=laneX(l.axis)+'%';
-  h.innerHTML=`<div class="l-name">${l.label}</div><div class="l-axis">${l.axis}</div>`; territory.appendChild(h);
-});
+/* story lines are plain English; each maps to a real engine event:
+ * learned=teaching · proved=SOLID · gap=missing/misconception · dive=push_child
+ * return=resume_after_child · sealed=distill/OWNED · shaky · note=sibling · here */
+const UNITS={
+ load_prompts:{story:[["learned",0,"the file is loaded and turned into rows"],
+          ["proved",0,"you can trace where the rows come from","COMPREHEND"],
+          ["sealed",0,"Read the prompt file"]]},
+ normalize_row:{story:[["learned",0,"each row gets a real pin flag, even when it's missing"],
+          ["proved",0,"you handled the row with no pin key","ROBUSTNESS"],
+          ["sealed",0,"Coerce each row's shape"]]},
+ _pinned_qa_group:{story:[
+     ["learned",0,"pinned items stay in the order they were given"],
+     ["proved",0,"you can read pinned-first ordering","COMPREHEND"],
+     ["proved",0,"the order survives because the two groups are joined","MECHANISM"],
+     ["note",0,"de-dupe across groups — worth doing, but it doesn't block you"],
+     ["gap",0,"the same id can appear in both groups — nothing removes the duplicate","ROBUSTNESS"],
+     ["dive",0,"Dict identity vs value","you needed this first"],
+       ["learned",1,"`is` checks identity, `==` checks value"],
+       ["gap",1,"to be sure, you needed how dict keys are matched"],
+       ["dive",1,"Why keys must hash","needed before that could click"],
+         ["learned",2,"membership checks the hash, then equality"],
+         ["proved",2,"you named a key Python can't hash","MECHANISM"],
+         ["sealed",2,"Why keys must hash"],
+       ["return",1,"Dict identity vs value",null,"which do two equal dicts share — identity or value?"],
+       ["proved",1,"two equal-looking dicts are still different objects","MECHANISM"],
+       ["sealed",1,"Dict identity vs value"],
+     ["return",0,"Group pinned questions first","ROBUSTNESS","trace an input where a pinned id also appears unpinned"],
+     ["dive",0,"What 'collision' means for ids","the gap came back once identity was solid"],
+       ["learned",1,"two equal ids mean one real question, not two"],
+       ["shaky",1,"still fuzzy on what the output length should be","COMPREHEND"],
+       ["here",1,"answer what the output length should be","MECHANISM"],
+   ]},
+ dict_identity:{story:[["why",0,"You opened this because ids collided in Group pinned questions first"],
+          ["learned",0,"`is` checks identity, `==` checks value"],
+          ["proved",0,"two equal-looking dicts are still different objects","MECHANISM"],
+          ["sealed",0,"Dict identity vs value"],
+          ["return",0,"Group pinned questions first","ROBUSTNESS","trace an input where a pinned id also appears unpinned"]]},
+ hashing_keys:{story:[["why",0,"You opened this because identity needed how keys are matched"],
+          ["learned",0,"membership checks the hash, then equality"],
+          ["proved",0,"you named a key Python can't hash","MECHANISM"],
+          ["sealed",0,"Why keys must hash"],
+          ["return",0,"Dict identity vs value","MECHANISM","which do two equal dicts share — identity or value?"]]},
+ collision_semantics:{story:[["why",0,"You opened this because the collision gap came back"],
+          ["learned",0,"two equal ids mean one real question, not two"],
+          ["shaky",0,"still fuzzy on what the output length should be","COMPREHEND"],
+          ["here",0,"answer what the output length should be","MECHANISM"]]},
+ _dedupe_by_id:{story:[["locked",0,"Not started yet — it's next on the ladder."]]},
+ build_prompt_batch:{story:[["locked",0,"Locked until the earlier units are owned."]]},
+ run_prompts:{story:[["locked",0,"Locked until the earlier units are owned."]]},
+ read_schema:{story:[["locked",0,"Parked — resume from the sidebar to continue."]]},
+ validate_row:{story:[["locked",0,"Locked until the earlier units are owned."]]},
+};
 
-/* trail svg (drawn after layout) */
-const trailSvg=document.createElementNS(SVGNS,'svg'); trailSvg.setAttribute('class','trail-svg'); territory.appendChild(trailSvg);
-
-/* action nodes */
-ACTIONS.forEach((a,i)=>{
-  const el=document.createElement('div'); el.className='act'+(a.current?' current':''); el.dataset.kind=a.kind; el.dataset.id=a.id;
-  a._x=laneX(a.axis); a._y=ROW_TOP+ROW_GAP*i;
-  el.style.left=a._x+'%'; el.style.top=a._y+'px';
-  el.innerHTML=`<div class="act-card"><div class="a-kind">${a.label}</div><div class="a-title">${a.title}</div></div>`;
-  el.addEventListener('click',()=>focusAction(a,el));
-  territory.appendChild(el); a._el=el;
-});
-
-/* current position pin + label at the last action */
-const last=ACTIONS[ACTIONS.length-1];
-const pin=document.createElement('div'); pin.className='pin'; pin.style.left=last._x+'%'; pin.style.top=(last._y+34)+'px'; territory.appendChild(pin);
-const pinLbl=document.createElement('div'); pinLbl.className='pin-label'; pinLbl.textContent='you are here'; pinLbl.style.left=last._x+'%'; pinLbl.style.top=(last._y+54)+'px'; territory.appendChild(pinLbl);
-
-/* draw the winding trail through the actions in order (smooth cubic S-curves) */
-function drawTrail(){
-  trailSvg.querySelectorAll('path').forEach(p=>p.remove());
-  const W=territory.clientWidth;
-  const pts=ACTIONS.map(a=>({x:a._x/100*W, y:a._y}));
-  let d=`M ${pts[0].x} ${pts[0].y}`;
-  for(let i=1;i<pts.length;i++){ const p0=pts[i-1], p1=pts[i], my=(p0.y+p1.y)/2;
-    d+=` C ${p0.x} ${my}, ${p1.x} ${my}, ${p1.x} ${p1.y}`; }
-  const glow=document.createElementNS(SVGNS,'path'); glow.setAttribute('d',d); glow.setAttribute('class','trail-glow'); trailSvg.appendChild(glow);
-  const line=document.createElementNS(SVGNS,'path'); line.setAttribute('d',d); line.setAttribute('class','trail-line'); trailSvg.appendChild(line);
+/* render one line of the story in plain English */
+function line(row){
+  const [t,d,a,b,c]=row;
+  const rail=S("│  ".repeat(d),"fa");
+  const at=x=>x?S("  ‹"+AX[x]+"›","dm"):"";
+  switch(t){
+    case "why":     return rail+S("↪ ","dm")+S(a,"dm i");
+    case "learned": return rail+S("• ","dm")+S("Learned","dm")+"   "+S(a,"fg");
+    case "proved":  return rail+S("✓ ","o")+S("Proved","o b")+"    "+S(a,"fg")+at(b);
+    case "shaky":   return rail+S("~ ","od")+S("Almost","od b")+"    "+S(a,"fg")+at(b);
+    case "gap":     return rail+S("⚠ ","g")+S("Found a gap","g b")+"  "+S(a,"fg")+at(b);
+    case "note":    return rail+S("○ ","dm")+S("Noted for later","dm")+"  "+S(a,"dm");
+    case "dive":    return rail+S("↳ ","g")+S((d>0?"Needed first":"Went to learn first")+" — ","g")+S(a,"cy b")+(b?S("   ("+b+")","dm"):"");
+    case "sealed":  return rail+S("★ ","o")+S("Sealed — you own ","o")+S(a,"cy");
+    case "return":  {
+      const head=rail+S("↩ ","o b")+S("Came back to ","o b")+S(a,"cy b")+(b?S("  · continue ","o")+S("‹"+AX[b]+"›","od"):"");
+      const q=c?"\n"+S("│  ".repeat(d),"fa")+S("   picking up: ","dm")+S("“"+c+"”","od i"):"";
+      return head+q;
+    }
+    case "here":    return rail+S("◉ ","o b")+S("You are here","o b")+" — "+S(a,"fg")+at(b);
+    case "locked":  return S(a,"dm");
+  }
+  return "";
 }
-requestAnimationFrame(drawTrail);
-window.addEventListener('resize',drawTrail);
 
-/* focus the conversation on an action's evidence */
-function focusAction(a,el){
-  showMid('conversation');
-  const ev=new Set(a.ev.map(String));
-  convo.classList.add('focused');
-  convo.querySelectorAll('[data-id]').forEach(x=>x.classList.toggle('ev',ev.has(x.dataset.id)));
-  document.querySelectorAll('.act.selected').forEach(x=>x.classList.remove('selected'));
-  el.classList.add('selected');
-  document.getElementById('focusBar').classList.add('on');
-  document.getElementById('focusName').textContent=a.label+' · '+a.title;
-  const first=convo.querySelector('.ev'); if(first) first.scrollIntoView({block:'center',behavior:'smooth'});
+/* render a unit's story into the map pane; highlight it in the sidebar */
+let currentSlug=null;
+function renderStory(slug){
+  const u=UNITS[slug]; if(!u) return;
+  currentSlug=slug;
+  document.getElementById('story').innerHTML=u.story.map(line).join("\n");
+  document.querySelectorAll('.unit').forEach(el=>
+    el.classList.toggle('current',el.dataset.slug===slug));
 }
-
-/* GPS next-maneuver card (the tutor's live action) + trip stats */
-const owned=CODEBASES[0].units.filter(u=>u.state==='OWNED').length, total=CODEBASES[0].units.length;
-document.getElementById('gps').innerHTML=`
-  <div class="turn-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20V10a4 4 0 0 1 4-4h6"/><path d="M15 2l4 4-4 4"/></svg></div>
-  <div><div class="g-kicker">Next maneuver</div>
-    <div class="g-main">Close the open gap — id collisions across groups</div>
-    <div class="g-sub">then prove <b>IMPLEMENT</b> · learn <i>dict identity vs value</i> first</div></div>`;
-document.getElementById('trip').innerHTML=`
-  <span><b>${owned}</b>/${total} owned</span>
-  <span class="prog"><i style="width:${Math.round(owned/total*100)}%"></i></span>
-  <span>ETA <b>${total-owned}</b> units</span>
-  <span>axis · <b>What it does</b></span>`;
 
 /* conversation */
 const convo=document.getElementById('convo');
@@ -454,7 +404,6 @@ function showMid(v){
   midSeg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
   document.getElementById('view-map').classList.toggle('on',v==='map');
   document.getElementById('view-conversation').classList.toggle('on',v==='conversation');
-  if(v==='map') requestAnimationFrame(drawTrail);
 }
 
 function clearFocus(){
@@ -497,13 +446,15 @@ function applyGrid(){
   document.getElementById('right').style.visibility=rightOpen?'visible':'hidden';
   document.getElementById('reopenLeft').classList.toggle('show',!leftOpen);
   document.getElementById('reopenRight').classList.toggle('show',!rightOpen);
-  setTimeout(()=>requestAnimationFrame(drawTrail),240);
 }
 document.getElementById('collapseLeft').addEventListener('click',()=>{leftOpen=false;applyGrid();});
 document.getElementById('reopenLeft').addEventListener('click',()=>{leftOpen=true;applyGrid();});
 document.getElementById('collapseRight').addEventListener('click',()=>{rightOpen=false;applyGrid();});
 document.getElementById('reopenRight').addEventListener('click',()=>{rightOpen=true;applyGrid();});
 applyGrid();
+
+/* open the map on the current unit */
+renderStory('_pinned_qa_group');
 </script>
 </body>
 </html>
