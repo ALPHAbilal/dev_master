@@ -71,13 +71,15 @@ textarea { border: none; outline: none; }
 .mid { background:var(--bg-app); display:flex; flex-direction:column; min-width:0; }
 .view { display:none; flex:1; min-height:0; }
 .view.on { display:flex; flex-direction:column; }
-.map-scroll { flex:1; overflow:auto; }
-.route-wrap { max-width:600px; margin:0 auto; padding:16px 22px 32px; }
+.map-scroll { flex:1; overflow-y:auto; overflow-x:hidden; }
+.route-wrap { max-width:680px; margin:0 auto; padding:22px 28px 44px; }
 
 /* unit story — the single unit's journey, plain English, borderless.
  * No terminal chrome, no title/rev, no axis header, no unit switcher:
- * the units live in the left sidebar; this pane is only the story. */
-.unit-story { font-family:var(--font-code); font-size:13px; line-height:1.85; white-space:pre; color:var(--text-secondary); }
+ * the units live in the left sidebar; this pane is only the story.
+ * Lines wrap inside the pane (never past its right edge) and the pane
+ * scrolls vertically when the story runs taller than the viewport. */
+.unit-story { font-family:var(--font-code); font-size:13.5px; line-height:2.15; white-space:pre-wrap; overflow-wrap:anywhere; color:var(--text-secondary); }
 .unit-story .o  { color:var(--accent); }
 .unit-story .od { color:var(--accent-dim); }
 .unit-story .g  { color:#e0a56f; }
