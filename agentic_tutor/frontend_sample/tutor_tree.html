@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tutor — tree</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#12151a;--term:#171b21;--bar:#232830;--line:#2b323b;
+  --fg:#c8c8bd;--dim:#5e6570;--faint:#39404a;
+  --amber:#d8b24d;--amber-d:#a98f3c;--gap:#d08a55;--green:#8fbf87;--cyan:#7fb6c4;
+  --code:"Cascadia Code","JetBrains Mono","SF Mono",Consolas,monospace;
+  background:var(--bg);color:var(--fg);font-family:var(--code);
+}
+body{min-height:100vh;padding:26px 18px 80px;}
+.head{max-width:960px;margin:0 auto 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.head h1{font-size:13px;font-weight:600;letter-spacing:.3px;}
+.head .note{font-size:11px;color:var(--dim);}
+.term{max-width:960px;margin:0 auto;background:var(--term);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,0.45);}
+.termbar{display:flex;align-items:center;gap:8px;padding:9px 13px;background:var(--bar);border-bottom:1px solid var(--line);}
+.dot{width:11px;height:11px;border-radius:50%;}
+.dot.r{background:#e0605a;}.dot.y{background:#e0b34d;}.dot.g{background:#5db65d;}
+.termbar .ttl{margin-left:8px;font-size:11px;color:var(--dim);}
+.termbar .rev{margin-left:auto;font-size:10px;color:var(--faint);}
+.screen{padding:18px 20px 22px;overflow-x:auto;}
+pre{font:13px/1.7 var(--code);white-space:pre;}
+.o{color:var(--amber);}.od{color:var(--amber-d);}.g{color:var(--gap);}.dm{color:var(--dim);}
+.fa{color:var(--faint);}.gr{color:var(--green);}.cy{color:var(--cyan);}.fg{color:var(--fg);}.b{font-weight:700;}
+.ret{color:var(--amber);}
+i{font-style:italic;}
+.cap{max-width:960px;margin:12px auto 0;font-size:11px;color:var(--dim);line-height:1.7;}
+.cap b{color:var(--fg);} .cap .o{color:var(--amber);}
+</style>
+</head>
+<body>
+<div class="head"><h1>tutor // tree</h1><span class="note">state · progress · verdict·category · method — and where each dive returns</span></div>
+<div class="term">
+  <div class="termbar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+    <span class="ttl">learner@tutor: ~/run_prompts.py — tree --meta</span><span class="rev">rev 50 · 2/6 owned</span></div>
+  <div class="screen"><pre id="out"></pre></div>
+</div>
+<div class="cap" id="cap"></div>
+<script>
+const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;");
+/* column: parts=[[text,cls?]...], pad plain length to width */
+function C(parts,width){let h="",n=0;for(const p of parts){const t=p[0],cls=p[1];h+=cls?`<span class="${cls}">${esc(t)}</span>`:esc(t);n+=t.length;}if(width&&n<width)h+=" ".repeat(width-n);return h;}
+const bar=(fill,total)=>[["▰".repeat(fill),"o"],["▱".repeat(total-fill),"fa"]];
+const L=[];
+/* helper builders */
+function file(name,meta){L.push(C([[name,"fg b"]],44)+C([[meta,"dm"]]));}
+function spacer(pfx){L.push(C([[pfx,"fa"]]));}
+/* unit line: prefix (box), glyph, name, state, prog[fill,total], verdict, category, method */
+function unit(pfx,glyph,gcls,name,state,scls,fill,total,verdict,vcls,cat,method,extra){
+  const col1=C([[pfx,"fa"],[glyph+" ",gcls],[name,"cy"]],44);
+  const col2=C([[state,scls]],9);
+  const col3=total?C([[fill+"/"+total+" ",("dm")],...bar(fill,total)],11):C([["",""]],11);
+  const meta=[];
+  if(verdict)meta.push([verdict+" ",vcls]);
+  if(cat)meta.push([cat+"  ","g"]);
+  if(extra)meta.push([extra+"  ","o b"]);
+  if(method)meta.push([method,"dm"]);
+  L.push(col1+col2+col3+C(meta));
+}
+/* return line: shows destination parent + the exact resumed question */
+function ret(pfx,parent,axis,q){
+  L.push(C([[pfx,"fa"],["↩ ","ret b"],["returns to ","fg"],[parent,"cy b"],["  ‹resumes "+axis+": ","dm"],['“'+q+'”',"od"],["›","dm"]]));
+}
+function sibling(pfx,name,note){
+  L.push(C([[pfx,"fa"],["○ ","dm"],[name,"cy"]],44)+C([["sibling","dm"]],9)+C([["queued  ","dm"],[note,"dm"]]));
+}
+
+/* ── run_prompts.py ─────────────────────────────────────────────────────── */
+file("run_prompts.py","2/6 owned");
+spacer("│");
+unit("├─ ","●","o","load_prompts",           "owned","od",3,3,"SOLID","o","correct-deep","route_grade→_advance_after_solid_locked");
+unit("├─ ","●","o","normalize_row",          "owned","od",3,3,"SOLID","o","correct-deep","route_grade→_advance_after_solid_locked");
+unit("├─ ","◐","o","_pinned_qa_group",       "here","o b",2,3,null,null,null,"route_grade→_push_child_locked","GAP ROBUSTNESS");
+spacer("│  │");
+unit("│  ├─ ","✓","o","dict_identity",       "owned","od",2,2,"SOLID","o","dive · correct-deep","commit_distill→seal");
+unit("│  │  └─ ","✓","o","hashing_keys",     "owned","od",2,2,"SOLID","o","dive · correct-deep","commit_distill→seal");
+ret ("│  │     ","dict_identity","MECHANISM","which do two equal dicts share — identity or value?");
+ret ("│  ├──── ","_pinned_qa_group","ROBUSTNESS","trace an input where a pinned id also appears unpinned");
+unit("│  ├─ ","◐","o","collision_semantics", "dive","o b",0,2,"SHAKY","od","shaky (1/2)","route_grade→_effective_verdict","◉ HERE");
+sibling("│  └─ ","dedupe_across_groups","non-blocking · sibling-hole");
+spacer("│");
+unit("├─ ","○","dm","_dedupe_by_id",          "queued","dm",0,2,null,null,null,"—");
+unit("├─ ","⊘","fa","build_prompt_batch",     "locked","dm",0,0,null,null,null,"—");
+unit("└─ ","⊘","fa","run_prompts",            "locked","dm",0,0,null,null,null,"—");
+spacer("");
+/* ── schema_loader.py ───────────────────────────────────────────────────── */
+file("schema_loader.py","0/2 owned");
+unit("├─ ","⊙","od","read_schema",           "parked","od",2,3,"SHAKY","od","resume→ROBUSTNESS","park→restore_parked_stack");
+unit("└─ ","○","dm","validate_row",           "queued","dm",0,2,null,null,null,"—");
+spacer("");
+L.push(C([["legend  ","dm"],["● ","o"],["owned  ","dm"],["◐ ","o"],["active  ","dm"],["○ ","dm"],["queued  ","dm"],["⊘ ","fa"],["locked  ","dm"],["⊙ ","od"],["parked   ","dm"],["↩ ","ret"],["returns-to a parent (with the exact resumed question)","dm"]]));
+
+document.getElementById("out").innerHTML=L.join("\n");
+document.getElementById("cap").innerHTML=
+ "<b>The return, made explicit.</b> Every dive that finished gets its own <span class='o'>↩ returns to …</span> line naming the <b>parent it popped back to</b>, the <b>axis</b>, and the <b>exact question that resumes</b> — so the learner always sees where they came back to, not just that they came back. Right of each unit: <b>verdict · category · method</b>, the same metadata as the live log, tying every row to the engine.";
+</script>
+</body>
+</html>

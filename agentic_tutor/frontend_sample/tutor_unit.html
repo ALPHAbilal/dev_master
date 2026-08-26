@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tutor — one unit</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#12151a;--term:#171b21;--bar:#232830;--line:#2b323b;
+  --fg:#cdcdc2;--dim:#67707b;--faint:#39404a;
+  --amber:#d8b24d;--amber-d:#b39442;--gap:#d08a55;--green:#8fbf87;--cyan:#8ec1cf;
+  --code:"Cascadia Code","JetBrains Mono","SF Mono",Consolas,monospace;
+  background:var(--bg);color:var(--fg);font-family:var(--code);
+}
+body{min-height:100vh;padding:26px 18px 80px;}
+.head{max-width:900px;margin:0 auto 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.head h1{font-size:13px;font-weight:600;letter-spacing:.3px;}
+.head .note{font-size:11px;color:var(--dim);}
+.term{max-width:900px;margin:0 auto;background:var(--term);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,0.45);}
+.termbar{display:flex;align-items:center;gap:8px;padding:9px 13px;background:var(--bar);border-bottom:1px solid var(--line);}
+.dot{width:11px;height:11px;border-radius:50%;}.dot.r{background:#e0605a;}.dot.y{background:#e0b34d;}.dot.g{background:#5db65d;}
+.termbar .ttl{margin-left:8px;font-size:11px;color:var(--dim);}
+.termbar .rev{margin-left:auto;font-size:10px;color:var(--faint);}
+/* unit switcher strip */
+.units{display:flex;flex-wrap:wrap;gap:2px;padding:9px 12px;border-bottom:1px solid var(--line);background:#141821;}
+.units .lbl{font-size:10px;color:var(--faint);align-self:center;margin-right:6px;}
+.units button{font:11px var(--code);color:var(--dim);padding:4px 9px;border-radius:5px;border:0;background:none;cursor:pointer;}
+.units button:hover{color:var(--fg);background:var(--bar);}
+.units button.on{color:var(--bg);background:var(--amber);font-weight:600;}
+.units button .s{opacity:.7;margin-right:5px;}
+.units button.on .s{opacity:1;}
+.screen{padding:20px 22px 24px;overflow-x:auto;min-height:360px;}
+pre{font:13px/1.75 var(--code);white-space:pre;}
+.o{color:var(--amber);}.od{color:var(--amber-d);}.g{color:var(--gap);}.dm{color:var(--dim);}
+.fa{color:var(--faint);}.gr{color:var(--green);}.cy{color:var(--cyan);}.fg{color:var(--fg);}.b{font-weight:700;}i{font-style:italic;}
+.cap{max-width:900px;margin:12px auto 0;font-size:11px;color:var(--dim);line-height:1.7;}
+.cap b{color:var(--fg);}
+</style>
+</head>
+<body>
+<div class="head"><h1>tutor // unit</h1><span class="note">one unit at a time · plain English · open another to switch</span></div>
+<div class="term">
+  <div class="termbar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+    <span class="ttl" id="ttl"></span><span class="rev">rev 50</span></div>
+  <div class="units" id="units"><span class="lbl">open:</span></div>
+  <div class="screen"><pre id="out"></pre></div>
+</div>
+<div class="cap" id="cap"></div>
+<script>
+const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;");
+function S(t,cls){return cls?`<span class="${cls}">${esc(t)}</span>`:esc(t);}
+
+/* plain-English axis names (the learner-facing wording the backend already uses) */
+const AX={COMPREHEND:"What it does",MECHANISM:"How it works",RATIONALE:"Why it's built this way",JUDGMENT:"When to use it",ROBUSTNESS:"What can break",INTEGRATION:"How it connects",EVOLUTION:"How to improve it"};
+
+/* ── units. story lines are plain English; each maps to a real engine event ──
+ * learned=teaching · proved=SOLID · gap=missing/misconception · dive=push_child
+ * return=resume_after_child · sealed=distill/OWNED · shaky · note=sibling · here */
+const UNITS={
+ load_prompts:{title:"Read the prompt file", status:"owned",
+   axes:[["COMPREHEND","done"],["MECHANISM","done"],["ROBUSTNESS","done"]],
+   story:[["learned",0,"the file is loaded and turned into rows"],
+          ["proved",0,"you can trace where the rows come from","COMPREHEND"],
+          ["sealed",0,"Read the prompt file"]]},
+ normalize_row:{title:"Coerce each row's shape", status:"owned",
+   axes:[["COMPREHEND","done"],["MECHANISM","done"],["RATIONALE","done"]],
+   story:[["learned",0,"each row gets a real pin flag, even when it's missing"],
+          ["proved",0,"you handled the row with no pin key","ROBUSTNESS"],
+          ["sealed",0,"Coerce each row's shape"]]},
+
+ _pinned_qa_group:{title:"Group pinned questions first", status:"here",
+   axes:[["COMPREHEND","done"],["MECHANISM","done"],["ROBUSTNESS","doing"]],
+   story:[
+     ["learned",0,"pinned items stay in the order they were given"],
+     ["proved",0,"you can read pinned-first ordering","COMPREHEND"],
+     ["proved",0,"the order survives because the two groups are joined","MECHANISM"],
+     ["note",0,"de-dupe across groups — worth doing, but it doesn't block you"],
+     ["gap",0,"the same id can appear in both groups — nothing removes the duplicate","ROBUSTNESS"],
+     ["dive",0,"Dict identity vs value","you needed this first"],
+       ["learned",1,"`is` checks identity, `==` checks value"],
+       ["gap",1,"to be sure, you needed how dict keys are matched"],
+       ["dive",1,"Why keys must hash","needed before that could click"],
+         ["learned",2,"membership checks the hash, then equality"],
+         ["proved",2,"you named a key Python can't hash","MECHANISM"],
+         ["sealed",2,"Why keys must hash"],
+       ["return",1,"Dict identity vs value",null,"which do two equal dicts share — identity or value?"],
+       ["proved",1,"two equal-looking dicts are still different objects","MECHANISM"],
+       ["sealed",1,"Dict identity vs value"],
+     ["return",0,"Group pinned questions first","ROBUSTNESS","trace an input where a pinned id also appears unpinned"],
+     ["dive",0,"What 'collision' means for ids","the gap came back once identity was solid"],
+       ["learned",1,"two equal ids mean one real question, not two"],
+       ["shaky",1,"still fuzzy on what the output length should be","COMPREHEND"],
+       ["here",1,"answer what the output length should be","MECHANISM"],
+   ]},
+
+ dict_identity:{title:"Dict identity vs value", status:"owned", dive:true,
+   axes:[["COMPREHEND","done"],["MECHANISM","done"]],
+   story:[["why",0,"You opened this because ids collided in Group pinned questions first"],
+          ["learned",0,"`is` checks identity, `==` checks value"],
+          ["proved",0,"two equal-looking dicts are still different objects","MECHANISM"],
+          ["sealed",0,"Dict identity vs value"],
+          ["return",0,"Group pinned questions first","ROBUSTNESS","trace an input where a pinned id also appears unpinned"]]},
+ hashing_keys:{title:"Why keys must hash", status:"owned", dive:true,
+   axes:[["COMPREHEND","done"],["MECHANISM","done"]],
+   story:[["why",0,"You opened this because identity needed how keys are matched"],
+          ["learned",0,"membership checks the hash, then equality"],
+          ["proved",0,"you named a key Python can't hash","MECHANISM"],
+          ["sealed",0,"Why keys must hash"],
+          ["return",0,"Dict identity vs value","MECHANISM","which do two equal dicts share — identity or value?"]]},
+ collision_semantics:{title:"What 'collision' means for ids", status:"here", dive:true,
+   axes:[["COMPREHEND","doing"],["MECHANISM","todo"]],
+   story:[["why",0,"You opened this because the collision gap came back"],
+          ["learned",0,"two equal ids mean one real question, not two"],
+          ["shaky",0,"still fuzzy on what the output length should be","COMPREHEND"],
+          ["here",0,"answer what the output length should be","MECHANISM"]]},
+
+ _dedupe_by_id:{title:"Drop duplicate ids", status:"queued",
+   axes:[["COMPREHEND","todo"],["MECHANISM","todo"]], story:[["locked",0,"Not started yet — it's next on the ladder."]]},
+ build_prompt_batch:{title:"Assemble the batch", status:"locked",
+   axes:[["COMPREHEND","todo"]], story:[["locked",0,"Locked until the earlier units are owned."]]},
+ run_prompts:{title:"Drive the whole run", status:"locked",
+   axes:[["COMPREHEND","todo"]], story:[["locked",0,"Locked until the earlier units are owned."]]},
+};
+const ORDER=["load_prompts","normalize_row","_pinned_qa_group","dict_identity","hashing_keys","collision_semantics","_dedupe_by_id","build_prompt_batch","run_prompts"];
+const STAT={owned:["●","o"],here:["◐","o b"],queued:["○","dm"],locked:["⊘","fa"]};
+
+/* render one line of the story in plain English */
+function line(row){
+  const [t,d,a,b,c]=row;
+  const rail=S("│  ".repeat(d),"fa");
+  const at=x=>x?S("  ‹"+AX[x]+"›","dm"):"";
+  switch(t){
+    case "why":     return rail+S("↪ ","dm")+S(a,"dm i");
+    case "learned": return rail+S("• ","dm")+S("Learned","dm")+"   "+S(a,"fg");
+    case "proved":  return rail+S("✓ ","o")+S("Proved","o b")+"    "+S(a,"fg")+at(b);
+    case "shaky":   return rail+S("~ ","od")+S("Almost","od b")+"    "+S(a,"fg")+at(b);
+    case "gap":     return rail+S("⚠ ","g")+S("Found a gap","g b")+"  "+S(a,"fg")+at(b);
+    case "note":    return rail+S("○ ","dm")+S("Noted for later","dm")+"  "+S(a,"dm");
+    case "dive":    return rail+S("↳ ","g")+S((d>0?"Needed first":"Went to learn first")+" — ","g")+S(a,"cy b")+(b?S("   ("+b+")","dm"):"");
+    case "sealed":  return rail+S("★ ","o")+S("Sealed — you own ","o")+S(a,"cy");
+    case "return":  {
+      const head=rail+S("↩ ","o b")+S("Came back to ","o b")+S(a,"cy b")+(b?S("  · continue ","o")+S("‹"+AX[b]+"›","od"):"");
+      const q=c?"\n"+S("│  ".repeat(d),"fa")+S("   picking up: ","dm")+S("“"+c+"”","od i"):"";
+      return head+q;
+    }
+    case "here":    return rail+S("◉ ","o b")+S("You are here","o b")+" — "+S(a,"fg")+at(b);
+    case "locked":  return S(a,"dm");
+  }
+  return "";
+}
+
+function render(slug){
+  const u=UNITS[slug];
+  document.getElementById("ttl").textContent="learner@tutor: ~/run_prompts.py::"+slug;
+  /* switcher */
+  const strip=document.getElementById("units");
+  strip.querySelectorAll("button").forEach(b=>b.remove());
+  ORDER.forEach(s=>{
+    const uu=UNITS[s];const st=STAT[uu.status]||STAT.queued;
+    const btn=document.createElement("button");if(s===slug)btn.className="on";
+    btn.innerHTML=`<span class="s">${st[0]}</span>${uu.dive?"↳":""}${s}`;
+    btn.onclick=()=>render(s);strip.appendChild(btn);
+  });
+  /* header + axes + story */
+  const done=u.axes.filter(a=>a[1]==="done").length;
+  const head=S("You are learning","dm")+"\n"+S("  "+u.title,"fg b")+S("   "+slug,"cy")+"\n\n";
+  const axLine=u.axes.map(([n,st])=>{
+    const g=st==="done"?["✓","o"]:st==="doing"?["◐","o b"]:["·","fa"];
+    const nm=st==="done"?["fg"]:st==="doing"?["fg"]:["dm"];
+    return S(g[0]+" ",g[1])+S(AX[n],nm[0]);
+  }).join(S("    ","fa"));
+  const axes=S("Understanding  ","dm")+axLine+S("     "+done+" of "+u.axes.length+" solid","dm")+"\n"+S("─".repeat(60),"fa")+"\n\n";
+  const story=u.story.map(line).join("\n");
+  document.getElementById("out").innerHTML=head+axes+story;
+  document.getElementById("cap").innerHTML=
+   u.status==="here"||slug==="_pinned_qa_group"
+   ? "<b>One unit, plain English.</b> The <span class='o'>↩ Came back to …</span> lines name where you returned and the exact question that picks up again — no engine words. Open any unit above to switch the whole view to its story."
+   : "<b>Open another unit</b> from the strip above — the terminal swaps entirely to that unit's own story.";
+}
+render("_pinned_qa_group");
+</script>
+</body>
+</html>

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tutor — 6 map concepts</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{font-size:16px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.12) transparent;}
+body{line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh;}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:none;}
+::-webkit-scrollbar{width:8px;height:8px;}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.14);border-radius:3px;}
+:root{
+  --bg:#171b1f;--app:#20252a;--surface:#2b3138;--card:#333a42;--elev:#3f474f;
+  --text:#f4f1e6;--sec:#c6c2b3;--muted:#8d8b7e;--dis:#5e5d54;
+  --accent:#d8b24d;--dim:#a98f3c;--soft:rgba(216,178,77,0.12);--gap:#cf8f5a;--line:#3a4149;
+  --ui:"Segoe UI",Tahoma,sans-serif;--code:"Cascadia Code","JetBrains Mono",Consolas,monospace;
+  background:var(--bg);color:var(--text);font-family:var(--ui);
+}
+.top{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line);padding:14px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.top h1{font-size:14px;font-weight:600;}
+.top .note{font-size:11px;color:var(--muted);}
+.seg{margin-left:auto;display:inline-flex;gap:2px;background:var(--surface);border-radius:9px;padding:3px;flex-wrap:wrap;}
+.seg button{font-size:11px;font-weight:600;color:var(--muted);padding:6px 11px;border-radius:6px;}
+.seg button:hover{color:var(--sec);} .seg button.on{color:var(--bg);background:var(--accent);}
+.stage{max-width:820px;margin:0 auto;padding:18px 20px 100px;}
+.variant{display:none;} .variant.on{display:block;}
+.vh{font-size:11.5px;color:var(--muted);line-height:1.6;padding:2px 2px 20px;}
+.vh b{color:var(--sec);font-weight:600;}
+.slug{font-family:var(--code);}
+.mono{font-family:var(--code);}
+.pill{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-radius:3px;padding:2px 6px;color:var(--muted);background:var(--surface);}
+.pill.dive{color:var(--gap);background:rgba(207,143,90,0.12);}
+.pill.here{color:var(--bg);background:var(--accent);}
+.pill.done{color:var(--accent);background:var(--soft);}
+
+/* ── C1 Focus stack ── */
+.c1 .crumb{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font:11px var(--code);color:var(--muted);padding-bottom:20px;}
+.c1 .crumb .c{color:var(--sec);} .c1 .crumb .c.cur{color:var(--bg);background:var(--accent);padding:2px 7px;border-radius:5px;font-weight:600;}
+.c1 .crumb .s{color:var(--dis);}
+.c1 .band{padding:16px 0;border-top:1px solid var(--line);}
+.c1 .eb{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:11px;}
+.c1 .eb.gap{color:var(--gap);}
+.c1 .causal{position:relative;padding-left:20px;}
+.c1 .causal::before{content:"";position:absolute;left:4px;top:6px;bottom:6px;width:1.5px;background:var(--line);}
+.c1 .cz{position:relative;padding:4px 0;font-size:12.5px;color:var(--sec);}
+.c1 .cz::before{content:"";position:absolute;left:-16px;top:9px;width:7px;height:7px;border-radius:50%;background:var(--dis);box-shadow:0 0 0 3px var(--bg);}
+.c1 .cz.gap::before{background:var(--gap);} .c1 .cz.dive::before{background:transparent;box-shadow:inset 0 0 0 2px var(--dim),0 0 0 3px var(--bg);}
+.c1 .cz .k{font:9px var(--code);text-transform:uppercase;color:var(--muted);margin-right:8px;}
+.c1 .focus{padding:20px;background:var(--surface);border-left:2px solid var(--accent);}
+.c1 .focus h2{font:600 16px var(--code);} .c1 .focus .t{margin-top:4px;color:var(--sec);font-size:12.5px;}
+.c1 .axes{display:grid;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);}
+.c1 .ax{display:grid;grid-template-columns:8px 1fr auto;gap:9px;align-items:center;font-size:11.5px;color:var(--sec);}
+.c1 .ax .d{width:7px;height:7px;border-radius:50%;background:var(--dis);}
+.c1 .ax.SOLID .d{background:var(--accent);} .c1 .ax.SHAKY .d{background:#9f894c;} .c1 .ax.MISSING .d{background:var(--gap);}
+.c1 .ax .v{font:9.5px var(--code);color:var(--muted);}
+.c1 .ret{display:flex;gap:9px;font-size:12px;color:var(--sec);}
+.c1 .ret strong{font:600 11.5px var(--code);color:var(--text);}
+
+/* ── C2 Ladder ── */
+.c2 .file{font:600 14px var(--code);padding:8px 0 6px;}
+.c2 .rail{position:relative;margin-left:6px;padding-left:18px;}
+.c2 .rail::before{content:"";position:absolute;left:0;top:-2px;bottom:12px;width:1.5px;background:var(--line);}
+.c2 .rail.dive::before{background:var(--dim);}
+.c2 .row{position:relative;display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:7px;}
+.c2 .row:hover{background:var(--surface);}
+.c2 .row.cur{background:var(--soft);}
+.c2 .row::before{content:"";position:absolute;left:-18px;top:50%;width:15px;height:1.5px;background:var(--line);}
+.c2 .rail.dive>.row::before{background:var(--dim);}
+.c2 .m{width:12px;height:12px;flex-shrink:0;}
+.c2 .nm{font-size:12.5px;color:var(--sec);} .c2 .row.cur .nm{color:var(--text);}
+.c2 .meta{margin-left:auto;font:10px var(--code);color:var(--dis);}
+.c2 .rlabel{font-size:10.5px;color:var(--dim);font-style:italic;padding:2px 0 6px 4px;}
+
+/* ── C3 Call stack ── */
+.c3 .wrap{display:grid;grid-template-columns:1fr 240px;gap:20px;}
+.c3 .stack{display:flex;flex-direction:column-reverse;gap:8px;}
+.c3 .frame{background:var(--surface);border-left:3px solid var(--dim);border-radius:8px;padding:12px 14px;}
+.c3 .frame.top{border-left-color:var(--accent);background:var(--soft);box-shadow:0 0 0 1px rgba(216,178,77,0.25);}
+.c3 .frame.popped{opacity:.5;border-left-color:var(--accent);}
+.c3 .fh{display:flex;align-items:center;gap:8px;}
+.c3 .fh .nm{font:600 13px var(--code);}
+.c3 .fh .lv{margin-left:auto;font:9px var(--code);color:var(--muted);}
+.c3 .fw{font-size:11.5px;color:var(--muted);margin-top:5px;}
+.c3 .fw b{color:var(--sec);}
+.c3 .push{text-align:center;font:9px var(--code);color:var(--dim);letter-spacing:.1em;text-transform:uppercase;}
+.c3 .aside h4{font:9.5px var(--code);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px;}
+.c3 .lad{display:grid;gap:2px;}
+.c3 .li{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--sec);padding:4px 6px;border-radius:6px;}
+.c3 .li .m{width:10px;height:10px;}
+
+/* ── C4 metro / C5 trace / C6 lanes: svg-driven ── */
+.svgbox{width:100%;overflow-x:auto;}
+.svgbox svg{display:block;}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:16px;font-size:11px;color:var(--muted);}
+.legend span{display:inline-flex;align-items:center;gap:6px;}
+.legend i{width:16px;height:0;border-top-width:2px;border-top-style:solid;display:inline-block;}
+.legend b{width:10px;height:10px;border-radius:50%;display:inline-block;}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>Map concepts</h1><span class="note">same journey · pick one</span>
+  <div class="seg" id="seg">
+    <button data-v="1" class="on">1 · Focus stack</button>
+    <button data-v="2">2 · Ladder</button>
+    <button data-v="3">3 · Call stack</button>
+    <button data-v="4">4 · Metro</button>
+    <button data-v="5">5 · Loop trace</button>
+    <button data-v="6">6 · Depth lanes</button>
+  </div>
+</div>
+<div class="stage">
+  <div class="variant on c1" id="v1"><div class="vh"><b>Focus stack.</b> Present-tense. Only where you are now — the dive chain that led here, the live unit + its axes, the next proof, and where you'll return. History folds away. Best for the learner mid-turn; the whole tree is deliberately hidden.</div><div id="c1"></div></div>
+  <div class="variant c2" id="v2"><div class="vh"><b>Clean ladder.</b> The full tree, but <b>one line per unit</b> — no expanded detail — so the rails stay short and never cross content. Dives indent on a gold rail; return is a labelled line. Best overview at a glance.</div><div id="c2"></div></div>
+  <div class="variant c3" id="v3"><div class="vh"><b>Call stack.</b> The Router's subhole-stack drawn literally, like a debugger. A dive <b>pushes</b> a frame on top; the live frame is the deepest. Returned dives are popped (faded ✓). The ladder rides alongside. Maps 1:1 to the <span class="slug">stack</span> table.</div><div id="c3"></div></div>
+  <div class="variant c4" id="v4"><div class="vh"><b>Metro line.</b> Units are stations on a line. A dive is a <b>branch line</b> that leaves at the gap station and loops back where it rejoins (the return). You are the train ●. Spatial and memorable; scales to a few dives, not dozens.</div><div class="svgbox" id="c4"></div><div class="legend" id="c4leg"></div></div>
+  <div class="variant c5" id="v5"><div class="vh"><b>Loop trace.</b> Time runs left→right in the exact order the loop ran. Depth is vertical: a dive <b>dips down</b>, a return <b>rises back</b>. One thread through every event. Best for "what actually happened," like an execution trace.</div><div class="svgbox" id="c5"></div><div class="legend" id="c5leg"></div></div>
+  <div class="variant c6" id="v6"><div class="vh"><b>Depth lanes.</b> git-graph columns: each depth is its own vertical lane, so lines never share a corridor. A dive branches to the next lane; a return merges back. All text sits to the right of the lanes — connectors never touch content. The tangle-proof version.</div><div class="svgbox" id="c6"></div><div class="legend" id="c6leg"></div></div>
+</div>
+
+<script>
+const NS="http://www.w3.org/2000/svg";
+const AX={COMPREHEND:"What it does",MECHANISM:"How it works",RATIONALE:"Why designed so",JUDGMENT:"When to use",ROBUSTNESS:"What breaks",INTEGRATION:"How it connects",EVOLUTION:"How to improve"};
+const C={accent:"#d8b24d",dim:"#a98f3c",line:"#3a4149",gap:"#cf8f5a",dis:"#5e5d54",soft:"rgba(216,178,77,0.20)",bg:"#171b1f",sec:"#c6c2b3",muted:"#8d8b7e"};
+
+/* Journey tree (mirrors JourneyReader). */
+const UNITS=[
+  {slug:"load_prompts",title:"Read the prompt file",state:"OWNED",axes:[["COMPREHEND","SOLID"],["MECHANISM","SOLID"],["ROBUSTNESS","SOLID"]]},
+  {slug:"normalize_row",title:"Coerce each row's shape",state:"OWNED",axes:[["COMPREHEND","SOLID"],["MECHANISM","SOLID"],["RATIONALE","SOLID"]]},
+  {slug:"_pinned_qa_group",title:"Group pinned questions first",state:"PROBED",parent_of_here:true,
+   resume:"trace an input where a pinned id also appears unpinned",
+   axes:[["COMPREHEND","SOLID"],["MECHANISM","SOLID"],["ROBUSTNESS","SHAKY"]],
+   siblings:[{slug:"dedupe_across_groups",title:"De-dupe ids across groups"}],
+   children:[
+     {slug:"dict_identity",title:"Dict identity vs value",state:"OWNED",tag:"dive",returned:{resume:"trace an input where a pinned id also appears unpinned"},
+      axes:[["COMPREHEND","SOLID"],["MECHANISM","SOLID"]],
+      children:[
+        {slug:"hashing_keys",title:"Why keys must hash",state:"OWNED",tag:"dive",returned:{resume:"which do two equal dicts share — identity or value?"},
+         axes:[["COMPREHEND","SOLID"],["MECHANISM","SOLID"]]},
+      ]},
+     {slug:"collision_semantics",title:"What 'collision' means for ids",state:"CURRENT",tag:"dive",
+      axes:[["COMPREHEND","SHAKY"],["MECHANISM","MISSING"]]},
+   ]},
+  {slug:"_dedupe_by_id",title:"Drop duplicate ids",state:"QUEUED",axes:[["COMPREHEND","UNGRADED"],["MECHANISM","UNGRADED"]]},
+  {slug:"build_prompt_batch",title:"Assemble the batch",state:"LOCKED",axes:[["COMPREHEND","UNGRADED"]]},
+  {slug:"run_prompts",title:"Drive the whole run",state:"LOCKED",axes:[["COMPREHEND","UNGRADED"]]},
+];
+const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
+const solid=u=>u.axes.filter(a=>a[1]==="SOLID").length;
+function svgMarker(state,frac){
+  const cx=6,cy=6,r=4.4;
+  if(state==="OWNED")return `<circle cx="6" cy="6" r="4.6" fill="${C.accent}"/>`;
+  if(state==="CURRENT")return `<circle cx="6" cy="6" r="6" fill="none" stroke="${C.soft}" stroke-width="2"/><circle cx="6" cy="6" r="3.8" fill="${C.accent}"/>`;
+  if(state==="QUEUED")return `<circle cx="6" cy="6" r="4.4" fill="none" stroke="${C.line}" stroke-width="1.4"/>`;
+  if(state==="LOCKED")return `<circle cx="6" cy="6" r="4.4" fill="none" stroke="${C.line}" stroke-width="1.4" stroke-dasharray="2 2"/>`;
+  if(state==="PARKED")return `<circle cx="6" cy="6" r="4.6" fill="none" stroke="${C.dim}" stroke-width="1.4"/><circle cx="6" cy="6" r="1.8" fill="${C.dim}"/>`;
+  const a0=-Math.PI/2,a1=-Math.PI/2+2*Math.PI*frac,x0=cx+r*Math.cos(a0),y0=cy+r*Math.sin(a0),x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1);
+  return `<circle cx="6" cy="6" r="4.4" fill="none" stroke="${C.line}" stroke-width="1.4"/><path d="M ${x0} ${y0} A ${r} ${r} 0 ${frac>.5?1:0} 1 ${x1} ${y1}" stroke="${C.accent}" stroke-width="1.7" fill="none" stroke-linecap="round"/>`;
+}
+const mkSpan=(u)=>`<svg class="m" viewBox="0 0 12 12">${svgMarker(u.state,solid(u)/u.axes.length)}</svg>`;
+
+/* live path: root → … → CURRENT */
+function livePath(){const p=[];let lvl=UNITS;while(lvl){const u=lvl.find(x=>x.state==="CURRENT"||x.parent_of_here);if(!u)break;p.push(u);if(u.state==="CURRENT")break;lvl=u.children;}return p;}
+
+/* ══ C1 focus stack ══ */
+(function(){
+  const path=livePath(),cur=path[path.length-1],parent=path[path.length-2];
+  const root=document.getElementById("c1");
+  let cr=`<div class="crumb"><span class="c">run_prompts.py</span>`;
+  path.forEach((u,i)=>cr+=`<span class="s">›</span><span class="c${i===path.length-1?" cur":""}">${u.slug}</span>`);
+  cr+=`</div>`;
+  root.innerHTML=cr+
+   `<div class="band"><div class="eb gap">Why you are here</div><div class="causal">
+      <div class="cz"><span class="k">unit</span>Working <span class="slug">${parent?parent.slug:cur.slug}</span></div>
+      <div class="cz gap"><span class="k">gap</span>ids collide across groups — no dedupe</div>
+      <div class="cz dive"><span class="k">dive</span>into <span class="slug">${cur.slug}</span> — missing prerequisite</div>
+    </div></div>
+    <div class="focus"><h2>${cur.slug}</h2><div class="t">${cur.title}</div>
+      <div class="axes">${cur.axes.map(([n,v])=>`<div class="ax ${v}"><span class="d"></span><span>${AX[n]}</span><span class="v">${v}</span></div>`).join("")}</div>
+    </div>
+    <div class="band"><div class="eb">Next proof</div><div class="ret"><div>Predict the output length for two equal ids — then we grade MECHANISM.</div></div></div>
+    <div class="band"><div class="eb">When this closes</div><div class="ret"><div><strong>↩ ${parent?parent.slug:"parent"}</strong> — resumes “${parent?parent.resume:""}”</div></div></div>`;
+})();
+
+/* ══ C2 clean ladder ══ */
+(function(){
+  const root=document.getElementById("c2");
+  root.appendChild(el("div","file","run_prompts.py"));
+  function render(list,dive){
+    const rail=el("div","rail"+(dive?" dive":""));
+    list.forEach(u=>{
+      const row=el("div","row"+(u.state==="CURRENT"?" cur":""));
+      row.innerHTML=`${mkSpan(u)}<span class="nm"><span class="slug">${u.slug}</span> — ${u.title}</span>`+
+        (u.state==="CURRENT"?`<span class="pill here" style="margin-left:6px">here</span>`:"")+
+        (u.tag==="dive"?`<span class="pill ${u.returned?'done':'dive'}" style="margin-left:6px">${u.returned?'dive·done':'dive'}</span>`:"")+
+        `<span class="meta">${solid(u)}/${u.axes.length}</span>`;
+      rail.appendChild(row);
+      if(u.children)rail.appendChild(render(u.children,true));
+      if(u.returned)rail.appendChild(el("div","rlabel",`↩ returned — resumed “${u.returned.resume}”`));
+      if(u.siblings)u.siblings.forEach(s=>{const r=el("div","row");r.innerHTML=`<svg class="m" viewBox="0 0 12 12">${svgMarker("QUEUED",0)}</svg><span class="nm"><span class="slug">${s.slug}</span> — ${s.title}</span><span class="pill sib" style="margin-left:6px">sibling</span><span class="meta">queued</span>`;rail.appendChild(r);});
+    });
+    return rail;
+  }
+  root.appendChild(render(UNITS,false));
+})();
+
+/* ══ C3 call stack ══ */
+(function(){
+  const path=livePath(); /* deepest last = top of stack */
+  const root=document.getElementById("c3");
+  const wrap=el("div","wrap");
+  const stack=el("div","stack");
+  path.forEach((u,i)=>{
+    const top=i===path.length-1;
+    const f=el("div","frame"+(top?" top":""));
+    f.innerHTML=`<div class="fh"><span class="nm">${u.slug}</span><span class="lv">frame ${i}${top?" · top":""}</span></div>
+      <div class="fw">${top?`working <b>MECHANISM</b> — awaiting your answer`:`paused · resumes <b>“${u.resume||''}”</b>`}</div>`;
+    stack.appendChild(f);
+    if(i<path.length-1) stack.appendChild(el("div","push","▲ pushed a dive"));
+  });
+  /* popped (returned) frames shown below the live stack */
+  const popped=el("div","stack");
+  [{slug:"hashing_keys"},{slug:"dict_identity"}].forEach(u=>{const f=el("div","frame popped");f.innerHTML=`<div class="fh"><span class="nm">${u.slug}</span><span class="lv">popped ✓</span></div><div class="fw">returned to parent</div>`;popped.appendChild(f);});
+  const aside=el("div","aside");
+  aside.innerHTML=`<h4>Ladder</h4>`;
+  const lad=el("div","lad");
+  UNITS.forEach(u=>{const li=el("div","li");li.innerHTML=`${mkSpan(u)}<span class="slug">${u.slug}</span>`;if(u.state==="CURRENT")li.style.background="var(--soft)";lad.appendChild(li);});
+  aside.appendChild(lad);
+  const left=el("div"); left.appendChild(el("div","eb",""));
+  left.appendChild(el("div",null,'<div style="font:9.5px var(--code);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px">Live stack (top = you are here)</div>'));
+  left.appendChild(stack);
+  left.appendChild(el("div",null,'<div style="font:9.5px var(--code);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:18px 0 10px">Popped this journey</div>'));
+  left.appendChild(popped);
+  wrap.appendChild(left);wrap.appendChild(aside);root.appendChild(wrap);
+})();
+
+/* ══ C4 metro ══ */
+(function(){
+  const W=780,H=300,x0=60,gap=110,mainY=90;
+  const stations=[["load_prompts","OWNED"],["normalize_row","OWNED"],["_pinned_qa_group","PROBED"],["_dedupe_by_id","QUEUED"],["build_prompt_batch","LOCKED"],["run_prompts","LOCKED"]];
+  const svg=document.createElementNS(NS,"svg");svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.setAttribute("width",W);svg.setAttribute("height",H);
+  const P=(d,st,w,dash)=>{const p=document.createElementNS(NS,"path");p.setAttribute("d",d);p.setAttribute("fill","none");p.setAttribute("stroke",st);p.setAttribute("stroke-width",w);p.setAttribute("stroke-linecap","round");if(dash)p.setAttribute("stroke-dasharray",dash);svg.appendChild(p);};
+  const dot=(x,y,st,fr,r=6)=>{const g=document.createElementNS(NS,"g");g.setAttribute("transform",`translate(${x-6},${y-6}) scale(${r/6})`);g.innerHTML=svgMarker(st,fr);svg.appendChild(g);};
+  const label=(x,y,t,col)=>{const e=document.createElementNS(NS,"text");e.setAttribute("x",x);e.setAttribute("y",y);e.setAttribute("fill",col||C.sec);e.setAttribute("font-size","10.5");e.setAttribute("font-family","var(--code)");e.setAttribute("text-anchor","middle");e.textContent=t;svg.appendChild(e);};
+  /* main line */
+  P(`M ${x0} ${mainY} H ${x0+gap*(stations.length-1)}`,C.line,3);
+  /* dive branch off station 2 (_pinned) down to two stations, looping back */
+  const gx=x0+gap*2, by=210;
+  P(`M ${gx} ${mainY} C ${gx} ${by-30}, ${gx+30} ${by}, ${gx+60} ${by} H ${gx+150}`,C.dim,2.5,"5 5");
+  /* return: branch rejoins main after the gap station */
+  P(`M ${gx+150} ${by} C ${gx+220} ${by}, ${gx+gap-10} ${mainY+30}, ${gx+gap} ${mainY}`,C.accent,2.5);
+  /* stations */
+  stations.forEach((s,i)=>{const x=x0+gap*i;dot(x,mainY,s[1],0.6,7);label(x,mainY-16,s[0],s[1]==="LOCKED"?C.dis:C.sec);});
+  label(gx+30,by-12,"dive",C.gap);
+  dot(gx+60,by,"OWNED",1,6);label(gx+60,by+20,"dict_identity",C.sec);
+  dot(gx+150,by,"OWNED",1,6);label(gx+150,by+20,"hashing_keys",C.sec);
+  label(gx+gap-6,mainY+26,"↩ return",C.accent);
+  /* the train = current position (on the dive, deepest) — put a moving marker on collision branch */
+  dot(gx+105,by,"CURRENT",0.4,8);label(gx+105,by+34,"collision_semantics · here",C.accent);
+  document.getElementById("c4").appendChild(svg);
+  document.getElementById("c4leg").innerHTML=`<span><i style="border-color:${C.line}"></i>main line</span><span><i style="border-color:${C.dim};border-top-style:dashed"></i>dive branch</span><span><i style="border-color:${C.accent}"></i>return</span><span><b style="background:${C.accent}"></b>you (train)</span>`;
+})();
+
+/* ══ C5 loop trace ══ */
+(function(){
+  /* events in loop order; depth = y band */
+  const ev=[
+    {t:"unit",d:0,x:0,lab:"_pinned_qa_group"},
+    {t:"taught",d:0,x:1},{t:"proven",d:0,x:2},{t:"gap",d:0,x:3,lab:"ids collide"},
+    {t:"dive",d:1,x:3.6,lab:"dict_identity"},
+    {t:"taught",d:1,x:4.4},{t:"dive",d:2,x:5,lab:"hashing_keys"},
+    {t:"taught",d:2,x:5.6},{t:"proven",d:2,x:6.3},
+    {t:"return",d:1,x:6.9,lab:"↩ dict_identity"},
+    {t:"proven",d:1,x:7.6},
+    {t:"return",d:0,x:8.2,lab:"↩ _pinned_qa_group"},
+    {t:"dive",d:1,x:8.9,lab:"collision_semantics"},
+    {t:"taught",d:1,x:9.6},{t:"probe",d:1,x:10.3},{t:"here",d:1,x:11,lab:"here"},
+  ];
+  const W=820,padL=40,padR=30,stepX=64,bandY=70,H=70+3*bandY+40;
+  const X=e=>padL+e.x*stepX, Y=e=>60+e.d*bandY;
+  const svg=document.createElementNS(NS,"svg");svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.setAttribute("width",W);svg.setAttribute("height",H);
+  const P=(d,st,w,dash)=>{const p=document.createElementNS(NS,"path");p.setAttribute("d",d);p.setAttribute("fill","none");p.setAttribute("stroke",st);p.setAttribute("stroke-width",w);p.setAttribute("stroke-linecap","round");if(dash)p.setAttribute("stroke-dasharray",dash);svg.appendChild(p);};
+  const label=(x,y,t,col,anch)=>{const e=document.createElementNS(NS,"text");e.setAttribute("x",x);e.setAttribute("y",y);e.setAttribute("fill",col||C.muted);e.setAttribute("font-size","9.5");e.setAttribute("font-family","var(--code)");if(anch)e.setAttribute("text-anchor",anch);svg.appendChild(e);e.textContent=t;};
+  /* depth band guides */
+  for(let d=0;d<3;d++){P(`M ${padL} ${60+d*bandY} H ${W-padR}`,"rgba(255,255,255,0.04)",1);label(6,64+d*bandY,"depth "+d,C.dis);}
+  /* thread */
+  let dd=`M ${X(ev[0])} ${Y(ev[0])}`;
+  for(let i=1;i<ev.length;i++){const a=ev[i-1],b=ev[i];const mx=(X(a)+X(b))/2;dd+=` C ${mx} ${Y(a)}, ${mx} ${Y(b)}, ${X(b)} ${Y(b)}`;}
+  P(dd,C.dim,2);
+  /* dots */
+  const col={taught:C.sec,proven:C.accent,gap:C.gap,probe:C.muted,dive:C.gap,return:C.accent,unit:C.sec,here:C.accent};
+  ev.forEach(e=>{
+    const c=col[e.t]||C.muted;
+    const cir=document.createElementNS(NS,"circle");cir.setAttribute("cx",X(e));cir.setAttribute("cy",Y(e));cir.setAttribute("r",e.t==="here"?6:4);cir.setAttribute("fill",e.t==="here"?C.accent:c);if(e.t==="dive"||e.t==="return"){cir.setAttribute("fill","none");cir.setAttribute("stroke",c);cir.setAttribute("stroke-width",2);}svg.appendChild(cir);
+    if(e.t==="here"){const h=document.createElementNS(NS,"circle");h.setAttribute("cx",X(e));h.setAttribute("cy",Y(e));h.setAttribute("r",10);h.setAttribute("fill","none");h.setAttribute("stroke",C.soft);h.setAttribute("stroke-width",2);svg.appendChild(h);}
+    if(e.lab)label(X(e),Y(e)-11,e.lab,c,"middle");
+  });
+  document.getElementById("c5").appendChild(svg);
+  document.getElementById("c5leg").innerHTML=`<span><b style="background:${C.accent}"></b>proven</span><span><b style="background:${C.gap}"></b>gap</span><span><b style="border:2px solid ${C.gap};background:none"></b>dive ↓</span><span><b style="border:2px solid ${C.accent};background:none"></b>return ↑</span>`;
+})();
+
+/* ══ C6 depth lanes ══ */
+(function(){
+  /* flatten tree to rows with depth + parent index for branch/merge */
+  const rows=[];
+  (function walk(list,depth,parentIdx){list.forEach(u=>{
+    const idx=rows.length;
+    rows.push({u,depth,parentIdx,branch:u.tag==="dive"&&depth>0,ret:!!u.returned});
+    if(u.children)walk(u.children,depth+1,idx);
+    if(u.siblings)u.siblings.forEach(s=>rows.push({u:{...s,state:"QUEUED",axes:[["COMPREHEND","UNGRADED"]],sib:true},depth,parentIdx:idx}));
+  });})(UNITS,0,-1);
+  const laneX=d=>26+d*26, rowY=i=>24+i*40, textX=Math.max(...rows.map(r=>r.depth))*26+50;
+  const W=820,H=rowY(rows.length)+10;
+  const svg=document.createElementNS(NS,"svg");svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.setAttribute("width",W);svg.setAttribute("height",H);
+  const P=(d,st,w,dash)=>{const p=document.createElementNS(NS,"path");p.setAttribute("d",d);p.setAttribute("fill","none");p.setAttribute("stroke",st);p.setAttribute("stroke-width",w);p.setAttribute("stroke-linecap","round");if(dash)p.setAttribute("stroke-dasharray",dash);svg.appendChild(p);};
+  /* vertical lane segments: connect each row to previous row on same depth or its parent */
+  rows.forEach((r,i)=>{
+    const x=laneX(r.depth),y=rowY(i);
+    /* find previous row at same depth with same parent chain (simple: previous row with depth>=current until we hit lower) */
+    if(r.parentIdx>=0){
+      const px=laneX(rows[r.parentIdx].depth),py=rowY(r.parentIdx);
+      if(r.depth>rows[r.parentIdx].depth){ /* dive branch: curve from parent lane to this lane */
+        P(`M ${px} ${py+8} C ${px} ${y-14}, ${x} ${y-20}, ${x} ${y}`, r.u.sib?C.line:C.dim, r.u.sib?1.4:1.7, r.u.sib?"2 3":"4 4");
+      } else { /* same lane continuation */
+        P(`M ${px} ${py} L ${x} ${y}`,C.line,1.5);
+      }
+    }
+    /* straight lane down to next same-depth sibling handled by their own parent link */
+    /* return merge: from this row's lane back to parent lane just below */
+    if(r.ret){const px=laneX(rows[r.parentIdx].depth),py=rowY(r.parentIdx);
+      P(`M ${x} ${y+8} C ${x} ${y+24}, ${px} ${y+18}, ${px} ${py+22}`,C.accent,1.6);
+    }
+  });
+  /* trunk between consecutive depth-0 rows */
+  const roots=rows.map((r,i)=>({r,i})).filter(o=>o.r.depth===0);
+  for(let k=1;k<roots.length;k++)P(`M ${laneX(0)} ${rowY(roots[k-1].i)+8} L ${laneX(0)} ${rowY(roots[k].i)-8}`,C.line,1.5);
+  /* markers + text */
+  rows.forEach((r,i)=>{
+    const x=laneX(r.depth),y=rowY(i);
+    const g=document.createElementNS(NS,"g");g.setAttribute("transform",`translate(${x-6},${y-6})`);g.innerHTML=`<svg viewBox="0 0 12 12" width="12" height="12">${svgMarker(r.u.state,solid(r.u)/r.u.axes.length)}</svg>`;svg.appendChild(g);
+    const tx=textX;
+    const nm=document.createElementNS(NS,"text");nm.setAttribute("x",tx);nm.setAttribute("y",y+4);nm.setAttribute("font-size","12");nm.setAttribute("font-family","var(--code)");nm.setAttribute("fill",r.u.state==="CURRENT"?C.accent:(r.u.state==="LOCKED"?C.dis:C.sec));nm.textContent=r.u.slug+" — "+r.u.title;svg.appendChild(nm);
+    if(r.u.state==="CURRENT"){const b=document.createElementNS(NS,"text");b.setAttribute("x",tx+nm.getComputedTextLength?tx:tx);}
+    if(r.branch){const t=document.createElementNS(NS,"text");t.setAttribute("x",tx);t.setAttribute("y",y-9);t.setAttribute("font-size","8.5");t.setAttribute("font-family","var(--code)");t.setAttribute("fill",C.gap);t.textContent=r.u.sib?"":"dive";svg.appendChild(t);}
+  });
+  document.getElementById("c6").appendChild(svg);
+  document.getElementById("c6leg").innerHTML=`<span><i style="border-color:${C.line}"></i>lane / trunk</span><span><i style="border-color:${C.dim};border-top-style:dashed"></i>dive branch</span><span><i style="border-color:${C.accent}"></i>return merge</span>`;
+})();
+
+/* switcher */
+document.getElementById("seg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+  document.querySelectorAll("#seg button").forEach(x=>x.classList.toggle("on",x===b));
+  ["1","2","3","4","5","6"].forEach(v=>document.getElementById("v"+v).classList.toggle("on",v===b.dataset.v));
+});
+</script>
+</body>
+</html>

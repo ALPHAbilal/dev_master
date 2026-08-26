@@ -1,364 +1,78 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Tutor — ladder (hi-fi)</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tutor — Focus Stack</title>
 <style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-html{font-size:16px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.12) transparent;}
-body{line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh;}
-button{font:inherit;color:inherit;cursor:pointer;background:none;border:none;}
-::selection{background:rgba(216,178,77,0.30);color:#fff;}
-::-webkit-scrollbar{width:8px;height:8px;}
-::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.14);border-radius:3px;}
-:root{
-  --bg-deepest:#171b1f;--bg-app:#20252a;--bg-surface:#2b3138;--bg-card:#333a42;--bg-elevated:#3f474f;
-  --text-primary:#f4f1e6;--text-secondary:#c6c2b3;--text-muted:#8d8b7e;--text-disabled:#5e5d54;
-  --accent:#d8b24d;--accent-dim:#a98f3c;--accent-soft:rgba(216,178,77,0.12);
-  --gap:#cf8f5a;--line:#3a4149;
-  --font-ui:"Segoe UI",Tahoma,sans-serif;--font-code:"Cascadia Code","JetBrains Mono","Consolas",monospace;
-  --tf:130ms ease;
-  background:var(--bg-deepest);color:var(--text-primary);font-family:var(--font-ui);
-}
-.wrap{max-width:760px;margin:0 auto;padding:26px 22px 90px;}
-.hd{display:flex;align-items:baseline;gap:12px;padding:2px 6px 22px;}
-.hd h1{font-size:16px;font-weight:600;letter-spacing:.2px;}
-.hd .sub{font-size:12px;color:var(--text-muted);}
-.hd .rev{margin-left:auto;font-size:10.5px;color:var(--text-disabled);font-family:var(--font-code);}
-
-#ladder{position:relative;}
-#wires{position:absolute;left:0;top:0;z-index:0;pointer-events:none;overflow:visible;}
-.sec,.unit{position:relative;z-index:1;}
-
-/* section (file) */
-.sec{margin-bottom:4px;}
-.sec-row{display:flex;align-items:center;gap:11px;padding:11px 10px;border-radius:10px;cursor:pointer;transition:var(--tf);}
-.sec-row:hover{background:var(--bg-surface);}
-.sec-title{font-size:14.5px;font-weight:600;font-family:var(--font-code);letter-spacing:.2px;}
-.tw{display:flex;align-items:center;gap:9px;min-width:0;}
-.sec.open>.sec-row .caret,.unit.open>.u-row .caret{transform:rotate(90deg);}
-.caret{color:var(--text-disabled);transition:transform 160ms ease;display:grid;place-items:center;}
-.sec-body{display:none;} .sec.open>.sec-body{display:block;}
-.u-meta{margin-left:auto;display:flex;align-items:center;gap:10px;}
-.axp{font-size:10.5px;color:var(--text-disabled);font-family:var(--font-code);}
-.depth{font-size:8.5px;color:var(--text-disabled);font-family:var(--font-code);white-space:nowrap;}
-
-/* Fixed git-graph gutter: every nested .lvl advances exactly one wire lane. */
-.lvl{margin-left:42px;padding-left:0;}
-
-/* unit row */
-.u-row{display:flex;align-items:center;gap:11px;padding:8px 9px;border-radius:9px;cursor:pointer;transition:var(--tf);}
-.u-row:hover{background:var(--bg-surface);}
-.unit.cur>.u-row{background:var(--accent-soft);}
-.mk{width:18px;height:18px;flex-shrink:0;display:grid;place-items:center;}
-.u-title{font-size:13px;color:var(--text-secondary);}
-.unit.cur>.u-row .u-title,.u-row:hover .u-title{color:var(--text-primary);}
-.slug{font-family:var(--font-code);}
-.here{font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--bg-deepest);background:var(--accent);border-radius:3px;padding:2px 5px;}
-.tag{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;border-radius:3px;padding:2px 6px;color:var(--text-muted);background:var(--bg-surface);}
-.tag.dive{color:var(--gap);background:rgba(207,143,90,0.12);}
-.tag.done{color:var(--accent);background:var(--accent-soft);}
-.tag.park{color:var(--accent-dim);background:var(--accent-soft);}
-.tag.sib{color:var(--text-muted);}
-
-/* dive-in caption */
-.dive-in{display:flex;gap:8px;align-items:center;font-size:11px;color:var(--gap);padding:0 0 4px 38px;}
-.dive-in .why{color:var(--text-muted);}
-/* return caption */
-.ret{display:flex;gap:8px;align-items:baseline;font-size:11.5px;color:var(--accent-dim);padding:2px 0 6px 38px;}
-.ret .lead{color:var(--accent-dim);font-weight:600;}
-.ret q{color:var(--text-secondary);font-style:italic;}
-.ret q::before{content:"“";} .ret q::after{content:"”";}
-.cause{position:relative;margin:5px 0 7px;padding:8px 10px 8px 38px;border-left:1px solid rgba(207,143,90,.24);font-size:11px;}
-.cause-mk{position:absolute;left:13px;top:12px;width:10px;height:10px;border:1.6px solid var(--gap);background:var(--bg-app);transform:rotate(45deg);border-radius:1px;}
-.cause-line{display:flex;gap:9px;align-items:baseline;padding:2px 0;color:var(--text-secondary);}
-.cause-line .ck{min-width:58px;font-family:var(--font-code);font-size:8.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted);}
-.cause-line.answer .ck{color:var(--text-secondary);}.cause-line.gap .ck,.cause-line.gap .cv{color:var(--gap);}
-.cause-line q{font-style:italic;}.cause-line q::before{content:"“";}.cause-line q::after{content:"”";}
-
-.kids{display:none;} .unit.open>.kids{display:block;}
-
-/* detail */
-.detail{display:none;padding:2px 0 8px 38px;} .unit.open>.detail{display:block;}
-.axes{display:flex;flex-wrap:wrap;gap:5px;margin:5px 0 9px;}
-.ax{font-size:10px;font-weight:600;padding:3px 9px;border-radius:9999px;background:var(--bg-surface);color:var(--text-disabled);display:inline-flex;align-items:center;gap:5px;}
-.ax .dot{width:6px;height:6px;border-radius:50%;background:var(--text-disabled);}
-.ax.SOLID{color:var(--accent);background:var(--accent-soft);} .ax.SOLID .dot{background:var(--accent);}
-.ax.SHAKY{color:#c9a24b;box-shadow:inset 0 0 0 1px rgba(201,162,75,0.4);} .ax.SHAKY .dot{background:#c9a24b;}
-.ax.MISSING{color:#b96a5a;box-shadow:inset 0 0 0 1px rgba(185,106,90,0.4);} .ax.MISSING .dot{background:#b96a5a;}
-.ax .esc{font-family:var(--font-code);opacity:.7;font-size:9px;}
-.tl{position:relative;padding-left:22px;margin:2px 0;}
-.tl::before{content:"";position:absolute;left:4px;top:10px;bottom:10px;width:2px;border-radius:2px;background:#454c54;}
-.ev{position:relative;min-height:34px;padding:6px 0 6px 4px;display:flex;gap:12px;align-items:baseline;}
-.ev::before{content:"";position:absolute;left:-22px;top:10px;width:10px;height:10px;background:var(--text-disabled);border:2px solid var(--bg-app);box-shadow:0 0 0 2px #454c54;}
-.ev .k{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);min-width:52px;}
-.ev .txt{font-size:12px;color:var(--text-secondary);}
-.ev.proven::before{background:var(--accent);border-radius:50%;} .ev.proven .k{color:var(--accent);}
-.ev.taught::before{background:var(--text-secondary);border-radius:3px;}
-.ev.gap::before{background:var(--gap);border-radius:1px;transform:rotate(45deg);width:9px;height:9px;left:-21.5px;} .ev.gap .k{color:var(--gap);}
-.ev.test::before{border-radius:50%;background:var(--bg-app);box-shadow:0 0 0 2px #454c54,inset 0 0 0 2px var(--text-muted);}
-.ev.next{opacity:.68;} .ev.next::before{border-radius:50%;background:var(--bg-app);box-shadow:0 0 0 2px #454c54,inset 0 0 0 2px var(--accent);}
-.seal{display:flex;align-items:center;gap:9px;background:var(--accent-soft);border-radius:8px;padding:6px 11px;font-size:11px;color:var(--text-secondary);margin-top:6px;}
-.seal b{color:var(--accent);} .seal .diff{margin-left:auto;font-family:var(--font-code);font-size:10px;}
-.seal .can{color:var(--accent);} .seal .cant{color:var(--gap);}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#171b1f;--surface:#1e2328;--surface-2:#23292e;--line:#353c42;--text:#f0eee6;--secondary:#c7c3b8;--muted:#898a83;--disabled:#61635f;--accent:#d8b24d;--gap:#c78958;--ui:"Segoe UI",Tahoma,sans-serif;--code:"Cascadia Code","JetBrains Mono",Consolas,monospace;color:var(--text);background:var(--bg);font:16px var(--ui)}
+body{min-height:100vh;background:var(--bg);line-height:1.5;-webkit-font-smoothing:antialiased}button,summary{font:inherit;color:inherit}button{border:0;background:none;cursor:pointer}button:focus-visible,summary:focus-visible{outline:1px solid var(--accent);outline-offset:2px}
+.page{width:min(760px,calc(100% - 28px));margin:30px auto 80px}.top{display:flex;align-items:center;gap:9px;padding:0 2px 20px;border-bottom:1px solid var(--line)}.top h1{font-size:14px;font-weight:600}.top .state{margin-left:auto;color:var(--muted);font:10px var(--code)}
+.breadcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:18px 2px 22px;color:var(--muted);font:11px var(--code)}.breadcrumb .current{color:var(--text)}.breadcrumb svg{color:var(--disabled)}
+.block{padding:22px 0;border-top:1px solid var(--line)}.block:first-of-type{border-top:0}.eyebrow{margin-bottom:13px;color:var(--muted);font-size:9.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase}.eyebrow.gap{color:var(--gap)}
+.causal{position:relative;margin-left:4px;padding-left:28px}.causal::before{content:"";position:absolute;left:8px;top:9px;bottom:10px;width:1px;background:var(--line)}.cause{position:relative;padding:0 0 17px}.cause:last-child{padding-bottom:0}.cause-icon{position:absolute;left:-28px;top:1px;width:17px;height:17px;display:grid;place-items:center;background:var(--bg);color:var(--muted)}.cause.gap .cause-icon{color:var(--gap)}.cause .kind{margin-bottom:3px;color:var(--muted);font:9px var(--code);text-transform:uppercase}.cause.gap .kind{color:var(--gap)}.cause p{color:var(--secondary);font-size:12.5px}.cause q{font-style:italic;color:var(--text)}.cause q::before{content:"“"}.cause q::after{content:"”"}
+.focus{padding:24px 22px;margin:4px 0;background:var(--surface);border-left:2px solid var(--accent)}.focus-head{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:10px;align-items:start}.focus-icon{color:var(--accent);padding-top:2px}.focus h2{font:600 16px/1.4 var(--code)}.focus .title{margin-top:4px;color:var(--secondary);font-size:12.5px}.depth{color:var(--muted);font:9.5px var(--code);white-space:nowrap}.axes{display:grid;gap:9px;margin-top:20px;padding-top:17px;border-top:1px solid var(--line)}.axis{display:grid;grid-template-columns:8px minmax(0,1fr) auto;gap:9px;align-items:center;color:var(--secondary);font-size:11.5px}.axis-dot{width:7px;height:7px;border-radius:50%;background:var(--disabled)}.axis.SOLID .axis-dot{background:var(--accent)}.axis.SHAKY .axis-dot{background:#9f894c}.axis.MISSING .axis-dot{background:var(--gap)}.axis .verdict{color:var(--muted);font:9.5px var(--code)}
+.next{display:grid;grid-template-columns:20px minmax(0,1fr);gap:11px}.next-icon{color:var(--accent);padding-top:2px}.next h3{margin-bottom:6px;font-size:12.5px;font-weight:600}.next p{color:var(--secondary);font-size:12.5px}.return-target{display:flex;align-items:flex-start;gap:10px;color:var(--secondary);font-size:12px}.return-target svg{flex:0 0 auto;color:var(--muted);margin-top:2px}.return-target strong{font:600 11.5px var(--code);color:var(--text)}.return-target span{display:block;margin-top:3px;color:var(--muted)}
+.fold{border-top:1px solid var(--line)}.fold>summary{list-style:none;display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:8px;align-items:center;min-height:48px;padding:5px 2px;cursor:pointer}.fold>summary::-webkit-details-marker{display:none}.fold>summary:hover{color:var(--text)}.fold .fold-icon{color:var(--muted);transition:transform 130ms ease}.fold[open] .fold-icon{transform:rotate(90deg)}.fold .fold-title{font-size:11.5px}.fold .fold-count{color:var(--muted);font:9.5px var(--code)}.fold-body{padding:2px 0 18px 26px}
+.episode{border-left:1px solid var(--line)}.episode+.episode{margin-top:3px}.episode-row{width:100%;display:grid;grid-template-columns:18px minmax(0,1fr) auto 18px;gap:8px;align-items:center;min-height:38px;padding:4px 4px 4px 10px;text-align:left;color:var(--secondary)}.episode-row:hover{background:var(--surface)}.episode-state{color:#aa985b}.episode-name{font:600 11.5px var(--code)}.episode-meta{color:var(--muted);font-size:10px}.episode-toggle{color:var(--muted);transition:transform 130ms ease}.episode.open .episode-toggle{transform:rotate(90deg)}.episode-detail{display:none;margin:0 12px 14px 36px;padding:12px 14px;background:var(--surface);color:var(--secondary);font-size:11.5px}.episode.open .episode-detail{display:block}.episode-detail dl{display:grid;grid-template-columns:76px minmax(0,1fr);gap:7px 10px}.episode-detail dt{color:var(--muted);font:9px var(--code);text-transform:uppercase}.episode-detail dd{min-width:0}.nested{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);color:var(--muted)}
+.queue{display:grid;gap:2px}.queue-row{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:8px;align-items:center;min-height:34px;padding:3px 8px;color:var(--muted);font-size:11.5px}.queue-row svg{color:var(--disabled)}.queue-row .name{font-family:var(--code)}.queue-row .qstate{font:9px var(--code);color:var(--disabled)}
+@media(max-width:560px){.page{width:calc(100% - 18px);margin-top:14px}.focus{padding:20px 16px}.focus-head{grid-template-columns:20px minmax(0,1fr)}.depth{display:none}.episode-detail{margin-left:20px}.episode-detail dl{grid-template-columns:1fr}.episode-detail dt{margin-top:5px}}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="hd"><h1>Learning ladder</h1><span class="sub">dive ↘ · return ↩ · here</span><span class="rev" id="rev"></span></div>
-  <div id="ladder"><svg id="wires"></svg><div id="rows"></div></div>
-</div>
+<main class="page">
+  <header class="top"><span id="topIcon"></span><h1>Learning journey</h1><span class="state">2 / 6 owned · revision 50</span></header>
+  <nav class="breadcrumb" id="breadcrumb" aria-label="Current learning path"></nav>
+
+  <section class="block" aria-labelledby="why-title">
+    <div class="eyebrow gap" id="why-title">Why you are here</div>
+    <div class="causal" id="causal"></div>
+  </section>
+
+  <section class="focus" id="focus" aria-labelledby="focus-title"></section>
+
+  <section class="block" aria-labelledby="next-title">
+    <div class="eyebrow" id="next-title">Next proof</div>
+    <div class="next"><span class="next-icon" id="nextIcon"></span><div><h3>Predict the program behavior</h3><p id="nextText"></p></div></div>
+  </section>
+
+  <section class="block" aria-labelledby="after-title">
+    <div class="eyebrow" id="after-title">After this</div>
+    <div class="return-target"><span id="returnIcon"></span><div><strong id="returnName"></strong><span id="returnText"></span></div></div>
+  </section>
+
+  <details class="fold" id="historyFold">
+    <summary><span class="fold-icon" id="historyChevron"></span><span class="fold-title">Journey history</span><span class="fold-count" id="historyCount"></span></summary>
+    <div class="fold-body" id="history"></div>
+  </details>
+  <details class="fold">
+    <summary><span class="fold-icon chevron"></span><span class="fold-title">Related, non-blocking</span><span class="fold-count" id="relatedCount"></span></summary>
+    <div class="fold-body queue" id="related"></div>
+  </details>
+  <details class="fold">
+    <summary><span class="fold-icon chevron"></span><span class="fold-title">Later in this file</span><span class="fold-count" id="laterCount"></span></summary>
+    <div class="fold-body queue" id="later"></div>
+  </details>
+</main>
 <script>
-const NS="http://www.w3.org/2000/svg";
 const AX={COMPREHEND:"What it does",MECHANISM:"How it works",RATIONALE:"Why designed so",JUDGMENT:"When to use",ROBUSTNESS:"What breaks",INTEGRATION:"How it connects",EVOLUTION:"How to improve"};
-
-/* ── DATA (mirrors JourneyReader) ─────────────────────────────────────────── */
-const FILES=[
-{ name:"run_prompts.py", open:true, units:[
-  { slug:"load_prompts", title:"Read the prompt file", state:"OWNED",
-    axes:[["COMPREHEND","SOLID"],["MECHANISM","SOLID"],["ROBUSTNESS","SOLID"]],
-    timeline:[{k:"Taught",kind:"taught",txt:"json.load returns raw rows"},{k:"Proven",kind:"proven",txt:"traced the load path"}],
-    seal:{v:"OWNED",can:2,cant:0,note:"file I/O ownership"} },
-  { slug:"normalize_row", title:"Coerce each row's shape", state:"OWNED",
-    axes:[["COMPREHEND","SOLID"],["MECHANISM","SOLID"],["RATIONALE","SOLID"]],
-    timeline:[{k:"Taught",kind:"taught",txt:"bool(r.get('pin')) defaults pins"},{k:"Tested",kind:"test",txt:"missing-key case"},{k:"Proven",kind:"proven",txt:"handled absent key"}],
-    seal:{v:"OWNED",can:1,cant:0,note:"normalization"} },
-  { slug:"_pinned_qa_group", title:"Group pinned questions first", state:"PROBED", parent_of_here:true,
-    resume:"trace an input where a pinned id also appears unpinned",
-    axes:[["COMPREHEND","SOLID"],["MECHANISM","SOLID"],["ROBUSTNESS","SHAKY",1]],
-    timeline:[{k:"Taught",kind:"taught",txt:"pinned kept in passed order"},{k:"Proven",kind:"proven",txt:"read pinned-first ordering"},{k:"Gap",kind:"gap",txt:"ids collide across groups — no dedupe"}],
-    siblings:[{slug:"dedupe_across_groups",title:"De-dupe ids across groups"}],
-    children:[
-      { slug:"dict_identity", title:"Dict identity vs value", state:"OWNED", tag:"dive",
-        dive_reason:"missing prerequisite for the collision gap",
-        returned:{resume:"trace an input where a pinned id also appears unpinned"},
-        axes:[["COMPREHEND","SOLID"],["MECHANISM","SOLID"]],
-        timeline:[{k:"Taught",kind:"taught",txt:"`is` vs `==`"},{k:"Gap",kind:"gap",txt:"could not explain why equal values need not share identity"}],
-        after_return:{timeline:[{k:"Proven",kind:"proven",txt:"equal dicts differ in identity"}],seal:{v:"OWNED",can:1,cant:0,note:"identity vs value"}},
-        children:[
-          { slug:"hashing_keys", title:"Why keys must hash", state:"OWNED", tag:"dive",
-            dive_reason:"needed before identity could be proven",
-            returned:{resume:"which do two equal dicts share — identity or value?"},
-            axes:[["COMPREHEND","SOLID"],["MECHANISM","SOLID"]],
-            timeline:[{k:"Taught",kind:"taught",txt:"membership: __hash__ then __eq__"},{k:"Proven",kind:"proven",txt:"named an unhashable key"}],
-            seal:{v:"OWNED",can:1,cant:0,note:"hashing"} },
-        ] },
-      { slug:"collision_semantics", title:"What 'collision' means for ids", state:"CURRENT", tag:"dive",
-        dive_reason:"the gap re-fired after identity was owned",
-        reentry:{answer:"They are different dict objects, so both entries should remain.",category:"misconception",gap:"Object identity does not decide whether two equal ids represent one logical question."},
-        axes:[["COMPREHEND","SHAKY",1],["MECHANISM","MISSING"]],
-        timeline:[{k:"Taught",kind:"taught",txt:"two equal ids ⇒ one logical question"},{k:"Probe",kind:"probe",txt:"so what should the output length be?"},{k:"Next",kind:"next",txt:"awaiting your answer"}] },
-    ] },
-  { slug:"_dedupe_by_id", title:"Drop duplicate ids", state:"QUEUED", axes:[["COMPREHEND","UNGRADED"],["MECHANISM","UNGRADED"]], timeline:[] },
-  { slug:"build_prompt_batch", title:"Assemble the batch", state:"LOCKED", axes:[["COMPREHEND","UNGRADED"],["INTEGRATION","UNGRADED"]], timeline:[] },
-  { slug:"run_prompts", title:"Drive the whole run", state:"LOCKED", axes:[["COMPREHEND","UNGRADED"],["JUDGMENT","UNGRADED"]], timeline:[] },
-]},
-{ name:"schema_loader.py", open:false, units:[
-  { slug:"read_schema", title:"Load the schema", state:"PARKED", tag:"park", axes:[["COMPREHEND","SOLID"],["MECHANISM","SOLID"],["ROBUSTNESS","SHAKY",1]], timeline:[] },
-  { slug:"validate_row", title:"Validate one row", state:"QUEUED", axes:[["COMPREHEND","UNGRADED"]], timeline:[] },
-]},
-];
-
-/* ── geometric SVG markers (no glyphs) ────────────────────────────────────── */
-const C={accent:"#d8b24d",dim:"#a98f3c",line:"#5e5d54",gap:"#cf8f5a",soft:"rgba(216,178,77,0.20)",bg:"#20252a"};
-function arc(cx,cy,r,frac){
-  if(frac<=0)return"";
-  if(frac>=1)return`M ${cx} ${cy-r} A ${r} ${r} 0 1 1 ${cx-0.01} ${cy-r}`;
-  const a0=-Math.PI/2,a1=-Math.PI/2+2*Math.PI*frac;
-  const x0=cx+r*Math.cos(a0),y0=cy+r*Math.sin(a0),x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1);
-  return`M ${x0} ${y0} A ${r} ${r} 0 ${frac>0.5?1:0} 1 ${x1} ${y1}`;
-}
-function marker(state,frac){
-  const s=`<svg width="18" height="18" viewBox="0 0 18 18" fill="none">`;
-  const cx=9,cy=9;
-  if(state==="OWNED")   return s+`<circle cx="9" cy="9" r="5.2" fill="${C.accent}"/></svg>`;
-  if(state==="CURRENT") return s+`<circle cx="9" cy="9" r="8" fill="none" stroke="${C.soft}" stroke-width="2"/><circle cx="9" cy="9" r="4.6" fill="${C.accent}"/></svg>`;
-  if(state==="PARKED")  return s+`<circle cx="9" cy="9" r="5.4" fill="none" stroke="${C.dim}" stroke-width="1.6"/><circle cx="9" cy="9" r="2" fill="${C.dim}"/></svg>`;
-  if(state==="QUEUED")  return s+`<circle cx="9" cy="9" r="5.2" fill="none" stroke="${C.line}" stroke-width="1.5"/></svg>`;
-  if(state==="LOCKED")  return s+`<circle cx="9" cy="9" r="5.2" fill="none" stroke="${C.line}" stroke-width="1.5" stroke-dasharray="2.4 2.4"/></svg>`;
-  /* PROGRESS: base ring + accent arc for solid fraction */
-  return s+`<circle cx="9" cy="9" r="5.2" fill="none" stroke="${C.line}" stroke-width="1.6"/>`+
-    `<path d="${arc(cx,cy,5.2,frac)}" stroke="${C.accent}" stroke-width="1.9" stroke-linecap="round"/></svg>`;
-}
-function caret(){return`<svg class="caret" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>`;}
-
-const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
-const solid=u=>u.axes.filter(a=>a[1]==="SOLID").length;
-const mkCls=u=>({OWNED:"OWNED",CURRENT:"CURRENT",PARKED:"PARKED",LOCKED:"LOCKED",QUEUED:"QUEUED"}[u.state]||"PROGRESS");
-const onPath=u=>u.state==="CURRENT"||u.parent_of_here;
-const D=new WeakMap(); (function td(list,d){list.forEach(u=>{D.set(u,d);td(u.children||[],d+1);});});
-(function tag(list,d){list.forEach(u=>{D.set(u,d);tag(u.children||[],d+1);});})(FILES.flatMap(f=>f.units),0);
-
-const EDGES=[]; /* {from:mkEl, to:mkEl, type} */
-
-function renderDetailBlock(data,owner,post=false){
-  const detail=el("div","detail"+(post?" post":""));
-  if((data.axes||[]).length){
-    const axes=el("div","axes");
-    data.axes.forEach(([n,v,sh])=>{const c=el("span","ax "+v);c.innerHTML=`<span class="dot"></span>${AX[n]||n}`+(v==="SHAKY"&&sh?` <span class="esc">${"·".repeat(sh)}${sh>=2?"→miss":""}</span>`:"");c.title=n+" · "+v;axes.appendChild(c);});
-    detail.appendChild(axes);
-  }
-  if((data.timeline||[]).length){
-    const tl=el("div","tl");
-    data.timeline.forEach(x=>{const ev=el("div","ev "+x.kind,`<span class="k">${x.k}</span><span class="txt">${x.txt}</span>`);if(x.kind==="gap"&&!post)owner._gapEv=ev;tl.appendChild(ev);});
-    detail.appendChild(tl);
-  }
-  if(data.seal)detail.appendChild(el("div","seal",`<span>Distilled &amp; <b>${data.seal.v}</b> — ${data.seal.note}</span><span class="diff"><span class="can">can +${data.seal.can}</span>${data.seal.cant?` · <span class="cant">cant −${data.seal.cant}</span>`:""}</span>`));
-  return detail;
-}
-
-function renderUnit(u){
-  const unit=el("div","unit"+(u.state==="CURRENT"?" cur":"")+(onPath(u)?" open":""));
-  const hasKids=(u.children&&u.children.length)||(u.siblings&&u.siblings.length);
-  const hasDetail=u.timeline.length||u.axes.length;
-
-  const row=el("div","u-row");
-  const mk=el("span","mk",marker(mkCls(u),solid(u)/u.axes.length)); u._mk=mk;
-  const tw=el("div","tw");
-  tw.appendChild(mk);
-  let t=`<span class="u-title"><span class="slug">${u.slug}</span> — ${u.title}</span>`;
-  if(u.state==="CURRENT")t+=`<span class="here">here</span>`;
-  if(u.tag==="dive")t+=`<span class="tag ${u.returned?'done':'dive'}">${u.returned?'dive · done':'dive'}</span>`;
-  if(u.tag==="park")t+=`<span class="tag park">parked</span>`;
-  tw.insertAdjacentHTML("beforeend",t);
-  row.appendChild(tw);
-  const meta=el("div","u-meta");
-  if(D.get(u))meta.appendChild(el("span","depth",`depth ${D.get(u)}`));
-  meta.appendChild(el("span","axp",`${solid(u)}/${u.axes.length}`));
-  if(hasDetail||hasKids)meta.insertAdjacentHTML("beforeend",caret());
-  row.appendChild(meta);
-  unit.appendChild(row);
-
-  if(u.dive_reason)unit.appendChild(el("div","dive-in",`<span>dive · <span class="why">${u.dive_reason}</span></span>`));
-
-  unit.appendChild(renderDetailBlock(u,u));
-
-  if(hasKids){
-    const kids=el("div","kids");
-    let routeAnchor=null;
-    (u.children||[]).forEach(c=>{
-      let causeMk=null;
-      if(c.reentry){
-        const cause=el("div","cause");causeMk=el("span","cause-mk");cause.appendChild(causeMk);
-        cause.insertAdjacentHTML("beforeend",`<div class="cause-line answer"><span class="ck">answer</span><span class="cv"><q>${c.reentry.answer}</q></span></div><div class="cause-line gap"><span class="ck">${c.reentry.category}</span><span class="cv">${c.reentry.gap}</span></div>`);
-        kids.appendChild(cause);
-        if(routeAnchor)EDGES.push({from:u._mk,fromAt:routeAnchor,to:causeMk,type:"resume"});
-      }
-      const lvl=el("div","lvl");
-      lvl.appendChild(renderUnit(c));
-      const fromGap=!routeAnchor&&u._gapEv;
-      EDGES.push({from:causeMk||fromGap||u._mk,fromKind:fromGap&&!causeMk?"gap":"marker",lane:u._mk,fromAt:causeMk?null:routeAnchor,to:c._mk,type:"dive"});
-      if(c.returned){
-        const ret=el("div","ret",`<span><span class="lead">returned to ${u.slug}</span> — resumed <q>${c.returned.resume}</q></span>`);
-        lvl.appendChild(ret);
-        EDGES.push({from:c._mk,fromAt:c._routeExit,to:u._mk,at:ret,type:"return"});
-        routeAnchor=ret;
-      }else{
-        routeAnchor=null;
-      }
-      kids.appendChild(lvl);
-    });
-    (u.siblings||[]).forEach(s=>{
-      const lvl=el("div","lvl");
-      const smk=el("span","mk",marker("QUEUED",0));
-      const uu=el("div","unit"); const rr=el("div","u-row");
-      const tw2=el("div","tw"); tw2.appendChild(smk);
-      tw2.insertAdjacentHTML("beforeend",`<span class="u-title"><span class="slug">${s.slug}</span> — ${s.title}</span><span class="tag sib">sibling · non-blocking</span>`);
-      rr.appendChild(tw2); rr.appendChild(el("div","u-meta axp","queued")); uu.appendChild(rr); lvl.appendChild(uu);
-      kids.appendChild(lvl);
-      const fromGap=u._gapEv;
-      EDGES.push({from:fromGap||u._mk,fromKind:fromGap?"gap":"marker",lane:u._mk,to:smk,type:"sib"});
-    });
-    u._routeExit=routeAnchor;
-    unit.appendChild(kids);
-  }
-  if(u.after_return)unit.appendChild(renderDetailBlock(u.after_return,u,true));
-  row.addEventListener("click",()=>{unit.classList.toggle("open");requestAnimationFrame(draw);});
-  return unit;
-}
-
-const rows=document.getElementById("rows");
-FILES.forEach(f=>{
-  const sec=el("div","sec"+(f.open?" open":""));
-  const owned=f.units.filter(u=>u.state==="OWNED").length;
-  sec.appendChild(el("div","sec-row",`<div class="tw">${caret()}<span class="sec-title">${f.name}</span></div><span class="u-meta"><span class="axp">${owned}/${f.units.length} owned</span></span>`));
-  const body=el("div","sec-body");const lvl=el("div","lvl");
-  f.units.forEach((u,i)=>{lvl.appendChild(renderUnit(u)); if(i>0)EDGES.push({from:f.units[i-1]._mk,to:u._mk,type:"trunk"});});
-  body.appendChild(lvl);sec.appendChild(body);
-  sec.querySelector(".sec-row").addEventListener("click",()=>{sec.classList.toggle("open");requestAnimationFrame(draw);});
-  rows.appendChild(sec);
-});
-document.getElementById("rev").textContent="projection_revision 47";
-
-/* ── the SVG wire layer ───────────────────────────────────────────────────── */
-const wires=document.getElementById("wires"), ladder=document.getElementById("ladder");
-function center(mk){const r=mk.getBoundingClientRect();if(!r.width)return null;const cr=ladder.getBoundingClientRect();return{x:r.left-cr.left+r.width/2,y:r.top-cr.top+r.height/2};}
-function gapPoint(ev){const r=ev.getBoundingClientRect();if(!r.width)return null;const cr=ladder.getBoundingClientRect();return{x:r.left-cr.left-17,y:r.top-cr.top+15};}
-function anchorY(node){const r=node.getBoundingClientRect();if(!r.width)return null;return r.top-ladder.getBoundingClientRect().top+r.height/2;}
-function path(d,stroke,w,dash,halo=false){
-  if(halo){const h=document.createElementNS(NS,"path");h.setAttribute("d",d);h.setAttribute("fill","none");h.setAttribute("stroke",C.bg);h.setAttribute("stroke-width",w+4);h.setAttribute("stroke-linecap","round");h.setAttribute("stroke-linejoin","round");wires.appendChild(h);}
-  const p=document.createElementNS(NS,"path");p.setAttribute("d",d);p.setAttribute("fill","none");p.setAttribute("stroke",stroke);p.setAttribute("stroke-width",w);p.setAttribute("stroke-linecap","round");p.setAttribute("stroke-linejoin","round");p.setAttribute("vector-effect","non-scaling-stroke");if(dash)p.setAttribute("stroke-dasharray",dash);wires.appendChild(p);
-}
-function mergeArrow(x,y){
-  const arrow=document.createElementNS(NS,"path");
-  arrow.setAttribute("d",`M ${x+1} ${y} L ${x+10} ${y-5.5} L ${x+10} ${y+5.5} Z`);
-  arrow.setAttribute("fill",C.accent);arrow.setAttribute("stroke",C.bg);arrow.setAttribute("stroke-width","2.4");arrow.setAttribute("stroke-linejoin","round");wires.appendChild(arrow);
-}
-function siblingArrow(x,y){
-  const d=`M ${x-4} ${y-4} L ${x} ${y} L ${x-4} ${y+4}`;
-  const arrow=document.createElementNS(NS,"path");arrow.setAttribute("d",d);arrow.setAttribute("fill","none");arrow.setAttribute("stroke",C.line);arrow.setAttribute("stroke-width","1.4");arrow.setAttribute("stroke-linecap","round");arrow.setAttribute("stroke-linejoin","round");wires.appendChild(arrow);
-}
-function regapNode(x,y){
-  const node=document.createElementNS(NS,"rect");node.setAttribute("x",x-4);node.setAttribute("y",y-4);node.setAttribute("width","8");node.setAttribute("height","8");node.setAttribute("rx","1");node.setAttribute("fill",C.bg);node.setAttribute("stroke",C.gap);node.setAttribute("stroke-width","1.6");node.setAttribute("transform",`rotate(45 ${x} ${y})`);wires.appendChild(node);
-}
-function draw(){
-  while(wires.firstChild)wires.removeChild(wires.firstChild);
-  wires.setAttribute("width",ladder.scrollWidth);wires.setAttribute("height",ladder.scrollHeight);
-  wires.style.width=ladder.scrollWidth+"px";wires.style.height=ladder.scrollHeight+"px";
-  for(const e of EDGES){
-    const a=e.fromKind==="gap"?gapPoint(e.from):center(e.from),b=center(e.to);if(!a||!b)continue;
-    if(e.type==="trunk"){path(`M ${a.x} ${a.y+7} L ${b.x} ${b.y-7}`,C.line,1.5);continue;}
-    if(e.type==="resume"){
-      const fromY=anchorY(e.fromAt);if(fromY==null)continue;
-      path(`M ${a.x} ${fromY} L ${a.x} ${b.y-7}`,C.accent,1.9,null,true);continue;
-    }
-    if(e.type==="dive"||e.type==="sib"){
-      const lane=e.lane?center(e.lane):a;if(!lane)continue;
-      const fromAtY=e.fromAt?anchorY(e.fromAt):null;
-      const startX=fromAtY!=null?lane.x:(e.fromKind==="gap"?a.x+6:a.x);
-      const startY=fromAtY!=null?Math.min(fromAtY+14,b.y-17):(e.fromKind==="gap"?a.y:a.y+7);
-      const isRegap=fromAtY!=null&&e.type==="dive";
-      if(isRegap){
-        path(`M ${lane.x} ${fromAtY} L ${lane.x} ${startY}`,C.accent,1.9,null,true);
-      }
-      if(e.type==="sib"){
-        const railX=b.x-12,approachY=b.y-13,endX=b.x-7;
-        const d=`M ${startX} ${startY} C ${startX} ${startY+12}, ${railX} ${startY+12}, ${railX} ${startY+24} L ${railX} ${approachY} C ${railX} ${b.y-5}, ${endX-4} ${b.y}, ${endX} ${b.y}`;
-        path(d,C.line,1.2,"2.5 4");siblingArrow(endX,b.y);continue;
-      }
-      const endY=b.y-7,isCurrent=e.type==="dive"&&!!e.to.closest(".unit.cur");
-      const bend=Math.min(28,Math.max(18,(endY-startY)*.32)),turnY=Math.max(startY+12,endY-bend);
-      const activeDy=Math.max(18,endY-startY),activeBend=Math.min(30,activeDy*.42);
-      const d=isCurrent
-        ?`M ${startX} ${startY} C ${startX} ${startY+activeBend}, ${b.x} ${endY-activeBend}, ${b.x} ${endY}`
-        :`M ${startX} ${startY} L ${startX} ${turnY} C ${startX} ${endY-bend*.35}, ${b.x} ${turnY+bend*.35}, ${b.x} ${endY}`;
-      const stroke=isCurrent?C.accent:C.dim,dash=isCurrent?null:"4 4";
-      path(d,stroke,isCurrent?2.2:1.7,dash,true);if(isRegap)regapNode(lane.x,startY);continue;
-    }
-    if(e.type==="return"){
-      const mergeY=anchorY(e.at);if(mergeY==null)continue;
-      const exitY=e.fromAt?anchorY(e.fromAt):null;
-      const startY=exitY!=null?exitY+2:a.y+7;
-      const turnY=Math.max(startY+15,mergeY-18),endX=b.x+8;
-      path(`M ${a.x} ${startY} L ${a.x} ${turnY} C ${a.x} ${mergeY-5}, ${endX+10} ${turnY+5}, ${endX} ${mergeY}`,C.accent,1.9,null,true);
-      mergeArrow(b.x,mergeY);
-    }
-  }
-}
-requestAnimationFrame(draw);
-window.addEventListener("resize",()=>requestAnimationFrame(draw));
-window.addEventListener("load",()=>requestAnimationFrame(draw));
+const DATA={file:"run_prompts.py",progress:"2 / 6 owned",current:{slug:"collision_semantics",title:"What 'collision' means for ids",state:"CURRENT",depth:1,axes:[["COMPREHEND","SHAKY"],["MECHANISM","MISSING"]],parent:"_pinned_qa_group",resume:"trace an input where a pinned id also appears unpinned",answer:"They are different dict objects, so both entries should remain.",gap:"Object identity does not decide whether two equal ids represent one logical question.",next:"If pinned and unpinned contain the same ID, what should the output length be?"},history:[
+{slug:"load_prompts",meta:"owned · 3/3",entered:"Main file sequence",proved:"Traced the file-loading path",returned:"Continued to normalize_row"},
+{slug:"normalize_row",meta:"owned · 3/3",entered:"Main file sequence",proved:"Handled the missing-key normalization case",returned:"Continued to _pinned_qa_group"},
+{slug:"dict_identity",meta:"owned · 2/2",entered:"Object identity was confused with value equality",proved:"Equal dictionaries can have different identities",returned:"_pinned_qa_group",nested:"hashing_keys · owned · proved __hash__ then __eq__"}
+],related:[{slug:"dedupe_across_groups",state:"queued"}],later:[{slug:"_dedupe_by_id",state:"queued"},{slug:"build_prompt_batch",state:"locked"},{slug:"run_prompts",state:"locked"}]};
+function svg(p,s=16){return `<svg width="${s}" height="${s}" viewBox="0 0 16 16" fill="none" aria-hidden="true">${p}</svg>`}
+const I={focus:()=>svg('<circle cx="8" cy="8" r="5.6" stroke="currentColor"/><circle cx="8" cy="8" r="2.2" fill="currentColor"/>'),check:()=>svg('<circle cx="8" cy="8" r="5" stroke="currentColor"/><path d="m5.7 8 1.5 1.6 3.2-3.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>'),gap:()=>svg('<path d="m8 2.5 5.5 5.5L8 13.5 2.5 8z" stroke="currentColor" stroke-width="1.2"/>'),answer:()=>svg('<path d="M3 3h10v7H7l-3 2v-2H3z" stroke="currentColor" stroke-width="1.2"/>'),return:()=>svg('<path d="M12.5 4.5H7A3.5 3.5 0 0 0 3.5 8v3m0 0L1.5 9m2 2 2-2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>'),chev:()=>svg('<path d="M6 4.5 10 8l-4 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>'),arrow:()=>svg('<path d="M3 8h9m-3-3 3 3-3 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',14),branch:()=>svg('<path d="M4 3v7.5A2.5 2.5 0 0 0 6.5 13H12M4 6h3.5A2.5 2.5 0 0 0 10 3.5V3" stroke="currentColor"/><circle cx="4" cy="2.5" r="1.2" fill="currentColor"/><circle cx="10" cy="2.5" r="1.2" fill="currentColor"/>'),clock:()=>svg('<circle cx="8" cy="8" r="5.5" stroke="currentColor"/><path d="M8 4.5V8l2.5 1.5" stroke="currentColor" stroke-linecap="round"/>')};
+function cause(cls,icon,kind,text,quote=false){const d=document.createElement("div");d.className=`cause ${cls}`;d.innerHTML=`<span class="cause-icon">${icon}</span><div class="kind">${kind}</div><p>${quote?`<q>${text}</q>`:text}</p>`;return d}
+function render(){const c=DATA.current;document.getElementById("topIcon").innerHTML=I.focus();document.querySelectorAll(".chevron").forEach(x=>x.innerHTML=I.chev());document.getElementById("historyChevron").innerHTML=I.chev();document.getElementById("nextIcon").innerHTML=I.focus();document.getElementById("returnIcon").innerHTML=I.return();
+ const crumb=document.getElementById("breadcrumb");[DATA.file,c.parent,c.slug].forEach((x,i,a)=>{if(i)crumb.insertAdjacentHTML("beforeend",I.arrow());const s=document.createElement("span");s.textContent=x;if(i===a.length-1)s.className="current";crumb.appendChild(s)});
+ const causal=document.getElementById("causal");causal.appendChild(cause("",I.return(),"Resumed parent question",c.resume,true));causal.appendChild(cause("",I.answer(),"Your answer",c.answer,true));causal.appendChild(cause("gap",I.gap(),"Gap detected",c.gap));
+ document.getElementById("focus").innerHTML=`<div class="focus-head"><span class="focus-icon">${I.focus()}</span><div><h2 id="focus-title">${c.slug}</h2><div class="title">${c.title}</div></div><span class="depth">depth ${c.depth} · current</span></div><div class="axes">${c.axes.map(a=>`<div class="axis ${a[1]}"><span class="axis-dot"></span><span>${AX[a[0]]}</span><span class="verdict">${a[1].toLowerCase()}</span></div>`).join("")}</div>`;
+ document.getElementById("nextText").textContent=c.next;document.getElementById("returnName").textContent=`Return to ${c.parent}`;document.getElementById("returnText").textContent=`Resume: “${c.resume}”`;
+ document.getElementById("historyCount").textContent=`${DATA.history.length} completed`;const history=document.getElementById("history");DATA.history.forEach(h=>{const e=document.createElement("article");e.className="episode";e.innerHTML=`<button class="episode-row"><span class="episode-state">${I.check()}</span><span class="episode-name">${h.slug}</span><span class="episode-meta">${h.meta}</span><span class="episode-toggle">${I.chev()}</span></button><div class="episode-detail"><dl><dt>Entered because</dt><dd>${h.entered}</dd><dt>Proved</dt><dd>${h.proved}</dd><dt>Returned to</dt><dd>${h.returned}</dd></dl>${h.nested?`<div class="nested">Nested prerequisite: ${h.nested}</div>`:""}</div>`;e.querySelector("button").onclick=()=>{history.querySelectorAll(".episode.open").forEach(x=>{if(x!==e)x.classList.remove("open")});e.classList.toggle("open")};history.appendChild(e)});
+ document.getElementById("relatedCount").textContent=String(DATA.related.length);document.getElementById("related").innerHTML=DATA.related.map(x=>`<div class="queue-row"><span>${I.branch()}</span><span class="name">${x.slug}</span><span class="qstate">${x.state}</span></div>`).join("");document.getElementById("laterCount").textContent=String(DATA.later.length);document.getElementById("later").innerHTML=DATA.later.map(x=>`<div class="queue-row"><span>${I.clock()}</span><span class="name">${x.slug}</span><span class="qstate">${x.state}</span></div>`).join("")}
+render();
 </script>
 </body>
 </html>
