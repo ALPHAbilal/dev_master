@@ -125,8 +125,8 @@ textarea { border: none; outline: none; }
 .agent-run .stamp .arrow { color:var(--text-disabled); margin-right:6px; }
 .agent-run .stamp .skind { color:var(--text-secondary); }
 
-/* JUDGE feedback — neutral, no accent; a quiet left rule marks it, a dot the verdict */
-.feedback { align-self:flex-start; max-width:92%; display:flex; flex-direction:column; gap:7px; padding:11px 14px; border-radius:var(--radius-sm); background:var(--bg-surface); box-shadow:inset 2px 0 0 var(--text-disabled); }
+/* JUDGE feedback — neutral, no accent, no side rule; a dot marks the verdict */
+.feedback { align-self:flex-start; max-width:92%; display:flex; flex-direction:column; gap:7px; padding:11px 14px; border-radius:var(--radius-sm); background:var(--bg-surface); }
 .feedback .fb-top { display:flex; align-items:center; gap:9px; }
 .verdict { font-size:9.5px; font-weight:700; letter-spacing:0.08em; padding:3px 9px; border-radius:9999px; background:var(--bg-elevated); color:var(--text-secondary); }
 .verdict::before { content:""; display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:6px; vertical-align:middle; background:var(--text-muted); }
@@ -151,29 +151,74 @@ textarea { border: none; outline: none; }
 .right-head .seg { margin:0 auto; }
 .rview { display:none; flex:1; min-height:0; overflow:auto; }
 .rview.on { display:block; }
-.editor, .codebase { font-family:var(--font-code); font-size:12.5px; line-height:1.7; padding:8px 0 12px; }
+.codebase { font-family:var(--font-code); font-size:12.5px; line-height:1.7; padding:8px 0 12px; }
 .code-line { display:flex; align-items:center; padding-right:12px; }
-.code-line.hl { background:rgba(216,178,77,0.08); box-shadow:inset 2px 0 0 var(--accent); }
-.code-line.hl2 { background:rgba(255,255,255,0.03); box-shadow:inset 2px 0 0 var(--text-disabled); }
+.code-line.hl { background:rgba(255,255,255,0.05); }
+.code-line.hl2 { background:rgba(255,255,255,0.03); }
 .code-line.dimfile { opacity:0.5; }
 .code-line .utag { margin-left:auto; flex-shrink:0; font-family:var(--font-ui); font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-muted); padding-left:10px; }
 .code-line.hl .utag { color:var(--accent); }
-/* VSCode-style explorer: file list on top, scrollable code below */
-#rview-codebase.on { display:flex; flex-direction:column; overflow:hidden; }
-.cb-files { flex-shrink:0; padding:8px; display:flex; flex-direction:column; gap:1px; }
-.cb-file { display:flex; align-items:center; gap:8px; padding:6px 10px; border-radius:6px; cursor:pointer; font-family:var(--font-code); font-size:12px; color:var(--text-secondary); transition:var(--transition-fast); }
-.cb-file:hover { background:var(--bg-surface); }
-.cb-file.on { background:var(--bg-surface); color:var(--text-primary); }
-.cb-file .fico { color:var(--text-muted); font-size:11px; flex-shrink:0; }
-.cb-file .fcount { margin-left:auto; font-size:9.5px; color:var(--text-disabled); background:var(--bg-app); border-radius:9999px; padding:1px 7px; }
-.cb-code { flex:1; min-height:0; overflow:auto; }
+/* VSCode-style layout: a collapsible file-tree column on the LEFT, the clicked
+ * file's source on the RIGHT. Each folder collapses from its own caret; the
+ * whole tree collapses from the Explorer header. */
+#rview-codebase.on { display:flex; flex-direction:row; overflow:hidden; }
+.explorer { flex-shrink:0; width:180px; height:100%; display:flex; flex-direction:column; background:var(--bg-app); border-right:1px solid var(--bg-deepest); }
+/* collapsed → thin rail; the code pane reclaims the width to its right. Click
+ * the header (the caret) to expand again. */
+.explorer.collapsed { width:38px; }
+.explorer.collapsed .ex-label { display:none; }
+.explorer.collapsed .ex-tree { display:none; }
+.explorer-head { flex-shrink:0; display:flex; align-items:center; gap:8px; padding:11px 13px; font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); cursor:pointer; user-select:none; }
+.explorer-head:hover { color:var(--text-secondary); }
+.explorer-head .ex-caret { font-size:9px; transition:transform 150ms ease; }
+.explorer.collapsed .ex-caret { transform:rotate(-90deg); }
+.ex-tree { flex:1; overflow:auto; padding:2px 0 8px; }
+.ex-row { display:flex; align-items:center; gap:7px; padding:5px 10px; cursor:pointer; font-family:var(--font-code); font-size:13px; color:var(--text-secondary); transition:var(--transition-fast); }
+.ex-row:hover { background:var(--bg-surface); }
+.ex-row.on { background:var(--accent-soft); color:var(--text-primary); }
+.ex-caret2 { width:11px; flex-shrink:0; font-size:9px; color:var(--text-muted); transition:transform 150ms ease; }
+.ex-folder.closed > .ex-row .ex-caret2 { transform:rotate(-90deg); }
+.ex-folder.closed > .ex-children { display:none; }
+.ex-file .ex-caret2 { visibility:hidden; }
+.ex-svg { flex-shrink:0; display:block; }
+.ex-folder > .ex-row .ex-svg { color:var(--accent-dim); }
+.ex-file > .ex-row .ex-svg { color:var(--text-muted); }
+.ex-row.on .ex-svg { color:var(--accent); }
+/* long names marquee-scroll on hover so the full title reads without dragging */
+.ex-name-clip { flex:1; min-width:0; overflow:hidden; }
+.ex-name { display:inline-block; white-space:nowrap; }
+.ex-name.scrolling { animation:exMarquee var(--dur,3s) linear infinite alternate; }
+@keyframes exMarquee { from{transform:translateX(0);} to{transform:translateX(var(--shift,0));} }
+.ex-count { flex-shrink:0; margin-left:6px; font-size:10px; color:var(--text-disabled); background:var(--bg-app); border-radius:9999px; padding:1px 7px; }
+.cb-code { flex:1; min-width:0; min-height:0; overflow:auto; }
 .ln { width:44px; flex-shrink:0; text-align:right; padding-right:14px; color:var(--text-disabled); user-select:none; }
 .code { color:var(--text-secondary); white-space:pre; }
 .file-sep { font-family:var(--font-ui); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); padding:4px 16px 6px; }
 .k { color:#d4d4d4; font-weight:600; } .s { color:#c8c8c8; } .f { color:#fff; } .c { color:var(--text-disabled); font-style:italic; }
-.editbox { padding:0 12px; height:calc(100% - 60px); }
-.editbox textarea { width:100%; height:100%; background:var(--bg-app); border-radius:var(--radius-md); color:var(--text-primary); font-family:var(--font-code); font-size:12.5px; line-height:1.7; padding:14px 16px; resize:none; }
-.run-row { display:flex; padding:12px; }
+/* real code editor (right · Editor tab): file tabs + line-number gutter +
+ * an inside scrollbar. This is the surface the learner fills; the AI checks it.
+ * Multiple files are supported so a task that spans files can be answered. */
+#rview-editor.on { display:flex; flex-direction:column; overflow:hidden; }
+.code-editor { flex:1; display:flex; flex-direction:column; min-height:0; }
+/* the tab row never scrolls as a whole — only the tab strip does, so the
+ * new-file (+) button stays pinned and reachable no matter how many files. */
+.editor-tabs { flex-shrink:0; display:flex; align-items:stretch; background:var(--bg-app); }
+.editor-tabs-scroll { flex:1; min-width:0; display:flex; align-items:stretch; overflow-x:auto; scrollbar-width:none; }
+.editor-tabs-scroll::-webkit-scrollbar { display:none; }
+.etab { display:flex; align-items:center; gap:8px; padding:8px 12px; font-family:var(--font-code); font-size:11.5px; color:var(--text-muted); white-space:nowrap; border-right:1px solid var(--bg-deepest); transition:var(--transition-fast); }
+.etab:hover { color:var(--text-secondary); background:var(--bg-surface); }
+.etab.on { color:var(--text-primary); background:var(--bg-deepest); }
+.etab .etab-name { outline:none; }
+.etab .etab-name.editing { background:var(--bg-elevated); color:var(--text-primary); border-radius:4px; padding:1px 4px; margin:-1px -4px; }
+.etab .etab-x { display:grid; place-items:center; width:16px; height:16px; font-size:14px; line-height:1; color:var(--text-disabled); border-radius:4px; }
+.etab .etab-x:hover { color:var(--text-secondary); background:var(--bg-elevated); }
+.etab-add { flex-shrink:0; padding:8px 13px; color:var(--text-muted); font-size:15px; line-height:1; border-left:1px solid var(--bg-deepest); }
+.etab-add:hover { color:var(--text-primary); background:var(--bg-surface); }
+.editor-body { flex:1; min-height:0; display:flex; background:var(--bg-deepest); overflow:hidden; }
+.editor-gutter { flex-shrink:0; overflow:hidden; padding:14px 0; font-family:var(--font-code); font-size:12.5px; line-height:1.7; color:var(--text-disabled); user-select:none; }
+.editor-gutter span { display:block; padding:0 12px 0 16px; text-align:right; }
+.editor-area { flex:1; min-width:0; background:transparent; color:var(--text-primary); font-family:var(--font-code); font-size:12.5px; line-height:1.7; padding:14px 16px; resize:none; white-space:pre; overflow:auto; tab-size:4; caret-color:var(--accent); }
+.run-row { display:flex; padding:12px; flex-shrink:0; }
 .btn { font-size:12px; font-weight:600; padding:9px 20px; border-radius:9px; }
 .btn.primary { background:var(--accent); color:var(--bg-deepest); width:100%; }
 .btn.primary:hover { background:#e8c565; }
@@ -248,19 +293,24 @@ textarea { border: none; outline: none; }
     </div>
 
     <div class="rview on" id="rview-editor">
-      <div class="editbox">
-        <textarea spellcheck="false">def _pinned_qa_group(questions):
-    pinned = [q for q in questions if q["pin"]]
-    rest   = [q for q in questions if not q["pin"]]
-    # TODO: id collisions across groups?
-    return pinned + rest
-</textarea>
+      <div class="code-editor">
+        <div class="editor-tabs">
+          <div class="editor-tabs-scroll" id="editorTabs"></div>
+          <button class="etab-add" id="editorAddTab" title="New file">+</button>
+        </div>
+        <div class="editor-body">
+          <div class="editor-gutter" id="editorGutter"></div>
+          <textarea class="editor-area" id="editorArea" spellcheck="false" wrap="off"></textarea>
+        </div>
+        <div class="run-row"><button class="btn primary">Submit</button></div>
       </div>
-      <div class="run-row"><button class="btn primary">Submit</button></div>
     </div>
 
     <div class="rview" id="rview-codebase">
-      <div class="cb-files" id="cbFiles"></div>
+      <div class="explorer" id="cbExplorer">
+        <div class="explorer-head" id="cbExplorerHead"><span class="ex-caret">▾</span><span class="ex-label">Explorer</span></div>
+        <div class="ex-tree" id="cbTree"></div>
+      </div>
       <div class="cb-code"><div class="codebase" id="codebase"></div></div>
     </div>
 
@@ -530,17 +580,202 @@ function renderCodeFile(path){
     const esc=raw.replace(/&/g,'&amp;').replace(/</g,'&lt;');
     return `<div class="code-line${cls}"><span class="ln">${ln}</span><span class="code">${esc||' '}</span>${tag}</div>`;
   }).join('');
-  document.querySelectorAll('.cb-file').forEach(el=>el.classList.toggle('on',el.dataset.path===path));
+  document.querySelectorAll('.ex-file .ex-row').forEach(el=>el.classList.toggle('on',el.dataset.path===path));
 }
 
-const cbFiles=document.getElementById('cbFiles');
-Object.keys(FILES).forEach(path=>{
-  const el=document.createElement('div'); el.className='cb-file'; el.dataset.path=path;
-  el.innerHTML=`<span class="fico">▤</span><span>${path}</span><span class="fcount">${FILES[path].units.length}</span>`;
-  el.addEventListener('click',()=>renderCodeFile(path));
-  cbFiles.appendChild(el);
-});
+/* ── VSCode-style file explorer ────────────────────────────────────────────
+ * Folders collapse from their caret; files (real names, keyed into FILES) open
+ * in the code view. The whole tree collapses from the Explorer header. */
+const FILE_TREE = { name:'agentic_tutor', open:true, children:[
+  { name:'soufiane_prompts', open:true, children:[
+    { name:'run_prompts.py', file:true },
+    { name:'schema_loader.py', file:true },
+    { name:'pinned_qa_group_normalization_helpers.py', file:true },
+  ]},
+]};
+const cbTree=document.getElementById('cbTree');
+const ICON_FOLDER='<svg class="ex-svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h3.5l2 2H19a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+const ICON_FILE='<svg class="ex-svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9z"/><path d="M13 3v6h6"/></svg>';
+/* marquee a row's name on hover only when it actually overflows its clip */
+function attachMarquee(row){
+  const clip=row.querySelector('.ex-name-clip'), name=row.querySelector('.ex-name');
+  row.addEventListener('mouseenter',()=>{
+    const over=name.scrollWidth-clip.clientWidth;
+    if(over>2){
+      name.style.setProperty('--shift',`-${over+6}px`);
+      name.style.setProperty('--dur',`${Math.max(1.6,(over+6)/40)}s`);
+      name.classList.add('scrolling');
+    }
+  });
+  row.addEventListener('mouseleave',()=>{ name.classList.remove('scrolling'); name.style.transform=''; });
+}
+function renderTree(node, depth, parentEl){
+  const pad=8+depth*14;
+  if(node.file){
+    const wrap=document.createElement('div'); wrap.className='ex-file';
+    const count=FILES[node.name]?FILES[node.name].units.length:'';
+    const row=document.createElement('div'); row.className='ex-row'; row.dataset.path=node.name;
+    row.style.paddingLeft=pad+'px';
+    row.innerHTML=`<span class="ex-caret2">▶</span>${ICON_FILE}<span class="ex-name-clip"><span class="ex-name">${esc(node.name)}</span></span>`+
+      (count!==''?`<span class="ex-count">${count}</span>`:'');
+    row.addEventListener('click',()=>renderCodeFile(node.name));
+    attachMarquee(row);
+    wrap.appendChild(row); parentEl.appendChild(wrap);
+    return;
+  }
+  const wrap=document.createElement('div'); wrap.className='ex-folder'+(node.open?'':' closed');
+  const row=document.createElement('div'); row.className='ex-row'; row.style.paddingLeft=pad+'px';
+  row.innerHTML=`<span class="ex-caret2">▶</span>${ICON_FOLDER}<span class="ex-name-clip"><span class="ex-name">${esc(node.name)}</span></span>`;
+  const children=document.createElement('div'); children.className='ex-children';
+  (node.children||[]).forEach(c=>renderTree(c,depth+1,children));
+  row.addEventListener('click',()=>wrap.classList.toggle('closed'));
+  attachMarquee(row);
+  wrap.appendChild(row); wrap.appendChild(children); parentEl.appendChild(wrap);
+}
+renderTree(FILE_TREE,0,cbTree);
+document.getElementById('cbExplorerHead').addEventListener('click',()=>
+  document.getElementById('cbExplorer').classList.toggle('collapsed'));
 renderCodeFile('run_prompts.py');
+
+/* ── Editor: a real multi-file code surface ────────────────────────────────
+ * The learner fills these files; the AI checks them. A task may span several
+ * files, so tabs let you add / close / switch, each keeping its own content.
+ * The gutter is a plain line-number column kept in vertical sync with the
+ * textarea's own (inside) scrollbar. */
+const EDITOR_FILES = [
+  { name:'test_pinned_qa.py', content:
+`def _pinned_qa_group(questions):
+    pinned = [q for q in questions if q["pin"]]
+    rest   = [q for q in questions if not q["pin"]]
+    # TODO: id collisions across groups?
+    return pinned + rest
+` },
+];
+const INDENT='    '; // one indent step = 4 spaces (Python)
+let activeFile = 0;
+const editorTabs=document.getElementById('editorTabs');
+const editorGutter=document.getElementById('editorGutter');
+const editorArea=document.getElementById('editorArea');
+
+function renderTabs(){
+  editorTabs.innerHTML='';
+  EDITOR_FILES.forEach((f,i)=>{
+    const tab=document.createElement('div');
+    tab.className='etab'+(i===activeFile?' on':'');
+    tab.innerHTML=`<span class="etab-name" title="Double-click to rename">${esc(f.name)}</span>`+
+      (EDITOR_FILES.length>1?`<button class="etab-x" title="Close">×</button>`:'');
+    const nameEl=tab.querySelector('.etab-name');
+    nameEl.addEventListener('click',()=>{ if(!nameEl.classList.contains('editing')) selectFile(i); });
+    nameEl.addEventListener('dblclick',()=>startRename(i,nameEl));
+    const x=tab.querySelector('.etab-x');
+    if(x) x.addEventListener('click',e=>{e.stopPropagation();closeFile(i);});
+    editorTabs.appendChild(tab);
+  });
+  const active=editorTabs.querySelector('.etab.on');
+  if(active) active.scrollIntoView({block:'nearest',inline:'nearest'});
+}
+/* inline rename: the tab label itself becomes editable — Enter/blur commits,
+ * Esc cancels. No modal, so renaming is one gesture. */
+function startRename(i,nameEl){
+  nameEl.classList.add('editing');
+  nameEl.contentEditable='true';
+  nameEl.focus();
+  document.getSelection().selectAllChildren(nameEl);
+  const commit=()=>{
+    nameEl.contentEditable='false'; nameEl.classList.remove('editing');
+    const v=nameEl.textContent.trim();
+    if(v) EDITOR_FILES[i].name=v; renderTabs();
+  };
+  nameEl.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){ e.preventDefault(); nameEl.blur(); }
+    else if(e.key==='Escape'){ e.preventDefault(); nameEl.textContent=EDITOR_FILES[i].name; nameEl.blur(); }
+  });
+  nameEl.addEventListener('blur',commit,{once:true});
+}
+function syncGutter(){
+  const lines=editorArea.value.split('\n').length;
+  let out='';
+  for(let n=1;n<=lines;n++) out+=`<span>${n}</span>`;
+  editorGutter.innerHTML=out;
+  editorGutter.scrollTop=editorArea.scrollTop;
+}
+function selectFile(i){
+  activeFile=i;
+  editorArea.value=EDITOR_FILES[i].content;
+  renderTabs(); syncGutter(); editorArea.focus();
+}
+function addFile(){
+  let n=1; while(EDITOR_FILES.some(f=>f.name===`untitled_${n}.py`)) n++;
+  EDITOR_FILES.push({name:`untitled_${n}.py`,content:''});
+  selectFile(EDITOR_FILES.length-1);
+}
+function closeFile(i){
+  if(EDITOR_FILES.length<=1) return;
+  EDITOR_FILES.splice(i,1);
+  if(activeFile>=EDITOR_FILES.length) activeFile=EDITOR_FILES.length-1;
+  else if(i<activeFile) activeFile--;
+  selectFile(activeFile);
+}
+
+/* real editor key handling: Tab indents (never leaves the field), Shift+Tab
+ * dedents, Enter keeps the current line's indent (and adds one step after a
+ * line ending in ':'). Selections indent/dedent line-by-line. */
+function setValue(text,selStart,selEnd){
+  editorArea.value=text;
+  editorArea.selectionStart=selStart; editorArea.selectionEnd=selEnd;
+  EDITOR_FILES[activeFile].content=text; syncGutter();
+}
+function lineStartsInSelection(val,s,e){
+  let start=val.lastIndexOf('\n',s-1)+1;
+  const starts=[start];
+  for(let i=start;i<e;i++) if(val[i]==='\n') starts.push(i+1);
+  return starts;
+}
+editorArea.addEventListener('keydown',e=>{
+  const val=editorArea.value, s=editorArea.selectionStart, ep=editorArea.selectionEnd;
+  if(e.key==='Tab'){
+    e.preventDefault();
+    if(s!==ep || e.shiftKey){
+      const starts=lineStartsInSelection(val,s,ep);
+      if(e.shiftKey){
+        // dedent: strip up to 4 leading spaces (or a tab) per line
+        let removedBeforeS=0,removed=0;
+        let result=val;
+        for(let k=starts.length-1;k>=0;k--){
+          const p=starts[k]; let cut=0;
+          if(result[p]==='\t') cut=1;
+          else { while(cut<4 && result[p+cut]===' ') cut++; }
+          if(cut>0){ result=result.slice(0,p)+result.slice(p+cut);
+            if(p<s) removedBeforeS+=cut; removed+=cut; }
+        }
+        setValue(result,Math.max(starts[0],s-removedBeforeS),ep-removed);
+      } else {
+        let result=val;
+        for(let k=starts.length-1;k>=0;k--){ const p=starts[k]; result=result.slice(0,p)+INDENT+result.slice(p); }
+        setValue(result,s+INDENT.length,ep+INDENT.length*starts.length);
+      }
+    } else {
+      setValue(val.slice(0,s)+INDENT+val.slice(ep),s+INDENT.length,s+INDENT.length);
+    }
+  } else if(e.key==='Enter'){
+    e.preventDefault();
+    const lineStart=val.lastIndexOf('\n',s-1)+1;
+    const indent=(val.slice(lineStart,s).match(/^[ \t]*/)||[''])[0];
+    const prevChar=val.slice(0,s).trimEnd().slice(-1);
+    const extra=prevChar===':' ? INDENT : '';
+    const ins='\n'+indent+extra;
+    setValue(val.slice(0,s)+ins+val.slice(ep),s+ins.length,s+ins.length);
+  }
+});
+editorArea.addEventListener('input',()=>{ EDITOR_FILES[activeFile].content=editorArea.value; syncGutter(); });
+editorArea.addEventListener('scroll',()=>{ editorGutter.scrollTop=editorArea.scrollTop; });
+document.getElementById('editorAddTab').addEventListener('click',addFile);
+// vertical wheel scrolls the tab strip horizontally, so every tab is reachable
+editorTabs.addEventListener('wheel',e=>{
+  if(e.deltaY===0) return;
+  editorTabs.scrollLeft+=e.deltaY; e.preventDefault();
+},{passive:false});
+selectFile(0);
 
 /* chat input auto-grows from one line up to its CSS max-height, then scrolls */
 const chatInput=document.querySelector('.chat-input');
