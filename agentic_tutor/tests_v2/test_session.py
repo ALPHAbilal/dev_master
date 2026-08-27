@@ -51,7 +51,8 @@ def _make_agent():
             return ["What does load(path) do, and why is reading delegated?"]
         if step == "wakeup.grade":
             return [json.dumps({"kind": "return.grade", "axis": "COMPREHEND", "verdict": "SOLID",
-                                "category": "correct-deep", "evidence_ref": "events:1", "hidden_gap": None})]
+                                "category": "correct-deep", "evidence_ref": "events:1", "hidden_gap": None,
+                                "map_text": {"title": "load reads a file", "summary": "Proved COMPREHEND"}})]
         raise AssertionError(f"unexpected step {step}")
     return run
 

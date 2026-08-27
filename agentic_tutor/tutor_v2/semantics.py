@@ -56,6 +56,7 @@ class SemanticGraphService:
         provenance: str,
         unit_id: int | None = None,
         summary: str | None = None,
+        axis: str | None = None,
         source_ref: dict[str, Any] | None = None,
         evidence_refs: list[str] | None = None,
         status: str = "active",
@@ -73,9 +74,9 @@ class SemanticGraphService:
             self._validate_source_ref(source_ref)
         with self.db.transaction():
             cursor = self.db.connection.execute(
-                "INSERT INTO semantic_nodes(journey_id,unit_id,kind,title,summary,source_ref_json,"
-                "status,provenance,evidence_refs_json) VALUES(?,?,?,?,?,?,?,?,?)",
-                (journey_id, unit_id, kind, title, summary,
+                "INSERT INTO semantic_nodes(journey_id,unit_id,kind,title,summary,axis,"
+                "source_ref_json,status,provenance,evidence_refs_json) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                (journey_id, unit_id, kind, title, summary, axis,
                  _json(source_ref) if source_ref is not None else None,
                  status, provenance, _json(evidence_refs)),
             )
@@ -114,6 +115,14 @@ class SemanticGraphService:
                  provenance, _json(evidence_refs)),
             )
         return int(cursor.lastrowid)
+
+    def set_node_status(self, node_id: int, status: str) -> None:
+        if status not in {"active", "disproved", "superseded"}:
+            raise ValidationError(f"unsupported node status: {status}")
+        with self.db.transaction():
+            self.db.connection.execute(
+                "UPDATE semantic_nodes SET status=?,updated_at=datetime('now') WHERE id=?",
+                (status, node_id))
 
     # -- parser ingestion + reconciliation ---------------------------------------
 

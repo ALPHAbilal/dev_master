@@ -111,9 +111,11 @@ textarea { border: none; outline: none; }
 .turn.learner .say { background:var(--bg-card); border-radius:var(--radius-md); padding:12px 16px; }
 .turn .say code { font-family:var(--font-code); font-size:13.5px; background:var(--bg-surface); color:var(--text-primary); padding:1px 5px; border-radius:4px; }
 
-/* agent-run trace — the read-only tools an agent actually consulted.
- * These 8 reads are the entire tool surface (see backend CapabilityPolicy);
- * every write tool is blocked. Rendered monochrome, like a real tool log. */
+/* agent-run trace — only the GROUNDING reads surface here (read_code_slice,
+ * read_workspace): the tools done to the learner's own work. The other six reads
+ * (axis_evidence, probe_history, transcript, turn_context, event_trace,
+ * search_repository) are machinery and live in the map view, not the conversation.
+ * Rendered monochrome, like a real tool log. */
 .agent-run { align-self:flex-start; max-width:92%; display:flex; flex-direction:column; gap:2px; font-family:var(--font-code); }
 .agent-run .ar-head { font-size:10.5px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-muted); margin-bottom:5px; }
 .agent-run .ar-head .dot { color:var(--text-disabled); margin:0 6px; }
@@ -412,6 +414,7 @@ const UNITS={
      ["gap",0,"the same id can appear in both groups — nothing removes the duplicate","ROBUSTNESS"],
      ["dive",0,"Dict identity vs value","you needed this first"],
        ["learned",1,"`is` checks identity, `==` checks value"],
+       ["mechanism",1,"you first explained equality by identity, not by value","MECHANISM"],
        ["gap",1,"to be sure, you needed how dict keys are matched"],
        ["dive",1,"Why keys must hash","needed before that could click"],
          ["learned",2,"membership checks the hash, then equality"],
@@ -419,6 +422,7 @@ const UNITS={
          ["sealed",2,"Why keys must hash"],
        ["return",1,"Dict identity vs value",null,"which do two equal dicts share — identity or value?"],
        ["proved",1,"two equal-looking dicts are still different objects","MECHANISM"],
+       ["resolved",1,"equality is by identity, not value","MECHANISM"],
        ["sealed",1,"Dict identity vs value"],
      ["return",0,"Group pinned questions first","ROBUSTNESS","trace an input where a pinned id also appears unpinned"],
      ["dive",0,"What 'collision' means for ids","the gap came back once identity was solid"],
@@ -458,6 +462,12 @@ function line(row){
     case "proved":  return rail+S("✓ ","o")+S("Proved","o b")+"    "+S(a,"fg")+at(b);
     case "shaky":   return rail+S("~ ","od")+S("Almost","od b")+"    "+S(a,"fg")+at(b);
     case "gap":     return rail+S("⚠ ","g")+S("Found a gap","g b")+"  "+S(a,"fg")+at(b);
+    /* reasoning gap (backend `mechanism` node from working-code-wrong-reasoning):
+     * the code works but the WHY is wrong — distinct from a value/comprehension gap */
+    case "mechanism": return rail+S("⚙ ","g")+S("Reasoning off","g b")+"  "+S(a,"fg")+at(b);
+    /* a prior misconception/mechanism the backend flipped to status=disproved once the
+     * same axis was later proved — the "you were wrong, then cleared it up" moment */
+    case "resolved": return rail+S("✓ ","gr")+S("Cleared up — ","gr b")+`<s class="dm">`+esc(a)+`</s>`+at(b);
     case "note":    return rail+S("○ ","dm")+S("Noted for later","dm")+"  "+S(a,"dm");
     case "dive":    return rail+S("↳ ","g")+S((d>0?"Needed first":"Went to learn first")+" — ","g")+S(a,"cy b")+(b?S("   ("+b+")","dm"):"");
     case "sealed":  return rail+S("★ ","o")+S("Sealed — you own ","o")+S(a,"cy");
@@ -483,6 +493,8 @@ function renderStory(slug){
 }
 
 /* conversation */
+// only these two "grounding" tools surface in the conversation; the rest are map-only.
+const GROUNDING_TOOLS=new Set(['read_code_slice','read_workspace']);
 const convo=document.getElementById('convo');
 STREAM.forEach(item=>{
   if(item.t==='msg'){
@@ -491,14 +503,17 @@ STREAM.forEach(item=>{
     d.innerHTML=`<div class="who">${who}</div><div class="say">${item.text}</div>`;
     convo.appendChild(d);
   } else if(item.t==='run'){
-    // the agent's actual work: which scoped read-only tools it consulted, then its stamp
+    // conversation shows ONLY the grounding tools — the ones done TO the learner's work
+    // (read the code, read the submission). The other six (axis_evidence, probe_history,
+    // transcript, turn_context, event_trace, search_repository) are machinery: full tool
+    // traceability lives in the map view, never here. The stamp (return.grade JSON) is also
+    // machinery — the verdict/category already appear on the feedback card below.
+    const grounded=item.tools.filter(([name])=>GROUNDING_TOOLS.has(name));
+    if(!grounded.length) return;   // nothing grounding to show → no run block
     const d=document.createElement('div'); d.className='agent-run'; d.dataset.id=item.id;
-    const tools=item.tools.map(([name,ret])=>
+    const tools=grounded.map(([name,ret])=>
       `<div class="tool"><span class="tname">${name}</span><span class="tret">${ret}</span></div>`).join('');
-    const stamp=item.stamp
-      ? `<div class="stamp"><span class="arrow">→</span><span class="skind">${item.stamp.kind}</span> · ${item.stamp.verdict} · ${item.stamp.category}</div>`
-      : '';
-    d.innerHTML=`<div class="ar-head">${item.agent}<span class="dot">·</span>${item.step}</div>${tools}${stamp}`;
+    d.innerHTML=`<div class="ar-head">${item.agent}<span class="dot">·</span>${item.step}</div>${tools}`;
     convo.appendChild(d);
   } else {
     const d=document.createElement('div'); d.className='feedback'; d.dataset.id=item.id;

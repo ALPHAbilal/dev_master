@@ -9,7 +9,7 @@ from typing import Iterator
 
 from .errors import InvariantError
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 
 
@@ -65,6 +65,15 @@ class Database:
         if version == 4:
             # The additive journey-layer tables are created idempotently by schema.sql
             # (executescript runs on every init), so no transform is required here.
+            return
+        if version == 5:
+            # Per-axis tag on semantic nodes. schema.sql (run by executescript above)
+            # already creates the column on fresh DBs, so ignore "duplicate column".
+            try:
+                self._connection.execute("ALTER TABLE semantic_nodes ADD COLUMN axis TEXT")
+            except sqlite3.OperationalError as exc:
+                if "duplicate column" not in str(exc).lower():
+                    raise
             return
         raise RuntimeError(f"no migration implementation for schema {version}")
 

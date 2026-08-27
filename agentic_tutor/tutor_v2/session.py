@@ -31,7 +31,12 @@ DEFAULT_INSTRUCTIONS: dict[str, str] = {
     "wakeup.probe": "You are the TEACHER. Ask one probing question for the active axis.",
     "wakeup.teach": "You are the TEACHER. Explain the active axis concisely.",
     "wakeup.test": "You are the TEACHER. Pose one harder proof task for the active axis.",
-    "wakeup.grade": "You are the JUDGE. Return exactly one return.grade JSON object.",
+    "wakeup.grade": (
+        "You are the JUDGE. Return exactly one return.grade JSON object. When the category "
+        "emits a map node (correct-deep, working-code-wrong-reasoning, misconception, "
+        "different-prereq, sibling-hole), include map_text:{title,summary} naming the concept "
+        "the verdict establishes; otherwise map_text:null."
+    ),
     "wakeup.distill": "You are the DISTILLER. Return exactly one return.distill JSON object.",
 }
 

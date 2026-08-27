@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 from tutor_v2 import Database, Router, TutorConfig, WorkspaceService
+from tutor_v2.contracts import MAP_NODE_CATEGORIES
 
 
 def _setup():
@@ -31,9 +32,11 @@ def _unit(slug, axes):
 
 
 def _grade(axis, verdict, category, gap=None):
+    map_text = ({"title": f"{category} on {axis}", "summary": f"Verdict {verdict}"}
+                if category in MAP_NODE_CATEGORIES else None)
     return {
         "kind": "return.grade", "axis": axis, "verdict": verdict, "category": category,
-        "evidence_ref": "events:1", "hidden_gap": gap,
+        "evidence_ref": "events:1", "hidden_gap": gap, "map_text": map_text,
     }
 
 

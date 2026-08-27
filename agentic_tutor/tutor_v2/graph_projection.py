@@ -25,12 +25,15 @@ from typing import Any
 from .contracts import GRADE_CATEGORIES
 from .semantics import SemanticGraphService
 
+# per-axis "state" dots: exactly one per (unit, axis). prerequisite is intentionally excluded.
+_SINGLETON_KINDS = frozenset({"takeaway", "misconception", "mechanism"})
+
 # category -> (node_kind, relationship) or None for "this turn adds no concept".
 # Every GRADE_CATEGORIES member appears exactly once (enforced by test).
 _GRADE_EMISSION: dict[str, tuple[str, str] | None] = {
     "correct-deep": ("takeaway", "proved_by"),
     "misconception": ("misconception", "revealed_gap_in"),
-    "working-code-wrong-reasoning": ("misconception", "revealed_gap_in"),
+    "working-code-wrong-reasoning": ("mechanism", "revealed_gap_in"),
     "different-prereq": ("prerequisite", "depends_on"),
     "sibling-hole": ("prerequisite", "revealed_gap_in"),
     "pattern-matched": None,
@@ -67,35 +70,67 @@ class GraphProjection:
 
     def on_grade(
         self, *, journey_id: int, unit_id: int, axis: str, turn_id: str, category: str,
-        hidden_gap: dict[str, Any] | None, probe_id: int,
+        hidden_gap: dict[str, Any] | None, probe_id: int, map_text: dict[str, Any] | None,
     ) -> None:
-        """Emit the node the graded turn revealed (misconception / prerequisite / takeaway)."""
+        """Emit the node the graded turn revealed, using the agent-authored map_text."""
         spec = _GRADE_EMISSION[category]  # KeyError impossible: category is validated + total
         if spec is None:
             return
         node_kind, relationship = spec
         evidence = [f"probe:{probe_id}", f"turn:{turn_id}"]
         anchor = self._anchor(journey_id, unit_id)
-        title, summary = self._grade_node_text(node_kind, axis, hidden_gap)
-        node_id = self.graph.add_node(
-            journey_id=journey_id, unit_id=unit_id, kind=node_kind, title=title,
-            provenance="agent", summary=summary, evidence_refs=evidence,
-        )
+        node_id = self._agent_node(
+            journey_id=journey_id, unit_id=unit_id, axis=axis, kind=node_kind,
+            title=map_text["title"], summary=map_text["summary"], evidence=evidence)
         self._link(journey_id, anchor, node_id, relationship, evidence)
+        if node_kind == "takeaway":                      # a proof — resolve prior gaps on this axis
+            self._disprove_axis_gaps(journey_id, unit_id, axis, node_id, evidence)
 
-    # -- text ---------------------------------------------------------------------
+    # -- distill ------------------------------------------------------------------
 
-    @staticmethod
-    def _grade_node_text(node_kind: str, axis: str, hidden_gap: dict[str, Any] | None) -> tuple[str, str]:
-        if node_kind == "takeaway":
-            return (f"Proved: {axis}", f"Learner proved the {axis} axis")
-        why = hidden_gap["why"] if hidden_gap else None
-        slug = hidden_gap["slug"] if hidden_gap else None
-        if node_kind == "misconception":
-            belief = why or f"Unproven reasoning on {axis}"
-            return (belief, f"Revealed while working the {axis} axis")
-        # prerequisite
-        return (slug or f"Prerequisite for {axis}", why or f"Gap uncovered under {axis}")
+    def on_distill(
+        self, *, journey_id: int, unit_id: int, axes_tested: list[str], event_ref: str,
+    ) -> None:
+        """Seal each tested axis as a takeaway (find-or-create: no second dot for an axis)."""
+        evidence = [event_ref]
+        anchor = self._anchor(journey_id, unit_id)
+        for axis in axes_tested:
+            node_id = self._agent_node(
+                journey_id=journey_id, unit_id=unit_id, axis=axis, kind="takeaway",
+                title=f"Owned: {axis}", summary=f"Sealed the {axis} axis", evidence=evidence)
+            self._link(journey_id, anchor, node_id, "proved_by", evidence)
+
+    # -- code-owned disproval --------------------------------------------------------
+
+    def _disprove_axis_gaps(self, journey_id: int, unit_id: int, axis: str,
+                            proof_node_id: int, evidence: list[str]) -> None:
+        """Proving an axis disproves any still-active gap dot on that same axis."""
+        gaps = self.graph.db.query(
+            "SELECT id FROM semantic_nodes WHERE journey_id=? AND unit_id=? AND axis=? "
+            "AND kind IN ('misconception','mechanism') AND provenance='agent' AND status='active'",
+            (journey_id, unit_id, axis))
+        for g in gaps:
+            self.graph.set_node_status(int(g["id"]), "disproved")
+            # the gap was disproved BY the proof
+            self._link(journey_id, int(g["id"]), proof_node_id, "disproved_by", evidence)
+
+    # -- cross-turn edges (code-owned topology) -----------------------------------
+
+    def on_detour(
+        self, *, journey_id: int, parent_unit_id: int, child_unit_id: int, probe_id: int, turn_id: str,
+    ) -> None:
+        evidence = [f"probe:{probe_id}", f"turn:{turn_id}"]
+        parent = self._anchor(journey_id, parent_unit_id)
+        child = self._anchor(journey_id, child_unit_id)
+        self._link(journey_id, parent, child, "detoured_to", evidence)
+
+    def on_parent_resume(
+        self, *, journey_id: int, child_unit_id: int, parent_unit_id: int, event_ref: str,
+    ) -> None:
+        evidence = [event_ref]
+        child = self._anchor(journey_id, child_unit_id)
+        parent = self._anchor(journey_id, parent_unit_id)
+        self._link(journey_id, child, parent, "returned_to", evidence)
 
     # -- graph helpers (all find-or-create / idempotent) --------------------------
 
@@ -130,6 +165,20 @@ class GraphProjection:
             journey_id=journey_id, unit_id=unit_id, kind="concept", title=title,
             provenance="agent", evidence_refs=evidence, summary=f"Concept taught for the {axis} axis",
         )
+
+    def _agent_node(self, *, journey_id: int, unit_id: int, axis: str, kind: str,
+                    title: str, summary: str, evidence: list[str]) -> int:
+        """Find-or-create an agent state-dot; singleton kinds are unique per (unit, axis)."""
+        if kind in _SINGLETON_KINDS:
+            row = self.graph.db.one(
+                "SELECT id FROM semantic_nodes WHERE journey_id=? AND unit_id=? AND axis=? "
+                "AND kind=? AND provenance='agent' ORDER BY id LIMIT 1",
+                (journey_id, unit_id, axis, kind))
+            if row:
+                return int(row["id"])
+        return self.graph.add_node(
+            journey_id=journey_id, unit_id=unit_id, axis=axis, kind=kind, title=title,
+            provenance="agent", summary=summary, evidence_refs=evidence)
 
     def _link(self, journey_id: int, from_id: int, to_id: int, relationship: str, evidence: list[str]) -> None:
         exists = self.graph.db.one(

@@ -26,6 +26,10 @@ GRADE_CATEGORIES = frozenset({
     "silent-stuck", "disputes-verdict", "skip-request", "fatigue-switch",
     "working-code-wrong-reasoning",
 })
+MAP_NODE_CATEGORIES = frozenset({
+    "correct-deep", "working-code-wrong-reasoning", "misconception",
+    "different-prereq", "sibling-hole",
+})
 EVENT_KINDS = frozenset({"edit", "command", "test", "error", "ui", "feedback", "block", "message"})
 
 
@@ -140,7 +144,7 @@ def _validate_map(stamp: dict[str, Any]) -> dict[str, Any]:
 
 
 def _validate_grade(stamp: dict[str, Any]) -> dict[str, Any]:
-    _expect_keys(stamp, required={"kind", "axis", "verdict", "category", "evidence_ref", "hidden_gap"}, optional=set(), label="return.grade")
+    _expect_keys(stamp, required={"kind", "axis", "verdict", "category", "evidence_ref", "hidden_gap", "map_text"}, optional=set(), label="return.grade")
     if stamp["axis"] not in AXES:
         raise ValidationError("return.grade.axis is unsupported")
     if stamp["verdict"] not in {"SOLID", "SHAKY", "MISSING"}:
@@ -166,6 +170,15 @@ def _validate_grade(stamp: dict[str, Any]) -> dict[str, Any]:
             _integer(anchor["hi"], "return.grade.hidden_gap.anchor.hi", minimum=lo)
         else:
             raise ValidationError("return.grade.hidden_gap.anchor.kind must be code or conceptual")
+    map_text = stamp["map_text"]
+    if stamp["category"] in MAP_NODE_CATEGORIES:
+        map_text = _expect_object(map_text, "return.grade.map_text")
+        _expect_keys(map_text, required={"title", "summary"}, optional=set(),
+                     label="return.grade.map_text")
+        _string(map_text["title"], "return.grade.map_text.title")
+        _string(map_text["summary"], "return.grade.map_text.summary")
+    elif map_text is not None:
+        raise ValidationError("map_text must be null when the category emits no node")
     return deepcopy(stamp)
 
 

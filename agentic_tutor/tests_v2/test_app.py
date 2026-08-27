@@ -41,7 +41,9 @@ def _agent():
         if step == "wakeup.grade":
             return [json.dumps({"kind": "return.grade", "axis": "COMPREHEND", "verdict": "SOLID",
                                 "category": "correct-deep", "evidence_ref": "events:1",
-                                "hidden_gap": None})]
+                                "hidden_gap": None,
+                                "map_text": {"title": "load reads a file",
+                                             "summary": "Proved COMPREHEND"}})]
         if step == "wakeup.distill":
             return _distill_blocks()
         raise AssertionError(f"unexpected step {step}")

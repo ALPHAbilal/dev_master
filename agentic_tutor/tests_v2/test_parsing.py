@@ -12,6 +12,7 @@ def _grade(**over):
     stamp = {
         "kind": "return.grade", "axis": "COMPREHEND", "verdict": "SOLID",
         "category": "correct-deep", "evidence_ref": "events:1", "hidden_gap": None,
+        "map_text": {"title": "load reads a file", "summary": "Proved COMPREHEND"},
     }
     stamp.update(over)
     return stamp

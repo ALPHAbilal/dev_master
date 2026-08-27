@@ -204,12 +204,16 @@ class TurnOrchestrator:
             if self.graph_projection is not None:
                 self.graph_projection.on_grade(
                     journey_id=journey_id, unit_id=unit_id, axis=axis, turn_id=turn_id,
-                    category=stamp["category"], hidden_gap=stamp["hidden_gap"], probe_id=probe_id)
+                    category=stamp["category"], hidden_gap=stamp["hidden_gap"], probe_id=probe_id,
+                    map_text=stamp["map_text"])
             self.conversation.set_turn_status(journey_id=journey_id, turn_id=turn_id, status="EVALUATED")
             revision = self.journeys.bump_revision(journey_id)
         # Additive, post-commit: if the route opened a child detour, graph that child.
         if decision.unit_id is not None and decision.unit_id != unit_id:
             self.attach_unit_structure(journey_id=journey_id, unit_id=decision.unit_id)
+            if self.graph_projection is not None:
+                self.graph_projection.on_detour(journey_id=journey_id, parent_unit_id=unit_id,
+                    child_unit_id=decision.unit_id, probe_id=probe_id, turn_id=turn_id)
         return TurnResult(journey_id, decision, revision)
 
     # -- Stage 10: distill a finished unit (seal proof + apply learner diff) -------
@@ -256,6 +260,10 @@ class TurnOrchestrator:
                 )
             if self.learner_model is not None:
                 self.learner_model.apply_diff(stamp["learner_diff"])
+            if self.graph_projection is not None:
+                self.graph_projection.on_distill(journey_id=journey_id, unit_id=unit_id,
+                    axes_tested=stamp["axes_tested"],
+                    event_ref=f"unit_distilled:{unit_id}")
             self.journeys.record_event(
                 journey_id=journey_id, unit_id=unit_id, event_type="unit_distilled",
                 payload={"final_verdict": stamp["final_verdict"], "unit": stamp["unit"],
@@ -278,6 +286,10 @@ class TurnOrchestrator:
                     journey_id=journey_id, unit_id=decision.unit_id, event_type="parent_resumed",
                     axis=decision.axis, payload={"resume_question": decision.resume_question},
                 )
+                if self.graph_projection is not None:
+                    self.graph_projection.on_parent_resume(journey_id=journey_id,
+                        child_unit_id=child_unit_id, parent_unit_id=decision.unit_id,
+                        event_ref=f"parent_resumed:{decision.unit_id}")
             revision = self.journeys.bump_revision(journey_id)
         return TurnResult(journey_id, decision, revision)
 

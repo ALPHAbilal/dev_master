@@ -41,10 +41,25 @@ def test_return_map_enforces_dependency_order_and_mappable_axes():
 
 
 def test_return_grade_has_machine_route_signal_and_evidence():
-    stamp = {"kind": "return.grade", "axis": "RATIONALE", "verdict": "SHAKY", "category": "working-code-wrong-reasoning", "evidence_ref": "events:12", "hidden_gap": {"slug": "lookup", "why": "wrong complexity reason", "axis": "RATIONALE", "anchor": {"kind": "conceptual"}}}
+    stamp = {"kind": "return.grade", "axis": "RATIONALE", "verdict": "SHAKY", "category": "working-code-wrong-reasoning", "evidence_ref": "events:12", "hidden_gap": {"slug": "lookup", "why": "wrong complexity reason", "axis": "RATIONALE", "anchor": {"kind": "conceptual"}}, "map_text": {"title": "dict lookup cost", "summary": "Reasoning gap on RATIONALE"}}
     assert validate_return(stamp) == stamp
     _fails(validate_return, {**stamp, "category": "freeform guess"})
     _fails(validate_return, {**stamp, "evidence_ref": ""})
+
+
+def test_return_grade_map_text_matches_category_emission():
+    base = {"kind": "return.grade", "axis": "COMPREHEND", "verdict": "SOLID",
+            "category": "correct-deep", "evidence_ref": "events:1", "hidden_gap": None,
+            "map_text": {"title": "load reads a file", "summary": "Proved COMPREHEND"}}
+    # A node-emitting category with a valid map_text passes.
+    assert validate_return(base) == base
+    # A node-emitting category with map_text=null is rejected.
+    _fails(validate_return, {**base, "map_text": None})
+    # A non-emitting category carrying a non-null map_text is rejected.
+    _fails(validate_return, {**base, "category": "off-topic"})
+    # A non-emitting category with map_text=null passes.
+    ok = {**base, "category": "off-topic", "map_text": None}
+    assert validate_return(ok) == ok
 
 
 def test_return_distill_requires_complete_owned_or_parked_contract():

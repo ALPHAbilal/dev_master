@@ -37,7 +37,8 @@ def test_journey_start_is_idempotent_and_resolves_children_to_root():
         gap = {"slug": "child", "why": "prereq", "axis": "COMPREHEND", "anchor": {"kind": "conceptual"}}
         child = router.route_grade(unit_id=pointed.unit_id, stamp={
             "kind": "return.grade", "axis": "RATIONALE", "verdict": "MISSING",
-            "category": "misconception", "evidence_ref": "e:1", "hidden_gap": gap})
+            "category": "misconception", "evidence_ref": "e:1", "hidden_gap": gap,
+            "map_text": {"title": "prereq belief", "summary": "Revealed under RATIONALE"}})
 
         recorder = JourneyRecorder(db, config)
         journey_id = recorder.start(pointed.unit_id)

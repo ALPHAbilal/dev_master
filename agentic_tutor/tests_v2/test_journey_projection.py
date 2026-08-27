@@ -10,6 +10,7 @@ from tutor_v2 import (
     Router, SemanticGraphService, StructureExtractor, TurnOrchestrator, TutorConfig,
     WorkspaceService,
 )
+from tutor_v2.contracts import MAP_NODE_CATEGORIES
 
 _SAMPLE = "def load(path):\n    return read(path)\n\n\ndef read(path):\n    return {}\n"
 
@@ -35,8 +36,11 @@ def _map_blocks():
 
 
 def _grade(axis, verdict, category):
+    map_text = ({"title": f"{category} on {axis}", "summary": f"Verdict {verdict}"}
+                if category in MAP_NODE_CATEGORIES else None)
     return [json.dumps({"kind": "return.grade", "axis": axis, "verdict": verdict,
-                        "category": category, "evidence_ref": "events:1", "hidden_gap": None})]
+                        "category": category, "evidence_ref": "events:1", "hidden_gap": None,
+                        "map_text": map_text})]
 
 
 def _drive_to_owned(orch, db, config):

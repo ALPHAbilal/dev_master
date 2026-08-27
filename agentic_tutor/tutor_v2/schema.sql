@@ -170,6 +170,7 @@ CREATE TABLE IF NOT EXISTS semantic_nodes (
     kind               TEXT NOT NULL,
     title              TEXT NOT NULL,
     summary            TEXT,
+    axis               TEXT,
     source_ref_json    TEXT,
     status             TEXT NOT NULL DEFAULT 'active',
     provenance         TEXT NOT NULL CHECK (provenance IN ('parser','agent','system')),
