@@ -68,7 +68,7 @@ textarea { border: none; outline: none; }
 .u-here { margin-left:auto; font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--bg-deepest); background:var(--accent); border-radius:4px; padding:1px 5px; }
 
 /* ─── MIDDLE — map / conversation ────────────────────────────────────────── */
-.mid { background:var(--bg-app); display:flex; flex-direction:column; min-width:0; }
+.mid { background:var(--bg-app); display:flex; flex-direction:column; min-width:0; min-height:0; }
 .view { display:none; flex:1; min-height:0; }
 .view.on { display:flex; flex-direction:column; }
 .map-scroll { flex:1; overflow-y:auto; overflow-x:hidden; }
@@ -90,37 +90,59 @@ textarea { border: none; outline: none; }
 .unit-story .fg { color:var(--text-primary); }
 .unit-story .b  { font-weight:700; }
 .unit-story i   { font-style:italic; }
+/* the line the learner is working on now: a soft accent sheen sliding across it */
+.unit-story .hl-here { border-radius:5px; padding:2px 6px; background:linear-gradient(100deg,transparent 8%,var(--accent-soft) 30%,transparent 62%); background-size:220% 100%; animation:hereSweep 2.8s linear infinite; }
+@keyframes hereSweep { 0%{background-position:130% 0;} 100%{background-position:-30% 0;} }
 
 /* conversation */
 .focus-bar { display:none; align-items:center; gap:10px; padding:8px 14px; margin:10px 18px 0; background:var(--bg-surface); border-radius:9px; font-size:11.5px; color:var(--text-secondary); }
 .focus-bar.on { display:flex; }
 .focus-bar .clr { margin-left:auto; color:var(--text-muted); font-weight:600; }
 .focus-bar .clr:hover { color:var(--text-primary); }
-.convo-scroll { flex:1; overflow-y:auto; padding:16px 24px 8px; display:flex; flex-direction:column; gap:15px; }
-.turn { display:flex; flex-direction:column; gap:5px; max-width:640px; transition:opacity 200ms ease; }
+/* full-width scroller so the scrollbar sits at the far right by the sidebar;
+ * the messages themselves stay in a centered reading column inside it. */
+.convo-scroll { flex:1; overflow-y:auto; width:100%; }
+.convo-inner { max-width:780px; margin:0 auto; padding:26px 36px 12px; display:flex; flex-direction:column; gap:18px; }
+.turn { display:flex; flex-direction:column; gap:6px; max-width:90%; transition:opacity 200ms ease; }
 .turn.learner { align-self:flex-end; align-items:flex-end; }
-.turn .who { font-size:9.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); }
-.turn .say { font-size:14px; line-height:1.65; color:var(--text-secondary); }
+.turn .who { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); }
+.turn .say { font-size:15px; line-height:1.7; color:var(--text-secondary); }
 .turn.tutor .say { color:var(--text-primary); }
-.turn.learner .say { background:var(--bg-card); border-radius:var(--radius-md); padding:10px 14px; }
-.turn .say code { font-family:var(--font-code); font-size:12.5px; background:var(--bg-surface); color:#fff; padding:1px 5px; border-radius:4px; }
-.feedback { align-self:flex-start; max-width:640px; display:flex; flex-direction:column; gap:5px; padding:9px 13px; border-radius:var(--radius-sm); background:var(--bg-surface); box-shadow:inset 3px 0 0 var(--accent-dim); }
-.feedback .fb-top { display:flex; align-items:center; gap:8px; }
-.verdict { font-size:9.5px; font-weight:700; letter-spacing:0.06em; padding:2px 8px; border-radius:9999px; }
-.verdict.SOLID { background:var(--accent); color:var(--bg-deepest); }
-.verdict.SHAKY { background:var(--bg-elevated); color:var(--text-primary); }
-.verdict.MISSING { background:var(--bg-card); color:var(--text-primary); }
-.feedback .cat { font-size:10.5px; color:var(--text-muted); font-family:var(--font-code); }
-.feedback .fb-body { font-size:13px; color:var(--text-secondary); line-height:1.55; }
+.turn.learner .say { background:var(--bg-card); border-radius:var(--radius-md); padding:12px 16px; }
+.turn .say code { font-family:var(--font-code); font-size:13.5px; background:var(--bg-surface); color:var(--text-primary); padding:1px 5px; border-radius:4px; }
+
+/* agent-run trace — the read-only tools an agent actually consulted.
+ * These 8 reads are the entire tool surface (see backend CapabilityPolicy);
+ * every write tool is blocked. Rendered monochrome, like a real tool log. */
+.agent-run { align-self:flex-start; max-width:92%; display:flex; flex-direction:column; gap:2px; font-family:var(--font-code); }
+.agent-run .ar-head { font-size:10.5px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-muted); margin-bottom:5px; }
+.agent-run .ar-head .dot { color:var(--text-disabled); margin:0 6px; }
+.agent-run .tool { display:flex; gap:10px; font-size:12.5px; line-height:2; }
+.agent-run .tool::before { content:"⌁"; color:var(--text-disabled); }
+.agent-run .tool .tname { color:var(--text-secondary); }
+.agent-run .tool .tret { color:var(--text-disabled); }
+.agent-run .stamp { font-size:11.5px; color:var(--text-muted); margin-top:6px; }
+.agent-run .stamp .arrow { color:var(--text-disabled); margin-right:6px; }
+.agent-run .stamp .skind { color:var(--text-secondary); }
+
+/* JUDGE feedback — neutral, no accent; a quiet left rule marks it, a dot the verdict */
+.feedback { align-self:flex-start; max-width:92%; display:flex; flex-direction:column; gap:7px; padding:11px 14px; border-radius:var(--radius-sm); background:var(--bg-surface); box-shadow:inset 2px 0 0 var(--text-disabled); }
+.feedback .fb-top { display:flex; align-items:center; gap:9px; }
+.verdict { font-size:9.5px; font-weight:700; letter-spacing:0.08em; padding:3px 9px; border-radius:9999px; background:var(--bg-elevated); color:var(--text-secondary); }
+.verdict::before { content:""; display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:6px; vertical-align:middle; background:var(--text-muted); }
+.verdict.SOLID::before { background:var(--text-primary); }
+.verdict.MISSING::before { background:transparent; box-shadow:inset 0 0 0 1.5px var(--text-muted); }
+.feedback .cat { font-size:11.5px; color:var(--text-muted); font-family:var(--font-code); }
+.feedback .fb-body { font-size:14px; color:var(--text-secondary); line-height:1.6; }
 .feedback .agent { margin-left:auto; font-size:9px; color:var(--text-disabled); font-family:var(--font-code); }
-.convo-scroll.focused .turn:not(.ev), .convo-scroll.focused .feedback:not(.ev) { opacity:0.22; }
+.convo-inner.focused .turn:not(.ev), .convo-inner.focused .feedback:not(.ev), .convo-inner.focused .agent-run:not(.ev) { opacity:0.22; }
 /* chat input (conversation mode) */
-.chatbar-wrap { padding:12px 24px 18px; display:flex; justify-content:center; }
-.chatbar { width:100%; max-width:660px; background:var(--bg-surface); border-radius:16px; padding:8px 8px 8px 16px; display:flex; align-items:flex-end; gap:8px; transition:box-shadow 200ms ease; }
-.chatbar:focus-within { box-shadow:0 0 0 1.5px var(--accent-soft); }
-.chat-input { flex:1; background:transparent; color:var(--text-primary); font-family:var(--font-ui); font-size:13.5px; line-height:1.5; resize:none; min-height:26px; max-height:140px; padding:4px 0; }
+.chatbar-wrap { padding:8px 10px 14px; display:flex; justify-content:center; }
+.chatbar { width:100%; max-width:708px; background:var(--bg-surface); border-radius:14px; padding:12px 12px 12px 16px; display:flex; align-items:flex-end; gap:10px; transition:box-shadow 200ms ease; }
+.chatbar:focus-within { box-shadow:0 0 0 1.5px rgba(255,255,255,0.10); }
+.chat-input { flex:1; background:transparent; color:var(--text-primary); font-family:var(--font-ui); font-size:14px; line-height:1.6; resize:none; min-height:26px; max-height:180px; overflow-y:auto; padding:2px 0; }
 .chat-input::placeholder { color:var(--text-disabled); }
-.chat-send { width:34px; height:34px; border-radius:50%; background:var(--accent); color:var(--bg-deepest); display:grid; place-items:center; flex-shrink:0; transition:var(--transition-fast); }
+.chat-send { width:33px; height:33px; border-radius:50%; background:var(--accent); color:var(--bg-deepest); display:grid; place-items:center; flex-shrink:0; transition:var(--transition-fast); }
 .chat-send:hover { background:#e8c565; }
 
 /* ─── RIGHT — editor / codebase / metadata ───────────────────────────────── */
@@ -130,9 +152,21 @@ textarea { border: none; outline: none; }
 .rview { display:none; flex:1; min-height:0; overflow:auto; }
 .rview.on { display:block; }
 .editor, .codebase { font-family:var(--font-code); font-size:12.5px; line-height:1.7; padding:8px 0 12px; }
-.code-line { display:flex; padding-right:16px; }
-.code-line.hl { background:rgba(255,255,255,0.06); box-shadow:inset 2px 0 0 var(--accent); }
+.code-line { display:flex; align-items:center; padding-right:12px; }
+.code-line.hl { background:rgba(216,178,77,0.08); box-shadow:inset 2px 0 0 var(--accent); }
+.code-line.hl2 { background:rgba(255,255,255,0.03); box-shadow:inset 2px 0 0 var(--text-disabled); }
 .code-line.dimfile { opacity:0.5; }
+.code-line .utag { margin-left:auto; flex-shrink:0; font-family:var(--font-ui); font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-muted); padding-left:10px; }
+.code-line.hl .utag { color:var(--accent); }
+/* VSCode-style explorer: file list on top, scrollable code below */
+#rview-codebase.on { display:flex; flex-direction:column; overflow:hidden; }
+.cb-files { flex-shrink:0; padding:8px; display:flex; flex-direction:column; gap:1px; }
+.cb-file { display:flex; align-items:center; gap:8px; padding:6px 10px; border-radius:6px; cursor:pointer; font-family:var(--font-code); font-size:12px; color:var(--text-secondary); transition:var(--transition-fast); }
+.cb-file:hover { background:var(--bg-surface); }
+.cb-file.on { background:var(--bg-surface); color:var(--text-primary); }
+.cb-file .fico { color:var(--text-muted); font-size:11px; flex-shrink:0; }
+.cb-file .fcount { margin-left:auto; font-size:9.5px; color:var(--text-disabled); background:var(--bg-app); border-radius:9999px; padding:1px 7px; }
+.cb-code { flex:1; min-height:0; overflow:auto; }
 .ln { width:44px; flex-shrink:0; text-align:right; padding-right:14px; color:var(--text-disabled); user-select:none; }
 .code { color:var(--text-secondary); white-space:pre; }
 .file-sep { font-family:var(--font-ui); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); padding:4px 16px 6px; }
@@ -192,7 +226,7 @@ textarea { border: none; outline: none; }
         <span>Focused on node — <b id="focusName"></b>. Rest of the transcript dimmed.</span>
         <button class="clr" id="focusClear">show all</button>
       </div>
-      <div class="convo-scroll" id="convo"></div>
+      <div class="convo-scroll"><div class="convo-inner" id="convo"></div></div>
       <div class="chatbar-wrap">
         <div class="chatbar">
           <textarea class="chat-input" rows="1" placeholder="Write your answer…"></textarea>
@@ -225,7 +259,10 @@ textarea { border: none; outline: none; }
       <div class="run-row"><button class="btn primary">Submit</button></div>
     </div>
 
-    <div class="rview" id="rview-codebase"><div class="codebase" id="codebase"></div></div>
+    <div class="rview" id="rview-codebase">
+      <div class="cb-files" id="cbFiles"></div>
+      <div class="cb-code"><div class="codebase" id="codebase"></div></div>
+    </div>
 
     <div class="rview" id="rview-metadata">
       <div class="meta">
@@ -255,13 +292,26 @@ const CODEBASES = [
     { slug:'read_schema', state:'PARKED' }, { slug:'validate_row', state:'QUEUED' },
   ]},
 ];
+/* Each stream item is what the learner can actually see of the agent's work.
+ * `run` items are backend-true: the agent, the read-only tools it consulted
+ * (from CapabilityPolicy — the only 8 that exist), and the stamp it returned. */
 const STREAM = [
   { t:'msg', id:1, role:'system', text:'Unit opened — <code>_pinned_qa_group</code> (L42–46), phase ASSEMBLE.' },
+  { t:'run', id:'r2', agent:'TEACHER', step:'wakeup.probe',
+    tools:[['read_code_slice','L42–46'],['read_axis_evidence','What it does'],['read_probe_history','no prior probes']] },
   { t:'msg', id:2, role:'tutor', text:'Before you write it — what does the caller expect back? Shape and order.' },
   { t:'msg', id:3, role:'learner', text:'A list of question dicts, pinned first, preserving the passed order.' },
+  { t:'run', id:'r2g', agent:'JUDGE', step:'wakeup.grade',
+    tools:[['read_code_slice','L42–46'],['read_axis_evidence','What it does'],['read_probe_history','1 probe'],['read_transcript','your answer']],
+    stamp:{ kind:'return.grade', verdict:'SOLID', category:'correct-deep' } },
   { t:'fb', id:'f2', for:[2,3], verdict:'SOLID', category:'correct-deep', agent:'JUDGE', text:'Order within the pinned group is right — COMPREHEND proved.' },
+  { t:'run', id:'r5', agent:'TEACHER', step:'wakeup.probe',
+    tools:[['read_code_slice','L42–46'],['read_axis_evidence','What can break'],['read_probe_history','1 probe']] },
   { t:'msg', id:5, role:'tutor', text:'Now trace one input where a pinned <code>id</code> also appears unpinned. What comes out?' },
   { t:'msg', id:6, role:'learner', text:'…it would appear twice. I didn’t dedupe across the two groups.' },
+  { t:'run', id:'r6g', agent:'JUDGE', step:'wakeup.grade',
+    tools:[['read_code_slice','L42–46'],['read_axis_evidence','What can break'],['read_probe_history','2 probes'],['read_transcript','your answer']],
+    stamp:{ kind:'return.grade', verdict:'MISSING', category:'sibling-hole' } },
   { t:'fb', id:'f6', for:[5,6], verdict:'MISSING', category:'sibling-hole', agent:'JUDGE', text:'Gap: no de-duplication across groups. Prerequisite uncovered — dict identity vs value.' },
 ];
 
@@ -366,7 +416,7 @@ function line(row){
       const q=c?"\n"+S("│  ".repeat(d),"fa")+S("   picking up: ","dm")+S("“"+c+"”","od i"):"";
       return head+q;
     }
-    case "here":    return rail+S("◉ ","o b")+S("You are here","o b")+" — "+S(a,"fg")+at(b);
+    case "here":    return rail+`<span class="hl-here">`+S("◉ ","o b")+S("You are here","o b")+" — "+S(a,"fg")+at(b)+`</span>`;
     case "locked":  return S(a,"dm");
   }
   return "";
@@ -389,6 +439,16 @@ STREAM.forEach(item=>{
     const d=document.createElement('div'); d.className='turn '+item.role; d.dataset.id=item.id;
     const who=item.role==='tutor'?'Tutor':item.role==='learner'?'You':'System';
     d.innerHTML=`<div class="who">${who}</div><div class="say">${item.text}</div>`;
+    convo.appendChild(d);
+  } else if(item.t==='run'){
+    // the agent's actual work: which scoped read-only tools it consulted, then its stamp
+    const d=document.createElement('div'); d.className='agent-run'; d.dataset.id=item.id;
+    const tools=item.tools.map(([name,ret])=>
+      `<div class="tool"><span class="tname">${name}</span><span class="tret">${ret}</span></div>`).join('');
+    const stamp=item.stamp
+      ? `<div class="stamp"><span class="arrow">→</span><span class="skind">${item.stamp.kind}</span> · ${item.stamp.verdict} · ${item.stamp.category}</div>`
+      : '';
+    d.innerHTML=`<div class="ar-head">${item.agent}<span class="dot">·</span>${item.step}</div>${tools}${stamp}`;
     convo.appendChild(d);
   } else {
     const d=document.createElement('div'); d.className='feedback'; d.dataset.id=item.id;
@@ -424,19 +484,69 @@ rightSeg.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b
   ['editor','codebase','metadata'].forEach(v=>document.getElementById('rview-'+v).classList.toggle('on',v===b.dataset.rview));
 });
 
-/* full-codebase view */
-const FILE=['# assemble-pinned-qa','','def load_prompts(path):','    return json.load(open(path))','',
-'def normalize_row(r):','    return {**r, "pin": bool(r.get("pin"))}','',
-'def _pinned_qa_group(questions):','    pinned = [q for q in questions if q["pin"]]',
-'    rest   = [q for q in questions if not q["pin"]]','    # TODO: id collisions across groups?',
-'    return pinned + rest','','def build_prompt_batch(rows):','    grouped = _pinned_qa_group(rows)','    return [render(r) for r in grouped]'];
-const HL=new Set([9,10,11,12,13]);
-const cbEl=document.getElementById('codebase');
-cbEl.innerHTML=`<div class="file-sep">run_prompts.py</div>`+FILE.map((line,i)=>{
-  const ln=i+1; const hl=HL.has(ln)?' hl':(HL.size?' dimfile':'');
-  const esc=line.replace(/&/g,'&amp;').replace(/</g,'&lt;');
-  return `<div class="code-line${hl}"><span class="ln">${ln}</span><span class="code">${esc||' '}</span></div>`;
-}).join('');
+/* ── Codebase view: a VSCode-style file explorer ───────────────────────────
+ * Each file shows its real source; the unit line-ranges the tutor is teaching
+ * are highlighted in place (the active unit strongest, the rest faintly), so a
+ * learner opens any file and sees exactly which spans are under study. */
+const FILES = {
+  'run_prompts.py': {
+    code:['# assemble-pinned-qa','','def load_prompts(path):','    return json.load(open(path))','',
+      'def normalize_row(r):','    return {**r, "pin": bool(r.get("pin"))}','',
+      'def _pinned_qa_group(questions):','    pinned = [q for q in questions if q["pin"]]',
+      '    rest   = [q for q in questions if not q["pin"]]','    # TODO: id collisions across groups?',
+      '    return pinned + rest','','def build_prompt_batch(rows):','    grouped = _pinned_qa_group(rows)',
+      '    return [render(r) for r in grouped]'],
+    units:[
+      {slug:'load_prompts', lo:3, hi:4, state:'OWNED'},
+      {slug:'normalize_row', lo:6, hi:7, state:'OWNED'},
+      {slug:'_pinned_qa_group', lo:9, hi:13, state:'ACTIVE'},
+      {slug:'build_prompt_batch', lo:15, hi:17, state:'QUEUED'},
+    ],
+  },
+  'schema_loader.py': {
+    code:['# schema_loader.py','import json','',
+      'def read_schema(path):','    with open(path) as fh:','        return json.load(fh)','',
+      'def validate_row(row, schema):','    for key in schema["required"]:','        if key not in row:',
+      '            raise KeyError(key)','    return True'],
+    units:[
+      {slug:'read_schema', lo:4, hi:6, state:'PARKED'},
+      {slug:'validate_row', lo:8, hi:12, state:'QUEUED'},
+    ],
+  },
+};
+
+let currentFile=null;
+function renderCodeFile(path){
+  const f=FILES[path]; if(!f) return;
+  currentFile=path;
+  document.getElementById('codebase').innerHTML=f.code.map((raw,i)=>{
+    const ln=i+1;
+    const unit=f.units.find(u=>ln>=u.lo && ln<=u.hi);
+    let cls='', tag='';
+    if(unit){
+      cls=unit.state==='ACTIVE'?' hl':' hl2';
+      if(ln===unit.lo) tag=`<span class="utag">${unit.slug}</span>`;
+    }
+    const esc=raw.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    return `<div class="code-line${cls}"><span class="ln">${ln}</span><span class="code">${esc||' '}</span>${tag}</div>`;
+  }).join('');
+  document.querySelectorAll('.cb-file').forEach(el=>el.classList.toggle('on',el.dataset.path===path));
+}
+
+const cbFiles=document.getElementById('cbFiles');
+Object.keys(FILES).forEach(path=>{
+  const el=document.createElement('div'); el.className='cb-file'; el.dataset.path=path;
+  el.innerHTML=`<span class="fico">▤</span><span>${path}</span><span class="fcount">${FILES[path].units.length}</span>`;
+  el.addEventListener('click',()=>renderCodeFile(path));
+  cbFiles.appendChild(el);
+});
+renderCodeFile('run_prompts.py');
+
+/* chat input auto-grows from one line up to its CSS max-height, then scrolls */
+const chatInput=document.querySelector('.chat-input');
+function autosize(){ chatInput.style.height='auto'; chatInput.style.height=chatInput.scrollHeight+'px'; }
+chatInput.addEventListener('input',autosize);
+autosize();
 
 /* ── collapsible sidebars ─────────────────────────────────────────────────── */
 const shell=document.getElementById('shell');
