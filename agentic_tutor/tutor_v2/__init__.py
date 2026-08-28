@@ -5,7 +5,8 @@ from .contracts import (
     validate_archive_manifest, validate_continuation, validate_return, validate_wakeup,
 )
 from .db import Database
-from .domain import Axis, Event, Handoff, ReturnStamp, StackFrame, Unit, WakeupPacket, Workspace
+from .domain import (AgentOutput, Axis, Event, Handoff, ReturnStamp, StackFrame, ToolCall,
+                     Unit, WakeupPacket, Workspace)
 from .errors import (
     CapabilityUnavailableError,
     InvariantError,
@@ -16,7 +17,7 @@ from .errors import (
 from .routing import RouteDecision, Router
 from .packets import CapabilityPolicy, WakeupBuilder
 from .parsing import ReturnStampParser
-from .recorders import ConversationRecorder, JourneyRecorder, ProbeRecorder
+from .recorders import ConversationRecorder, JourneyRecorder, ProbeRecorder, ToolCallRecorder
 from .graph_projection import GraphProjection
 from .learner_model import LearnerModelService
 from .orchestrator import TurnOrchestrator, TurnResult

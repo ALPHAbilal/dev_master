@@ -23,7 +23,7 @@ from .graph_projection import GraphProjection
 from .journey_archive import JourneyArchiveService
 from .learner_model import LearnerModelService
 from .parsing import ReturnStampParser
-from .recorders import ConversationRecorder, JourneyRecorder, ProbeRecorder
+from .recorders import ConversationRecorder, JourneyRecorder, ProbeRecorder, ToolCallRecorder
 from .routing import RouteDecision, Router
 from .semantics import SemanticGraphService
 from .services import ArchiveService
@@ -57,6 +57,7 @@ class TurnOrchestrator:
         unit_archive: ArchiveService | None = None,
         learner_model: LearnerModelService | None = None,
         graph_projection: GraphProjection | None = None,
+        tool_calls_recorder: ToolCallRecorder | None = None,
     ) -> None:
         self.db = db
         self.config = config
@@ -80,6 +81,23 @@ class TurnOrchestrator:
         # transaction as the tutoring write. When omitted, no graph rows are produced and
         # behavior is byte-for-byte the prior version.
         self.graph_projection = graph_projection
+        # Tool-call capture (observability). When omitted, no tool trace is written and
+        # behavior is byte-for-byte the prior version.
+        self.tool_calls_recorder = tool_calls_recorder
+
+    def record_tool_calls(self, *, journey_id: int, unit_id: int | None, turn_id: str,
+                          step: str, agent: str, tool_calls: list) -> int:
+        """Persist one wakeup's tool calls best-effort, then bump the projection revision.
+
+        Recording is additive and its own transaction: an orphaned tool row after a
+        rolled-back turn is harmless observability, so this is never atomic with the
+        routing commit. Swallows nothing here — the session layer owns best-effort.
+        """
+        if self.tool_calls_recorder is not None:
+            self.tool_calls_recorder.record(journey_id=journey_id, unit_id=unit_id,
+                turn_id=turn_id, step=step, agent=agent, tool_calls=tool_calls)
+        with self.db.transaction():
+            return self.journeys.bump_revision(journey_id)   # so the next poll ships them
 
     # -- Stage 9: initial map + journey start -------------------------------------
 

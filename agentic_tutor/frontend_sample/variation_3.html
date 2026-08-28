@@ -1,0 +1,300 @@
+<!doctype html>
+<!--
+  variation_3.html — LAYERED STRATA
+  Geometric idea: every artifact is a stack of physical planes — sheets, strata, sediment.
+  It fits a reasoning artifact because understanding is deposited in layers: code sits on a
+  stack of sheets, a claim splits into strata that are recomposed into one new plane, and a
+  belief's history is a geological column where old layers sink, muted, below the present one.
+  Risk: supersession is shown almost entirely by depth — offset, dimming and occlusion carry
+  "past vs now" with no timeline marks at all, so the column must read as time on its own.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Variation 3 — Strata</title>
+<style>
+  :root{
+    --bg-deepest:#ffffff; --bg-app:#f4f4f2; --bg-surface:#ebeae6; --bg-card:#e3e1db;
+    --bg-elevated:#d8d6cf; --bg-hover:#cfccc3;
+    --text-primary:#1e2024; --text-secondary:#4a4d53; --text-muted:#7a7d84; --text-disabled:#a8a6a0;
+    --accent:#4f7290; --accent-dim:#385876; --accent-soft:rgba(79,114,144,0.15); --on-accent:#ffffff;
+    --r-s:8px; --r-m:12px; --r-l:16px;
+    --font-ui:"Segoe UI",system-ui,-apple-system,sans-serif;
+    --font-code:"Cascadia Code",ui-monospace,"Consolas",monospace;
+  }
+  *{box-sizing:border-box; margin:0}
+  body{
+    background:var(--bg-app); color:var(--text-primary);
+    font-family:var(--font-ui); font-size:15.5px; line-height:1.6;
+    padding:48px 16px 120px;
+  }
+  :focus-visible{outline:2px solid var(--accent-dim); outline-offset:2px; border-radius:4px}
+  @media (prefers-reduced-motion:reduce){ *{transition:none!important; animation:none!important} }
+
+  .col{max-width:780px; margin:0 auto}
+
+  /* ================= PLAIN TRANSCRIPT (identical across variations — deliberately quiet) ================= */
+  .sys{color:var(--text-muted); font-size:13px; margin-bottom:30px}
+  .tool{
+    font-family:var(--font-code); font-size:12.5px; color:var(--text-muted);
+    border-top:1px solid var(--bg-card); padding-top:10px; margin-bottom:30px;
+    letter-spacing:.02em;
+  }
+  .turn-tutor{max-width:92%; margin-bottom:26px}
+  .turn-learner{display:flex; justify-content:flex-end; margin-bottom:26px}
+  .turn-learner .card{
+    background:var(--bg-surface); border-radius:var(--r-s);
+    padding:12px 16px; max-width:78%; font-size:15px; color:var(--text-secondary);
+  }
+  .judge{max-width:92%; margin-bottom:56px; font-size:14px; color:var(--text-secondary); line-height:1.55}
+  .judge .v{font-family:var(--font-code); font-size:12px; letter-spacing:.08em; color:var(--text-primary); font-weight:600}
+  .judge .cat{color:var(--text-muted); font-size:13px}
+
+  /* ================= shared artifact substrate — a plane edge label ================= */
+  .artifact{max-width:92%; margin:0 0 60px; position:relative}
+  .strata-tag{
+    display:block; margin-bottom:10px; margin-left:14px;
+    font-family:var(--font-code); font-size:10.5px; letter-spacing:.14em; color:var(--accent-dim);
+  }
+
+  /* ================= ARTIFACT 1 · CODE — a stack of sheets ================= */
+  .code-stack{position:relative}
+  .code-head{
+    display:flex; align-items:center; gap:12px; width:100%;
+    position:relative; z-index:2;
+    background:var(--bg-card); border:1px solid var(--bg-elevated); border-bottom:0;
+    border-radius:var(--r-s) var(--r-s) 0 0;
+    cursor:pointer; text-align:left; font-family:var(--font-code);
+    padding:11px 16px; color:var(--text-primary);
+    margin:0 -8px; width:calc(100% + 16px);
+    box-shadow:0 -3px 0 -1px var(--bg-surface), 0 -6px 0 -2px var(--bg-app);
+  }
+  .code-head:hover{background:var(--bg-elevated)}
+  .ch-title{font-size:13.5px; font-weight:600}
+  .ch-meta{font-size:10.5px; letter-spacing:.1em; color:var(--text-muted)}
+  .ch-caret{margin-left:auto; font-size:13px; color:var(--accent-dim); width:1em; text-align:center}
+  .code-body{
+    position:relative; z-index:1;
+    background:var(--bg-deepest); border:1px solid var(--bg-elevated); border-top:1px solid var(--bg-hover);
+    border-radius:0 0 var(--r-s) var(--r-s);
+    overflow:hidden;
+    /* the sheets beneath */
+    box-shadow:
+      5px 5px 0 -1px var(--bg-card),
+      5px 5px 0 0 var(--bg-elevated),
+      10px 10px 0 -2px var(--bg-surface),
+      10px 10px 0 -1px var(--bg-elevated);
+  }
+  .cl{display:flex; font-family:var(--font-code); font-size:13px; line-height:1.75}
+  .cl:hover{background:rgba(79,114,144,0.05)}
+  .ln{
+    flex:0 0 3.2em; text-align:right; padding:0 12px 0 8px;
+    color:var(--text-disabled); background:var(--bg-card);
+    border-right:1px solid var(--bg-hover);
+    user-select:none;
+  }
+  .src{white-space:pre; padding:0 14px; color:var(--text-primary); overflow-x:auto; flex:1}
+  .k{color:var(--accent-dim)}
+  .s{color:#52714f}
+  .c{color:var(--text-muted); font-style:italic}
+  .f{color:var(--accent-dim); font-weight:600}
+  .collapsed .code-body{display:none}
+  .collapsed .code-head{
+    border-radius:var(--r-s); border-bottom:1px solid var(--bg-elevated);
+    box-shadow:5px 5px 0 -1px var(--bg-card), 5px 5px 0 0 var(--bg-elevated);
+  }
+
+  /* ================= ARTIFACT 2 · FIRST PRINCIPLES — split into strata, recomposed ================= */
+  .fp-claim, .fp-rebuild{
+    position:relative; background:var(--bg-deepest); border:1px solid var(--bg-elevated);
+    border-radius:var(--r-s); padding:14px 18px; font-size:15px;
+  }
+  .fp-claim{margin:0 7% 0 0; box-shadow:0 -3px 0 -1px var(--bg-surface)}
+  .fp-tag{
+    display:block; font-family:var(--font-code); font-size:10px; letter-spacing:.14em;
+    color:var(--accent-dim); margin-bottom:5px;
+  }
+  /* the split: two lines opening downward from the claim */
+  .split, .merge{position:relative; height:30px}
+  .split i, .merge i{
+    position:absolute; top:2px; bottom:2px; left:50%; width:2px;
+    background:rgba(79,114,144,0.5);
+  }
+  .split i.l{transform-origin:top center; transform:rotate(28deg) translateX(-1px)}
+  .split i.r{transform-origin:top center; transform:rotate(-28deg) translateX(1px)}
+  /* the merge: two lines closing downward into the rebuild */
+  .merge i.l{transform-origin:bottom center; transform:rotate(-28deg) translateX(-1px)}
+  .merge i.r{transform-origin:bottom center; transform:rotate(28deg) translateX(1px)}
+  .fp-atoms{display:flex; flex-direction:column; gap:12px}
+  .atom{
+    background:var(--bg-deepest); border:1px solid var(--bg-elevated);
+    border-radius:var(--r-s); padding:12px 15px;
+    font-size:13.5px; line-height:1.5; color:var(--text-secondary);
+    display:flex; gap:12px; align-items:baseline;
+  }
+  /* strata sliding apart: each atom plane offset further right */
+  .atom:nth-child(1){width:88%; margin:0 auto 0 0}
+  .atom:nth-child(2){width:88%; margin:0 6%}
+  .atom:nth-child(3){width:88%; margin:0 0 0 auto}
+  .atom .num{
+    font-family:var(--font-code); font-size:11px; color:var(--accent-dim);
+    letter-spacing:.1em; flex:none;
+  }
+  .fp-rebuild{
+    width:100%; margin-top:0;
+    border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft), 0 4px 0 -1px var(--bg-surface);
+  }
+
+  /* ================= ARTIFACT 3 · CONCEPT EVOLUTION — the geological column ================= */
+  .column{border-left:2px solid var(--bg-elevated); margin-left:10px}
+  .layer{position:relative; padding:14px 14px 14px 22px}
+  /* tick on the depth ruler */
+  .layer::before{
+    content:""; position:absolute; left:-2px; top:24px; width:12px; height:2px;
+    background:var(--bg-elevated);
+  }
+  .layer .at{
+    font-family:var(--font-code); font-size:10.5px; letter-spacing:.12em;
+    color:var(--text-muted); margin-bottom:4px;
+  }
+  .layer .belief{
+    background:var(--bg-deepest); border:1px solid var(--bg-elevated);
+    border-radius:var(--r-s); padding:11px 14px;
+    font-size:13.5px; line-height:1.5; color:var(--text-secondary);
+    display:inline-block;
+  }
+  .layer .sup{
+    display:block; margin-top:5px;
+    font-family:var(--font-code); font-size:9.5px; letter-spacing:.14em; color:var(--text-disabled);
+  }
+  /* superseded layers sink: offset right, dimmed, occluded edges */
+  .layer.past.d1{margin-left:20px; opacity:.78}
+  .layer.past.d2{margin-left:40px; opacity:.6}
+  .layer.past .belief{border-style:dashed; color:var(--text-muted)}
+  /* the present layer: on top, elevated */
+  .layer.now{margin-top:14px}
+  .layer.now::before{background:var(--accent); width:16px}
+  .layer.now .at{color:var(--accent-dim); font-weight:600}
+  .layer.now .belief{
+    border-color:var(--accent); color:var(--text-primary);
+    box-shadow:0 0 0 3px var(--accent-soft), 4px 4px 0 -1px var(--bg-card), 4px 4px 0 0 var(--bg-elevated);
+  }
+  .layer.now .sup{color:var(--accent-dim)}
+
+  @media (max-width:560px){
+    .turn-learner .card{max-width:92%}
+    .atom:nth-child(1),.atom:nth-child(2),.atom:nth-child(3){width:100%; margin:0}
+    .layer.past.d1{margin-left:12px}
+    .layer.past.d2{margin-left:24px}
+    .code-head{margin:0 -4px; width:calc(100% + 8px)}
+  }
+</style>
+</head>
+<body>
+<div class="col">
+
+  <!-- ============ plain transcript (quiet on purpose) ============ -->
+  <p class="sys">Session 4 · list dedup — continuing from your last attempt.</p>
+  <p class="tool">TEACHER · read_code_slice L42–46</p>
+
+  <div class="turn-tutor">
+    <p>Your <code style="font-family:var(--font-code);font-size:.9em">_pinned_qa_group</code> merges
+    <code style="font-family:var(--font-code);font-size:.9em">pinned + rest</code>, yet a duplicate still
+    slips through. Walk me through why you think the dict's <code style="font-family:var(--font-code);font-size:.9em">id</code>
+    field isn't catching it.</p>
+  </div>
+
+  <div class="turn-learner">
+    <div class="card">I thought <code style="font-family:var(--font-code);font-size:.9em">+</code> would compare the
+    dicts by their <code style="font-family:var(--font-code);font-size:.9em">id</code> field, so
+    <code style="font-family:var(--font-code);font-size:.9em">seen</code> would block the second copy.
+    I'm not sure where the extra entry comes from.</div>
+  </div>
+
+  <p class="judge">
+    <span class="v">INCORRECT</span> · <span class="cat">object-identity vs value equality</span> —
+    List concatenation copies references; it never inspects the dicts' fields.
+  </p>
+
+  <!-- ============ ARTIFACT 1 · generated code — the sheet stack ============ -->
+  <section class="artifact" id="codeArtifact">
+    <span class="strata-tag">PLANE 1 · CODE</span>
+    <div class="code-stack">
+      <button class="code-head" aria-expanded="true" aria-controls="codeBody">
+        <span class="ch-title">_pinned_qa_group.py</span>
+        <span class="ch-meta">PY · 9 LN</span>
+        <span class="ch-caret" aria-hidden="true">−</span>
+      </button>
+      <div class="code-body" id="codeBody">
+        <div class="cl"><span class="ln">1</span><span class="src"><span class="k">def</span> <span class="f">_pinned_qa_group</span>(questions):</span></div>
+        <div class="cl"><span class="ln">2</span><span class="src">    pinned = [q <span class="k">for</span> q <span class="k">in</span> questions <span class="k">if</span> q[<span class="s">"pin"</span>]]</span></div>
+        <div class="cl"><span class="ln">3</span><span class="src">    rest   = [q <span class="k">for</span> q <span class="k">in</span> questions <span class="k">if</span> <span class="k">not</span> q[<span class="s">"pin"</span>]]</span></div>
+        <div class="cl"><span class="ln">4</span><span class="src">    seen, out = <span class="f">set</span>(), []</span></div>
+        <div class="cl"><span class="ln">5</span><span class="src">    <span class="k">for</span> q <span class="k">in</span> pinned + rest:          <span class="c"># pinned first, order preserved</span></span></div>
+        <div class="cl"><span class="ln">6</span><span class="src">        <span class="k">if</span> q[<span class="s">"id"</span>] <span class="k">not in</span> seen:      <span class="c"># dedupe by value, not object identity</span></span></div>
+        <div class="cl"><span class="ln">7</span><span class="src">            seen.add(q[<span class="s">"id"</span>])</span></div>
+        <div class="cl"><span class="ln">8</span><span class="src">            out.append(q)</span></div>
+        <div class="cl"><span class="ln">9</span><span class="src">    <span class="k">return</span> out</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ARTIFACT 2 · first principles — split into strata, recomposed ============ -->
+  <section class="artifact">
+    <span class="strata-tag">PLANE 2 · FIRST PRINCIPLES</span>
+
+    <div class="fp-claim"><span class="fp-tag">CLAIM · TOP LAYER</span>Why does the duplicate survive <code style="font-family:var(--font-code);font-size:.9em">pinned + rest</code>?</div>
+
+    <div class="split" aria-hidden="true"><i class="l"></i><i class="r"></i></div>
+
+    <div class="fp-atoms">
+      <div class="atom"><span class="num">01</span><span>A list <code style="font-family:var(--font-code);font-size:.9em">+</code> copies references — it compares nothing.</span></div>
+      <div class="atom"><span class="num">02</span><span>Two dicts with the same <code style="font-family:var(--font-code);font-size:.9em">id</code> field are still separate objects.</span></div>
+      <div class="atom"><span class="num">03</span><span>So <code style="font-family:var(--font-code);font-size:.9em">q in seen</code> on objects checks identity, which is always unique.</span></div>
+    </div>
+
+    <div class="merge" aria-hidden="true"><i class="l"></i><i class="r"></i></div>
+
+    <div class="fp-rebuild"><span class="fp-tag">REBUILD · RECOMPOSED PLANE</span>Dedupe on the value you mean (<code style="font-family:var(--font-code);font-size:.9em">q["id"]</code>), never the object.</div>
+  </section>
+
+  <!-- ============ ARTIFACT 3 · concept evolution — the geological column ============ -->
+  <section class="artifact">
+    <span class="strata-tag">PLANE 3 · CONCEPT EVOLUTION · NEWEST ON TOP</span>
+
+    <div class="column">
+      <div class="layer now">
+        <div class="at">NOW</div>
+        <div class="belief">Dedupe by the <code style="font-family:var(--font-code);font-size:.9em">id</code> field's value — not the dict object.</div>
+        <span class="sup">SURFACE · CURRENT BELIEF</span>
+      </div>
+
+      <div class="layer past d1">
+        <div class="at">DIVE · IDENTITY</div>
+        <div class="belief"><code style="font-family:var(--font-code);font-size:.9em">==</code> compares value, <code style="font-family:var(--font-code);font-size:.9em">is</code> compares the object.</div>
+        <span class="sup">BURIED · SUPERSEDED</span>
+      </div>
+
+      <div class="layer past d2">
+        <div class="at">PROBE 1</div>
+        <div class="belief">Equality is about identity (<code style="font-family:var(--font-code);font-size:.9em">is</code>).</div>
+        <span class="sup">DEEPEST · SUPERSEDED</span>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  const stack = document.getElementById('codeArtifact');
+  const head  = stack.querySelector('.code-head');
+  const caret = stack.querySelector('.ch-caret');
+  head.addEventListener('click', () => {
+    const collapsed = stack.classList.toggle('collapsed');
+    head.setAttribute('aria-expanded', String(!collapsed));
+    caret.textContent = collapsed ? '+' : '−';
+  });
+</script>
+</body>
+</html>

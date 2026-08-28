@@ -190,21 +190,40 @@ class ClaudeAgentAdapter:
             permission_mode="dontAsk",
         )
 
-    async def run(self, wakeup: dict[str, Any], instruction: str) -> list[str]:
-        """Run one bounded-by-contract SDK wakeup and return its text blocks only."""
+    async def run(self, wakeup: dict[str, Any], instruction: str) -> "AgentOutput":
+        """Run one bounded-by-contract SDK wakeup, returning text blocks + captured tool calls."""
+        from .domain import AgentOutput, ToolCall
         options = self.build_options(wakeup, instruction)
         try:
-            from claude_agent_sdk import AssistantMessage, TextBlock, query
+            from claude_agent_sdk import AssistantMessage, TextBlock, ToolUseBlock, query
+            try:
+                from claude_agent_sdk import ToolResultBlock  # name may vary by SDK version
+            except ImportError:
+                ToolResultBlock = None  # type: ignore[assignment]
         except ImportError as error:  # pragma: no cover - dependency error above normally wins
             raise AgentSdkUnavailableError("claude-agent-sdk is unavailable") from error
         text: list[str] = []
+        uses: list[tuple[str, str, dict]] = []   # (tool_use_id, capability, arguments)
+        errored: set[str] = set()                # tool_use_ids that returned is_error
         async for message in query(prompt=json.dumps(wakeup, sort_keys=True), options=options):
-            if isinstance(message, AssistantMessage):
-                text.extend(
-                    block.text.strip() for block in message.content
-                    if isinstance(block, TextBlock) and block.text.strip()
-                )
-        return text
+            try:  # capture is best-effort: a parsing surprise must not fail the turn
+                if isinstance(message, AssistantMessage):
+                    for block in message.content:
+                        if isinstance(block, TextBlock) and block.text.strip():
+                            text.append(block.text.strip())
+                        elif isinstance(block, ToolUseBlock):
+                            # mcp__tutor__<capability> — store the stripped capability.
+                            cap = str(block.name).removeprefix("mcp__tutor__")
+                            uses.append((str(block.id), cap, dict(block.input or {})))
+                elif ToolResultBlock is not None:
+                    for block in getattr(message, "content", []) or []:
+                        if isinstance(block, ToolResultBlock) and getattr(block, "is_error", False):
+                            errored.add(str(block.tool_use_id))
+            except Exception:
+                continue
+        tool_calls = [ToolCall(cap, args, (tid in errored), i)
+                      for i, (tid, cap, args) in enumerate(uses)]
+        return AgentOutput(text, tool_calls)
 
     @staticmethod
     def _sdk_tools(gateway: TutorToolGateway) -> list[Any]:

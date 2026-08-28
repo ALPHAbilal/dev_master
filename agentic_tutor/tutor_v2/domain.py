@@ -66,3 +66,17 @@ class WakeupPacket:
 class ReturnStamp:
     kind: str
     payload: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class ToolCall:
+    capability: str
+    arguments: dict[str, Any]
+    refused: bool
+    ordinal: int
+
+
+@dataclass(frozen=True, slots=True)
+class AgentOutput:
+    blocks: list[str]
+    tool_calls: list[ToolCall]

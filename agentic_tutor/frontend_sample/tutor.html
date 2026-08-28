@@ -7,30 +7,30 @@
 <style>
 /* Spacing/radii/fonts/feel from devmind .theme-notebook. Palette: gray + white. Borderless. */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 16px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.12) transparent; }
+html { font-size: 16px; scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.20) transparent; }
 body { line-height: 1.6; -webkit-font-smoothing: antialiased; height: 100vh; overflow: hidden; }
 button { font: inherit; color: inherit; cursor: pointer; background: none; border: none; }
 textarea { border: none; outline: none; }
-::selection { background: rgba(216,178,77,0.30); color: #fff; }
+::selection { background: rgba(79,114,144,0.28); color: var(--text-primary); }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.20); border-radius: 3px; }
 :root {
-  --bg-deepest:#171b1f; --bg-app:#20252a; --bg-surface:#2b3138; --bg-card:#333a42; --bg-elevated:#3f474f; --bg-hover:#4a535c;
-  --text-primary:#f4f1e6; --text-secondary:#c6c2b3; --text-muted:#8d8b7e; --text-disabled:#5e5d54;
-  --accent:#d8b24d; --accent-dim:#a98f3c; --accent-soft:rgba(216,178,77,0.15);
+  --bg-deepest:#ffffff; --bg-app:#f4f4f2; --bg-surface:#ebeae6; --bg-card:#e3e1db; --bg-elevated:#d8d6cf; --bg-hover:#cfccc3;
+  --text-primary:#1e2024; --text-secondary:#4a4d53; --text-muted:#7a7d84; --text-disabled:#a8a6a0;
+  --accent:#4f7290; --accent-dim:#385876; --accent-soft:rgba(79,114,144,0.15); --on-accent:#ffffff;
   --radius-sm:8px; --radius-md:12px; --radius-lg:16px;
   --font-ui:"Segoe UI",Tahoma,sans-serif; --font-code:"Cascadia Code","JetBrains Mono","SF Mono","Consolas",monospace;
   --transition-fast:150ms ease; --transition-normal:250ms ease;
   background:var(--bg-deepest); color:var(--text-primary); font-family:var(--font-ui);
 }
-@keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(255,255,255,0.28);} 70%{box-shadow:0 0 0 7px rgba(255,255,255,0);} }
+@keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(0,0,0,0.20);} 70%{box-shadow:0 0 0 7px rgba(0,0,0,0);} }
 .shell { display:grid; height:100vh; transition:grid-template-columns 220ms cubic-bezier(0.4,0,0.2,1); }
 
 /* segmented mode toggle — centered per view */
 .seg { display:inline-flex; gap:2px; background:var(--bg-surface); border-radius:10px; padding:3px; }
 .seg button { font-size:11.5px; font-weight:600; color:var(--text-muted); padding:5px 14px; border-radius:7px; transition:var(--transition-fast); }
 .seg button:hover { color:var(--text-secondary); }
-.seg button.on { color:var(--bg-deepest); background:var(--accent); }
+.seg button.on { color:var(--on-accent); background:var(--accent); }
 .view-head { display:flex; justify-content:center; padding:12px; }
 
 /* collapse handles */
@@ -61,11 +61,11 @@ textarea { border: none; outline: none; }
 .unit.current { background:var(--accent-soft); }
 .u-state { width:7px; height:7px; border-radius:50%; flex-shrink:0; background:var(--text-disabled); }
 .u-state.OWNED { background:var(--accent); }
-.u-state.ACTIVE { background:var(--accent); box-shadow:0 0 0 3px rgba(255,255,255,0.12); }
+.u-state.ACTIVE { background:var(--accent); box-shadow:0 0 0 3px rgba(79,114,144,0.28); }
 .u-state.PARKED { background:transparent; box-shadow:inset 0 0 0 1.5px var(--text-muted); }
 .u-name { font-size:12px; color:var(--text-secondary); font-family:var(--font-code); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .unit.current .u-name { color:var(--text-primary); }
-.u-here { margin-left:auto; font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--bg-deepest); background:var(--accent); border-radius:4px; padding:1px 5px; }
+.u-here { margin-left:auto; font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--on-accent); background:var(--accent); border-radius:4px; padding:1px 5px; }
 
 /* ─── MIDDLE — map / conversation ────────────────────────────────────────── */
 .mid { background:var(--bg-app); display:flex; flex-direction:column; min-width:0; min-height:0; }
@@ -82,11 +82,11 @@ textarea { border: none; outline: none; }
 .unit-story { font-family:var(--font-code); font-size:13.5px; line-height:2.15; white-space:pre-wrap; overflow-wrap:anywhere; color:var(--text-secondary); }
 .unit-story .o  { color:var(--accent); }
 .unit-story .od { color:var(--accent-dim); }
-.unit-story .g  { color:#e0a56f; }
+.unit-story .g  { color:#b5651d; }
 .unit-story .dm { color:var(--text-muted); }
 .unit-story .fa { color:var(--text-disabled); }
-.unit-story .gr { color:#8fbf87; }
-.unit-story .cy { color:#8ec1cf; }
+.unit-story .gr { color:#3f7a3f; }
+.unit-story .cy { color:#2f7382; }
 .unit-story .fg { color:var(--text-primary); }
 .unit-story .b  { font-weight:700; }
 .unit-story i   { font-style:italic; }
@@ -137,15 +137,78 @@ textarea { border: none; outline: none; }
 .feedback .cat { font-size:11.5px; color:var(--text-muted); font-family:var(--font-code); }
 .feedback .fb-body { font-size:14px; color:var(--text-secondary); line-height:1.6; }
 .feedback .agent { margin-left:auto; font-size:9px; color:var(--text-disabled); font-family:var(--font-code); }
+
+/* ── AI teaching artifacts in the conversation ──────────────────────────────
+ * Structured blocks the tutor emits inside the chat: generated code (collapsible),
+ * and pedagogical templates (first-principles decomposition, concept evolution).
+ * Each is a quiet notebook card led by a tracked-mono eyebrow — no colored side
+ * rule; gold shows at most once per card. Prose around them stays normal weight.
+ * These map to a future backend "teaching block" type (structured present_teaching). */
+.tblk { align-self:flex-start; max-width:92%; }
+.tblk-eyebrow { font-family:var(--font-code); font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); display:flex; align-items:center; gap:7px; margin-bottom:7px; }
+.tblk-eyebrow .gl { color:var(--accent-dim); font-weight:400; }   /* the one restrained gold touch */
+
+/* generated code — a stack of sheets (from variation_3 "strata"); scoped under .ai-code */
+.ai-code { position:relative; font-family:var(--font-code); }
+/* header and body share the SAME bleed+width so the card never changes width on toggle */
+.ai-code .code-head { display:flex; align-items:center; gap:12px; position:relative; z-index:2;
+  background:var(--bg-card); border:1px solid var(--bg-elevated); border-bottom:0;
+  border-radius:var(--radius-sm) var(--radius-sm) 0 0; cursor:pointer; text-align:left;
+  padding:11px 16px; color:var(--text-primary); margin:0 -8px; width:calc(100% + 16px);
+  box-shadow:0 -3px 0 -1px var(--bg-surface), 0 -6px 0 -2px var(--bg-app);
+  transition:background var(--transition-fast), border-radius 260ms ease; }
+.ai-code .code-head:hover { background:var(--bg-elevated); }
+.ai-code .ch-title { font-size:13.5px; font-weight:600; }
+.ai-code .ch-meta { font-size:10.5px; letter-spacing:0.1em; color:var(--text-muted); }
+.ai-code .ch-caret { margin-left:auto; font-size:13px; color:var(--accent-dim); width:1em; text-align:center; }
+/* grid 1fr→0fr animates the TRUE height (no max-height snap), so nothing below jumps */
+.ai-code .code-body { position:relative; z-index:1; margin:0 -8px; width:calc(100% + 16px);
+  display:grid; grid-template-rows:1fr; transition:grid-template-rows 260ms ease; }
+.ai-code .code-inner { overflow:hidden; min-height:0;
+  background:var(--bg-deepest); border:1px solid var(--bg-elevated); border-top:1px solid var(--bg-hover);
+  border-radius:0 0 var(--radius-sm) var(--radius-sm);
+  box-shadow:5px 5px 0 -1px var(--bg-card), 5px 5px 0 0 var(--bg-elevated),
+             10px 10px 0 -2px var(--bg-surface), 10px 10px 0 -1px var(--bg-elevated);
+  transition:opacity 200ms ease; }
+.ai-code .cl { display:flex; font-size:13px; line-height:1.75; }
+.ai-code .cl:hover { background:rgba(79,114,144,0.05); }
+.ai-code .ln { flex:0 0 3.2em; text-align:right; padding:0 12px 0 8px; color:var(--text-disabled);
+  background:var(--bg-card); border-right:1px solid var(--bg-hover); user-select:none; }
+.ai-code .src { white-space:pre; padding:0 14px; color:var(--text-primary); overflow-x:auto; flex:1; }
+.ai-code.collapsed .code-body { grid-template-rows:0fr; }
+.ai-code.collapsed .code-inner { opacity:0; }
+.ai-code.collapsed .code-head { border-radius:var(--radius-sm); border-bottom:1px solid var(--bg-elevated);
+  box-shadow:5px 5px 0 -1px var(--bg-card), 5px 5px 0 0 var(--bg-elevated); }
+@media (prefers-reduced-motion:reduce){
+  .ai-code .code-head, .ai-code .code-body, .ai-code .code-inner { transition:none; } }
+
+/* first-principles — decompose to atoms, then rebuild (numbering IS the sequence) */
+.tq { background:var(--bg-card); border-radius:var(--radius-md); padding:13px 15px; }
+.tq-claim { font-size:14px; color:var(--text-primary); line-height:1.55; margin-bottom:11px; }
+.tq-atoms { list-style:none; display:flex; flex-direction:column; gap:8px; margin:0 0 2px; }
+.tq-atoms li { display:flex; gap:10px; font-size:13px; color:var(--text-secondary); line-height:1.5; }
+.tq-atoms .n { flex-shrink:0; font-family:var(--font-code); font-size:11px; color:var(--text-muted); width:16px; text-align:right; padding-top:1px; }
+.tq-rebuild { display:flex; gap:9px; font-size:13.5px; color:var(--text-primary); line-height:1.55; margin-top:12px; padding-top:11px; border-top:1px solid var(--bg-elevated); }
+.tq-rebuild .arrow { color:var(--accent-dim); flex-shrink:0; font-weight:700; }
+
+/* concept evolution — how the learner's understanding changed over turns */
+.evo { background:var(--bg-card); border-radius:var(--radius-md); padding:5px 15px; }
+.evo-row { display:grid; grid-template-columns:104px 1fr; gap:12px; padding:9px 0; align-items:baseline; }
+.evo-row + .evo-row { border-top:1px solid var(--bg-elevated); }
+.evo-stage { font-family:var(--font-code); font-size:10.5px; color:var(--text-muted); white-space:nowrap; }
+.evo-belief { font-size:13px; line-height:1.5; }
+.evo-row.past .evo-belief { color:var(--text-disabled); text-decoration:line-through; }
+.evo-row.now .evo-belief { color:var(--text-primary); }
+.evo-row.now .evo-stage::after { content:" ●"; color:var(--accent); }
 .convo-inner.focused .turn:not(.ev), .convo-inner.focused .feedback:not(.ev), .convo-inner.focused .agent-run:not(.ev) { opacity:0.22; }
 /* chat input (conversation mode) */
 .chatbar-wrap { padding:8px 10px 14px; display:flex; justify-content:center; }
 .chatbar { width:100%; max-width:708px; background:var(--bg-surface); border-radius:14px; padding:12px 12px 12px 16px; display:flex; align-items:flex-end; gap:10px; transition:box-shadow 200ms ease; }
-.chatbar:focus-within { box-shadow:0 0 0 1.5px rgba(255,255,255,0.10); }
+.chatbar:focus-within { box-shadow:0 0 0 1.5px rgba(0,0,0,0.14); }
 .chat-input { flex:1; background:transparent; color:var(--text-primary); font-family:var(--font-ui); font-size:14px; line-height:1.6; resize:none; min-height:26px; max-height:180px; overflow-y:auto; padding:2px 0; }
 .chat-input::placeholder { color:var(--text-disabled); }
-.chat-send { width:33px; height:33px; border-radius:50%; background:var(--accent); color:var(--bg-deepest); display:grid; place-items:center; flex-shrink:0; transition:var(--transition-fast); }
-.chat-send:hover { background:#e8c565; }
+.chat-send { width:33px; height:33px; border-radius:50%; background:var(--accent); color:var(--on-accent); display:grid; place-items:center; flex-shrink:0; transition:var(--transition-fast); }
+.chat-send:hover { background:#6a90b0; }
 
 /* ─── RIGHT — editor / codebase / metadata ───────────────────────────────── */
 .right { background:var(--bg-deepest); display:flex; flex-direction:column; min-width:0; overflow:hidden; }
@@ -155,8 +218,8 @@ textarea { border: none; outline: none; }
 .rview.on { display:block; }
 .codebase { font-family:var(--font-code); font-size:12.5px; line-height:1.7; padding:8px 0 12px; }
 .code-line { display:flex; align-items:center; padding-right:12px; }
-.code-line.hl { background:rgba(255,255,255,0.05); }
-.code-line.hl2 { background:rgba(255,255,255,0.03); }
+.code-line.hl { background:rgba(79,114,144,0.13); }
+.code-line.hl2 { background:rgba(0,0,0,0.04); }
 .code-line.dimfile { opacity:0.5; }
 .code-line .utag { margin-left:auto; flex-shrink:0; font-family:var(--font-ui); font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-muted); padding-left:10px; }
 .code-line.hl .utag { color:var(--accent); }
@@ -164,7 +227,7 @@ textarea { border: none; outline: none; }
  * file's source on the RIGHT. Each folder collapses from its own caret; the
  * whole tree collapses from the Explorer header. */
 #rview-codebase.on { display:flex; flex-direction:row; overflow:hidden; }
-.explorer { flex-shrink:0; width:180px; height:100%; display:flex; flex-direction:column; background:var(--bg-app); border-right:1px solid var(--bg-deepest); }
+.explorer { flex-shrink:0; width:180px; height:100%; display:flex; flex-direction:column; background:var(--bg-app); border-right:1px solid var(--bg-elevated); }
 /* collapsed → thin rail; the code pane reclaims the width to its right. Click
  * the header (the caret) to expand again. */
 .explorer.collapsed { width:38px; }
@@ -196,7 +259,7 @@ textarea { border: none; outline: none; }
 .ln { width:44px; flex-shrink:0; text-align:right; padding-right:14px; color:var(--text-disabled); user-select:none; }
 .code { color:var(--text-secondary); white-space:pre; }
 .file-sep { font-family:var(--font-ui); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); padding:4px 16px 6px; }
-.k { color:#d4d4d4; font-weight:600; } .s { color:#c8c8c8; } .f { color:#fff; } .c { color:var(--text-disabled); font-style:italic; }
+.k { color:#385876; font-weight:600; } .s { color:#52714f; } .f { color:#385876; font-weight:600; } .c { color:var(--text-muted); font-style:italic; }
 /* real code editor (right · Editor tab): file tabs + line-number gutter +
  * an inside scrollbar. This is the surface the learner fills; the AI checks it.
  * Multiple files are supported so a task that spans files can be answered. */
@@ -207,14 +270,14 @@ textarea { border: none; outline: none; }
 .editor-tabs { flex-shrink:0; display:flex; align-items:stretch; background:var(--bg-app); }
 .editor-tabs-scroll { flex:1; min-width:0; display:flex; align-items:stretch; overflow-x:auto; scrollbar-width:none; }
 .editor-tabs-scroll::-webkit-scrollbar { display:none; }
-.etab { display:flex; align-items:center; gap:8px; padding:8px 12px; font-family:var(--font-code); font-size:11.5px; color:var(--text-muted); white-space:nowrap; border-right:1px solid var(--bg-deepest); transition:var(--transition-fast); }
+.etab { display:flex; align-items:center; gap:8px; padding:8px 12px; font-family:var(--font-code); font-size:11.5px; color:var(--text-muted); white-space:nowrap; border-right:1px solid var(--bg-elevated); transition:var(--transition-fast); }
 .etab:hover { color:var(--text-secondary); background:var(--bg-surface); }
 .etab.on { color:var(--text-primary); background:var(--bg-deepest); }
 .etab .etab-name { outline:none; }
 .etab .etab-name.editing { background:var(--bg-elevated); color:var(--text-primary); border-radius:4px; padding:1px 4px; margin:-1px -4px; }
 .etab .etab-x { display:grid; place-items:center; width:16px; height:16px; font-size:14px; line-height:1; color:var(--text-disabled); border-radius:4px; }
 .etab .etab-x:hover { color:var(--text-secondary); background:var(--bg-elevated); }
-.etab-add { flex-shrink:0; padding:8px 13px; color:var(--text-muted); font-size:15px; line-height:1; border-left:1px solid var(--bg-deepest); }
+.etab-add { flex-shrink:0; padding:8px 13px; color:var(--text-muted); font-size:15px; line-height:1; border-left:1px solid var(--bg-elevated); }
 .etab-add:hover { color:var(--text-primary); background:var(--bg-surface); }
 .editor-body { flex:1; min-height:0; display:flex; background:var(--bg-deepest); overflow:hidden; }
 .editor-gutter { flex-shrink:0; overflow:hidden; padding:14px 0; font-family:var(--font-code); font-size:12.5px; line-height:1.7; color:var(--text-disabled); user-select:none; }
@@ -222,8 +285,8 @@ textarea { border: none; outline: none; }
 .editor-area { flex:1; min-width:0; background:transparent; color:var(--text-primary); font-family:var(--font-code); font-size:12.5px; line-height:1.7; padding:14px 16px; resize:none; white-space:pre; overflow:auto; tab-size:4; caret-color:var(--accent); }
 .run-row { display:flex; padding:12px; flex-shrink:0; }
 .btn { font-size:12px; font-weight:600; padding:9px 20px; border-radius:9px; }
-.btn.primary { background:var(--accent); color:var(--bg-deepest); width:100%; }
-.btn.primary:hover { background:#e8c565; }
+.btn.primary { background:var(--accent); color:var(--on-accent); width:100%; }
+.btn.primary:hover { background:#6a90b0; }
 .meta { padding:8px 16px 16px; }
 .meta-label { font-size:9.5px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin:0 0 10px; }
 .meta-row { margin-bottom:15px; }
@@ -290,7 +353,6 @@ textarea { border: none; outline: none; }
       <div class="seg" id="rightSeg">
         <button data-rview="editor" class="on">Editor</button>
         <button data-rview="codebase">Codebase</button>
-        <button data-rview="metadata">Metadata</button>
       </div>
     </div>
 
@@ -314,21 +376,6 @@ textarea { border: none; outline: none; }
         <div class="ex-tree" id="cbTree"></div>
       </div>
       <div class="cb-code"><div class="codebase" id="codebase"></div></div>
-    </div>
-
-    <div class="rview" id="rview-metadata">
-      <div class="meta">
-        <p class="meta-label">Where you are</p>
-        <div class="meta-row"><div class="meta-k">Breadcrumb</div>
-          <div class="breadcrumb">dev_master ›<br>run_prompts.py ›<br><b>_pinned_qa_group</b></div></div>
-        <div class="meta-row"><div class="meta-k">Range</div><div class="meta-v">L42–46</div></div>
-        <div class="meta-row"><div class="meta-k">Phase · Mode</div><div class="meta-v">ASSEMBLE · ADVERSARY</div></div>
-        <div class="meta-row"><div class="meta-k">Dive depth</div><div class="meta-v">1 (child of run_prompts)</div></div>
-        <div class="meta-row"><div class="meta-k">Axes</div>
-          <div style="margin-top:5px"><span class="axis-chip done">COMPREHEND</span><span class="axis-chip">IMPLEMENT</span><span class="axis-chip">EDGE</span></div></div>
-        <div class="meta-row"><div class="meta-k">Live verdict</div><div class="meta-v">PARTIAL — 1 gap open</div></div>
-        <div class="meta-row"><div class="meta-k">Position</div><div class="meta-v">CAN 6 · CANT 21</div></div>
-      </div>
     </div>
   </aside>
 </div>
@@ -365,6 +412,28 @@ const STREAM = [
     tools:[['read_code_slice','L42–46'],['read_axis_evidence','What can break'],['read_probe_history','2 probes'],['read_transcript','your answer']],
     stamp:{ kind:'return.grade', verdict:'MISSING', category:'sibling-hole' } },
   { t:'fb', id:'f6', for:[5,6], verdict:'MISSING', category:'sibling-hole', agent:'JUDGE', text:'Gap: no de-duplication across groups. Prerequisite uncovered — dict identity vs value.' },
+  { t:'msg', id:7, role:'tutor', text:'Here’s the shape once you dedupe by the value you care about — collapse it if it’s in the way.' },
+  { t:'code', id:'c7', agent:'Tutor', lang:'py', fname:'_pinned_qa_group.py', code:
+`def _pinned_qa_group(questions):
+    pinned = [q for q in questions if q["pin"]]
+    rest   = [q for q in questions if not q["pin"]]
+    seen, out = set(), []
+    for q in pinned + rest:          # pinned first, order preserved
+        if q["id"] not in seen:      # dedupe by value, not object identity
+            seen.add(q["id"])
+            out.append(q)
+    return out
+` },
+  { t:'technique', id:'t7', label:'First principles', claim:'Why does the duplicate survive <code>pinned + rest</code>?', atoms:[
+      'A list <code>+</code> copies references — it compares nothing.',
+      'Two dicts with the same <code>id</code> field are still separate objects.',
+      'So testing <code>q in seen</code> on objects checks identity, which is always unique.',
+    ], rebuild:'Dedupe on the value you mean (<code>q["id"]</code>), never the object.' },
+  { t:'evolution', id:'e7', label:'How your understanding changed', stages:[
+      { at:'Probe 1', belief:'Equality is about identity (<code>is</code>).' },
+      { at:'Dive · identity', belief:'<code>==</code> compares value, <code>is</code> compares the object.' },
+      { at:'Now', belief:'Dedupe by the id field’s value — not the dict object.' },
+    ] },
 ];
 
 /* tree */
@@ -515,14 +584,61 @@ STREAM.forEach(item=>{
       `<div class="tool"><span class="tname">${name}</span><span class="tret">${ret}</span></div>`).join('');
     d.innerHTML=`<div class="ar-head">${item.agent}<span class="dot">·</span>${item.step}</div>${tools}`;
     convo.appendChild(d);
-  } else {
+  } else if(item.t==='fb'){
     const d=document.createElement('div'); d.className='feedback'; d.dataset.id=item.id;
     d.innerHTML=`<div class="fb-top"><span class="verdict ${item.verdict}">${item.verdict}</span>
       <span class="cat">${item.category}</span><span class="agent">${item.agent}</span></div>
       <div class="fb-body">${item.text}</div>`;
     convo.appendChild(d);
+  } else if(item.t==='code'){
+    // AI-generated code: a collapsible card. Surrounding prose stays a normal `msg`.
+    const lines=item.code.replace(/\n$/,'').split('\n');
+    const body=lines.map((ln,i)=>
+      `<div class="cl"><span class="ln">${i+1}</span><span class="src">${hl(ln)||' '}</span></div>`).join('');
+    const d=document.createElement('div'); d.className='tblk'; d.dataset.id=item.id;
+    d.innerHTML=`<div class="tblk-eyebrow"><span class="gl">◆</span>${item.agent||'Tutor'} · generated</div>
+      <div class="ai-code${item.collapsed?' collapsed':''}">
+        <button class="code-head" aria-expanded="${item.collapsed?'false':'true'}">
+          <span class="ch-title">${item.fname||'snippet'}</span>
+          <span class="ch-meta">${(item.lang||'py').toUpperCase()} · ${lines.length} LN</span>
+          <span class="ch-caret" aria-hidden="true">${item.collapsed?'+':'−'}</span></button>
+        <div class="code-body"><div class="code-inner">${body}</div></div></div>`;
+    const el=d.querySelector('.ai-code'), head=d.querySelector('.code-head'), caret=d.querySelector('.ch-caret');
+    head.addEventListener('click',()=>{ const c=el.classList.toggle('collapsed');
+      head.setAttribute('aria-expanded',String(!c)); caret.textContent=c?'+':'−'; });
+    convo.appendChild(d);
+  } else if(item.t==='technique'){
+    // template UI — first-principles decomposition. `atoms` is an ordered break-down,
+    // `rebuild` the synthesis. A future AI would pick a template and fill these slots.
+    const atoms=item.atoms.map((a,i)=>`<li><span class="n">${i+1}</span><span>${a}</span></li>`).join('');
+    const d=document.createElement('div'); d.className='tblk'; d.dataset.id=item.id;
+    d.innerHTML=`<div class="tblk-eyebrow"><span class="gl">⚛</span>${item.label||'First principles'}</div>
+      <div class="tq"><div class="tq-claim">${item.claim}</div>
+        <ol class="tq-atoms">${atoms}</ol>
+        <div class="tq-rebuild"><span class="arrow">⇒</span><span>${item.rebuild}</span></div></div>`;
+    convo.appendChild(d);
+  } else if(item.t==='evolution'){
+    // template UI — how a concept changed in the learner's mind over turns.
+    const rows=item.stages.map((s,i)=>
+      `<div class="evo-row ${i===item.stages.length-1?'now':'past'}">
+         <span class="evo-stage">${s.at}</span><span class="evo-belief">${s.belief}</span></div>`).join('');
+    const d=document.createElement('div'); d.className='tblk'; d.dataset.id=item.id;
+    d.innerHTML=`<div class="tblk-eyebrow"><span class="gl">◷</span>${item.label||'How your understanding changed'}</div>
+      <div class="evo">${rows}</div>`;
+    convo.appendChild(d);
   }
 });
+
+/* a light Python tint for AI-code cards — reuses the .k/.s/.c token classes */
+function hl(line){
+  // order matters: tint strings on the RAW text first, then comments, then keywords —
+  // so later passes never re-match the quotes/words inside spans we just inserted.
+  let s=esc(line);
+  s=s.replace(/("[^"]*"|'[^']*')/g,'<span class="s">$1</span>');
+  s=s.replace(/(#[^<]*)$/,'<span class="c">$1</span>');
+  s=s.replace(/\b(def|return|for|if|not|in|and|or|else|None|True|False)\b/g,'<span class="k">$1</span>');
+  return s;
+}
 
 /* middle toggle */
 const midSeg=document.getElementById('midSeg');
@@ -546,7 +662,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') clearFocus(); });
 const rightSeg=document.getElementById('rightSeg');
 rightSeg.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return;
   rightSeg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
-  ['editor','codebase','metadata'].forEach(v=>document.getElementById('rview-'+v).classList.toggle('on',v===b.dataset.rview));
+  ['editor','codebase'].forEach(v=>document.getElementById('rview-'+v).classList.toggle('on',v===b.dataset.rview));
 });
 
 /* ── Codebase view: a VSCode-style file explorer ───────────────────────────

@@ -215,6 +215,21 @@ CREATE INDEX IF NOT EXISTS idx_messages_turn ON conversation_messages(journey_id
 CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_learner_answer_per_turn
     ON conversation_messages(journey_id, turn_id) WHERE role='learner';
 CREATE INDEX IF NOT EXISTS idx_journey_events_journey ON journey_events(journey_id, id);
+CREATE TABLE IF NOT EXISTS tool_calls (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    journey_id   INTEGER REFERENCES journeys(id) ON DELETE CASCADE,
+    unit_id      INTEGER REFERENCES units(id),
+    turn_id      TEXT NOT NULL,
+    step         TEXT NOT NULL,
+    agent        TEXT NOT NULL,
+    capability   TEXT NOT NULL,
+    arguments_json TEXT NOT NULL DEFAULT '{}',
+    refused      INTEGER NOT NULL DEFAULT 0,
+    ordinal      INTEGER NOT NULL,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_tool_calls_journey ON tool_calls(journey_id, id);
+
 CREATE INDEX IF NOT EXISTS idx_semantic_nodes_journey ON semantic_nodes(journey_id, id);
 CREATE INDEX IF NOT EXISTS idx_semantic_edges_journey ON semantic_edges(journey_id, id);
 CREATE INDEX IF NOT EXISTS idx_learner_notes_journey ON learner_notes(journey_id, id);

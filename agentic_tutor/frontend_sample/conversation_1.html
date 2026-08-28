@@ -1,0 +1,449 @@
+<!doctype html>
+<!--
+  conversation_1.html — THE SPINE
+  Idea: one vertical spine carries the whole dialogue; every turn hangs off it as a node,
+  and a verdict is a clamp mounted ON the spine that visually binds the Q→A nodes above it.
+  Fits a reasoning transcript because provenance (who spoke, what judged what) reads as
+  position on one continuous structural member, not as chat bubbles.
+  Risk: verdicts and artifacts have no bubbles at all — grouping is carried purely by the
+  spine connectors and plate tabs, so the hierarchy must survive with whitespace alone.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conversation — The Spine</title>
+<style>
+  :root{
+    --bg-deepest:#ffffff; --bg-app:#f4f4f2; --bg-surface:#ebeae6; --bg-card:#e3e1db;
+    --bg-elevated:#d8d6cf; --bg-hover:#cfccc3;
+    --text-primary:#1e2024; --text-secondary:#4a4d53; --text-muted:#7a7d84; --text-disabled:#a8a6a0;
+    --accent:#4f7290; --accent-dim:#385876; --accent-soft:rgba(79,114,144,0.15); --on-accent:#ffffff;
+    --r-s:8px; --r-m:12px; --r-l:16px;
+    --font-ui:"Segoe UI",system-ui,-apple-system,sans-serif;
+    --font-code:"Cascadia Code",ui-monospace,"Consolas",monospace;
+  }
+  *{box-sizing:border-box; margin:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg-app); color:var(--text-primary);
+    font-family:var(--font-ui); font-size:15.5px; line-height:1.62;
+    display:flex; flex-direction:column;
+  }
+  :focus-visible{outline:2px solid var(--accent-dim); outline-offset:2px; border-radius:4px}
+  @media (prefers-reduced-motion:reduce){ *{transition:none!important; animation:none!important; scroll-behavior:auto!important} }
+
+  /* ---------- the column ---------- */
+  .col{
+    flex:1; width:min(780px,100%); margin:0 auto; padding:44px 20px 140px;
+    position:relative;
+  }
+  /* the spine itself */
+  .col::before{
+    content:""; position:absolute; left:63px; top:0; bottom:0; width:2px;
+    background:var(--bg-elevated);
+  }
+
+  /* ---------- generic turn node ---------- */
+  .turn{position:relative; padding-left:56px; margin-bottom:34px}
+  .turn .node{
+    position:absolute; left:8px; top:6px; width:12px; height:12px;
+    background:var(--bg-app); border:2px solid var(--text-muted); border-radius:3px;
+  }
+  .turn.tutor .node{border-color:var(--accent)}
+  .turn.learner .node{background:var(--accent); border-color:var(--accent)}
+  .turn.system{padding-left:100px; margin-bottom:26px}
+  .turn.system .node{left:60px; top:9px; width:8px; height:2px; border:0; background:var(--text-disabled)}
+
+  .who{
+    font-size:11px; font-weight:600; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--text-muted); margin-bottom:4px;
+  }
+  .turn.learner .who{color:var(--accent-dim); text-align:right}
+
+  .prose{color:var(--text-primary)}
+  .prose code, .sys code{
+    font-family:var(--font-code); font-size:.88em; background:var(--bg-surface);
+    border:1px solid var(--bg-card); border-radius:6px; padding:0 5px;
+  }
+
+  /* learner text: right-aligned plate, flat — geometry distinguishes the voices, not bubbles */
+  .turn.learner .prose{
+    background:var(--bg-surface); border:1px solid var(--bg-card);
+    border-radius:var(--r-m) var(--r-m) 2px var(--r-m);
+    padding:12px 16px; max-width:78%; margin-left:auto; text-align:left;
+  }
+  .turn.tutor .prose{max-width:92%}
+
+  .turn.system .sys{
+    font-size:12.5px; color:var(--text-muted); font-family:var(--font-code);
+  }
+
+  /* ---------- agent-run grounding trace ---------- */
+  .run{
+    display:flex; align-items:center; gap:10px;
+    font-family:var(--font-code); font-size:11.5px; color:var(--text-muted);
+    margin-bottom:22px; padding-left:56px; position:relative;
+  }
+  .run .node{
+    position:absolute; left:8px; top:3px; width:12px; height:12px;
+    background:var(--accent-soft); border:2px solid var(--accent-dim); border-radius:3px;
+  }
+  .run .agent{color:var(--accent-dim); font-weight:600}
+  .run .dot{width:3px; height:3px; border-radius:50%; background:var(--text-disabled)}
+  .run .tools{display:flex; gap:10px; flex-wrap:wrap}
+  .run .tool{
+    background:var(--bg-surface); border:1px solid var(--bg-card); border-radius:6px;
+    padding:1px 8px; color:var(--text-secondary);
+  }
+  .run .tool b{font-weight:400; color:var(--text-muted)}
+
+  /* ---------- verdict: a clamp on the spine ---------- */
+  .verdict{position:relative; padding-left:56px; margin:0 0 38px}
+  .v-clamp{
+    /* the bracket that reaches UP the spine to the answer it judges */
+    position:absolute; left:13.5px; top:-30px; bottom:calc(100% - 14px); width:1px;
+    background:var(--accent-dim);
+  }
+  .v-plate{
+    border:1.5px solid var(--accent-dim); border-radius:2px var(--r-m) var(--r-m) 2px;
+    background:var(--bg-deepest);
+    display:grid; grid-template-columns:auto 1fr; align-items:stretch; overflow:hidden;
+  }
+  .v-seal{
+    background:var(--accent); color:var(--on-accent);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:10px 18px; gap:2px;
+  }
+  .v-seal .v-word{font-size:11px; font-weight:700; letter-spacing:.14em}
+  .v-seal .v-mark{font-size:20px; line-height:1}
+  .v-body{padding:10px 16px}
+  .v-meta{
+    font-family:var(--font-code); font-size:11px; color:var(--accent-dim);
+    letter-spacing:.04em; margin-bottom:2px;
+  }
+  .v-text{font-size:14px; color:var(--text-primary)}
+  .verdict.missing .v-seal{background:var(--bg-elevated); color:var(--text-primary)}
+  .verdict.missing{--accent-dim:var(--text-muted)}
+  .verdict.missing .v-plate{background:var(--bg-app)}
+  .v-for{
+    font-family:var(--font-code); font-size:10.5px; color:var(--text-disabled);
+    margin-top:6px;
+  }
+
+  /* ---------- artifact plates (hang off the spine, wider) ---------- */
+  .artifact{position:relative; padding-left:56px; margin-bottom:34px}
+  .artifact .node{
+    position:absolute; left:8px; top:14px; width:12px; height:12px;
+    background:var(--bg-elevated); border:2px solid var(--text-muted); border-radius:3px;
+  }
+  .plate{
+    border:1px solid var(--bg-elevated); border-radius:var(--r-l);
+    background:var(--bg-deepest); overflow:hidden;
+  }
+  .plate-tab{
+    display:flex; align-items:center; gap:10px;
+    padding:9px 16px; background:var(--bg-surface); border-bottom:1px solid var(--bg-card);
+  }
+  .plate-tab .tab{
+    font-family:var(--font-code); font-size:11px; font-weight:600; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--accent-dim);
+    background:var(--accent-soft); border-radius:4px; padding:2px 8px;
+  }
+  .plate-tab .fname{font-family:var(--font-code); font-size:12.5px; color:var(--text-secondary)}
+  .plate-tab .spacer{flex:1}
+  .plate-note{font-size:12px; color:var(--text-muted)}
+
+  /* collapsible code */
+  .code-toggle{
+    appearance:none; border:0; background:none; font:inherit; cursor:pointer;
+    display:flex; align-items:center; gap:6px;
+    font-family:var(--font-code); font-size:11px; color:var(--accent-dim);
+    padding:4px 8px; border-radius:6px;
+  }
+  .code-toggle:hover{background:var(--bg-hover)}
+  .code-toggle .chev{transition:transform .15s ease}
+  .code-body{
+    display:grid; grid-template-columns:auto 1fr;
+    font-family:var(--font-code); font-size:13px; line-height:1.65;
+    padding:14px 0; overflow-x:auto;
+  }
+  .code-body.collapsed{display:none}
+  .gutter{
+    text-align:right; padding:0 14px 0 18px; color:var(--text-disabled);
+    border-right:1px solid var(--bg-card); user-select:none;
+  }
+  .code-src{padding:0 18px; color:var(--text-primary); white-space:pre}
+  .kw{color:var(--accent-dim); font-weight:600}
+  .fn{color:var(--accent)}
+  .cm{color:var(--text-muted); font-style:italic}
+  .str{color:#5d6e4a}
+
+  /* first-principles: decompose -> recompose geometry */
+  .fp-body{padding:16px}
+  .fp-claim{font-size:14px; color:var(--text-secondary); margin-bottom:14px}
+  .fp-claim b{font-weight:600; color:var(--text-primary)}
+  .atom{
+    position:relative; padding:9px 14px 9px 44px; margin-left:18px;
+    border-left:1.5px solid var(--bg-elevated); border-radius:0 var(--r-s) var(--r-s) 0;
+    background:var(--bg-app); margin-bottom:6px; font-size:14px;
+  }
+  .atom::before{
+    counter-increment:atom; content:counter(atom);
+    position:absolute; left:-13px; top:11px; width:24px; height:24px;
+    background:var(--bg-surface); border:1.5px solid var(--accent-dim); color:var(--accent-dim);
+    border-radius:6px; font-family:var(--font-code); font-size:11.5px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .atom-wrap{counter-reset:atom; margin-bottom:16px}
+  .atom:last-child{margin-bottom:0}
+  .atom code{font-family:var(--font-code); font-size:.88em; background:var(--bg-surface); border-radius:5px; padding:0 5px}
+  .rebuild{
+    margin-top:16px; margin-left:18px; padding:11px 16px;
+    border:1.5px dashed var(--accent); border-radius:var(--r-m);
+    color:var(--text-primary); font-size:14px; background:var(--accent-soft);
+    position:relative;
+  }
+  .rebuild::before{
+    content:"REBUILD"; position:absolute; top:-9px; left:12px;
+    background:var(--bg-deepest); color:var(--accent-dim);
+    font-family:var(--font-code); font-size:10px; letter-spacing:.12em; padding:0 6px;
+  }
+
+  /* evolution: a horizontal stage chain */
+  .ev-body{padding:16px}
+  .stages{display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:0; list-style:none; padding:0}
+  .stage{position:relative; padding:0 14px 4px 0}
+  .stage::before{ /* the chain line */
+    content:""; position:absolute; left:0; right:0; top:9px; height:1.5px; background:var(--bg-elevated);
+  }
+  .stage .at{
+    position:relative; display:inline-block; z-index:1;
+    font-family:var(--font-code); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--text-muted); background:var(--bg-app); border:1px solid var(--bg-card);
+    border-radius:4px; padding:1px 7px; margin-bottom:8px;
+  }
+  .stage:last-child .at{color:var(--on-accent); background:var(--accent); border-color:var(--accent)}
+  .stage .belief{font-size:13.5px; color:var(--text-secondary)}
+  .stage:last-child .belief{color:var(--text-primary)}
+  .stage sup{
+    font-family:var(--font-code); font-size:9px; color:var(--text-disabled); margin-left:6px;
+  }
+  @media (max-width:560px){
+    .stages{grid-auto-flow:row; gap:10px}
+    .stage{padding:0 0 0 18px}
+    .stage::before{left:4px; right:auto; top:0; bottom:0; width:1.5px; height:auto}
+  }
+
+  /* ---------- chat input ---------- */
+  .inputbar{
+    position:sticky; bottom:0; background:var(--bg-app);
+    border-top:1px solid var(--bg-card); padding:14px 20px 18px;
+  }
+  .inputbar .inner{
+    width:min(780px,100%); margin:0 auto;
+    display:grid; grid-template-columns:1fr auto; gap:10px;
+  }
+  .inputbar textarea{
+    resize:none; font:inherit; color:var(--text-primary);
+    background:var(--bg-deepest); border:1.5px solid var(--bg-elevated);
+    border-radius:var(--r-m); padding:11px 14px; min-height:46px; max-height:120px;
+  }
+  .inputbar textarea::placeholder{color:var(--text-disabled)}
+  .inputbar textarea:focus{border-color:var(--accent-dim); outline:none; box-shadow:0 0 0 3px var(--accent-soft)}
+  .send{
+    appearance:none; border:0; cursor:pointer;
+    background:var(--accent); color:var(--on-accent);
+    font:inherit; font-weight:600; border-radius:var(--r-m); padding:0 22px;
+  }
+  .send:hover{background:var(--accent-dim)}
+  .send:disabled{background:var(--bg-elevated); color:var(--text-disabled); cursor:default}
+
+  @media (max-width:560px){
+    .col{padding-left:12px; padding-right:12px}
+    .col::before{left:27px}
+    .turn,.run,.verdict,.artifact{padding-left:36px}
+    .turn .node,.run .node,.artifact .node{left:-1px}
+    .turn.system{padding-left:36px}
+    .turn.system .node{left:0}
+    .turn.learner .prose{max-width:100%}
+  }
+</style>
+</head>
+<body>
+
+<main class="col">
+
+  <!-- 1 · system -->
+  <section class="turn system" aria-label="system note">
+    <span class="node" aria-hidden="true"></span>
+    <p class="sys">Unit opened — <code>_pinned_qa_group</code> (L42–46).</p>
+  </section>
+
+  <!-- 2 · agent-run grounding trace -->
+  <div class="run" role="note" aria-label="agent grounding">
+    <span class="node" aria-hidden="true"></span>
+    <span class="agent">TEACHER</span><span class="dot" aria-hidden="true"></span>
+    <span>wakeup.probe</span><span class="dot" aria-hidden="true"></span>
+    <span class="tools">
+      <span class="tool">read_code_slice <b>L42–46</b></span>
+    </span>
+  </div>
+
+  <!-- 3 · tutor question -->
+  <section class="turn tutor">
+    <span class="node" aria-hidden="true"></span>
+    <p class="who">Tutor</p>
+    <p class="prose">Before you write it — what does the caller expect back? Shape and order.</p>
+  </section>
+
+  <!-- 4 · learner answer -->
+  <section class="turn learner">
+    <span class="node" aria-hidden="true"></span>
+    <p class="who">You</p>
+    <p class="prose">A list of question dicts, pinned first, preserving the passed order.</p>
+  </section>
+
+  <!-- 5 · agent-run for the grader -->
+  <div class="run" role="note" aria-label="agent grounding">
+    <span class="node" aria-hidden="true"></span>
+    <span class="agent">JUDGE</span><span class="dot" aria-hidden="true"></span>
+    <span>wakeup.grade</span><span class="dot" aria-hidden="true"></span>
+    <span class="tools">
+      <span class="tool">read_code_slice <b>L42–46</b></span>
+    </span>
+  </div>
+
+  <!-- 6 · verdict SOLID (clamped to the exchange above) -->
+  <div class="verdict" role="status">
+    <span class="v-clamp" aria-hidden="true"></span>
+    <div class="v-plate">
+      <div class="v-seal"><span class="v-mark">■</span><span class="v-word">SOLID</span></div>
+      <div class="v-body">
+        <p class="v-meta">JUDGE · correct-deep</p>
+        <p class="v-text">Order within the pinned group is right — COMPREHEND proved.</p>
+        <p class="v-for">judges turns t1 → t2</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7 · tutor question -->
+  <section class="turn tutor">
+    <span class="node" aria-hidden="true"></span>
+    <p class="who">Tutor</p>
+    <p class="prose">And if two groups share a question — what does your merge do with duplicates?</p>
+  </section>
+
+  <!-- 8 · learner answer -->
+  <section class="turn learner">
+    <span class="node" aria-hidden="true"></span>
+    <p class="who">You</p>
+    <p class="prose">It concatenates <code>pinned + rest</code> — I assumed ids are unique across groups.</p>
+  </section>
+
+  <!-- 9 · verdict MISSING -->
+  <div class="verdict missing" role="status">
+    <span class="v-clamp" aria-hidden="true"></span>
+    <div class="v-plate">
+      <div class="v-seal"><span class="v-mark">□</span><span class="v-word">MISSING</span></div>
+      <div class="v-body">
+        <p class="v-meta">JUDGE · sibling-hole</p>
+        <p class="v-text">Gap: no de-duplication across groups.</p>
+        <p class="v-for">judges turns t3 → t4</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 10 · tutor line -->
+  <section class="turn tutor">
+    <span class="node" aria-hidden="true"></span>
+    <p class="who">Tutor</p>
+    <p class="prose">Right — the duplicate survives. Watch how the fix falls out of the data, not from a patch:</p>
+  </section>
+
+  <!-- 11 · generated code (collapsible, expanded) -->
+  <section class="artifact">
+    <span class="node" aria-hidden="true"></span>
+    <div class="plate">
+      <div class="plate-tab">
+        <span class="tab">generated</span>
+        <span class="fname">_pinned_qa_group · py</span>
+        <span class="spacer"></span>
+        <button class="code-toggle" id="codeToggle" aria-expanded="true" aria-controls="codeBody">
+          <span class="chev" aria-hidden="true">▾</span><span data-label>collapse</span>
+        </button>
+      </div>
+      <div class="code-body" id="codeBody">
+        <div class="gutter" aria-hidden="true"><div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div><div>8</div><div>9</div><div>10</div></div>
+        <pre class="code-src"><span class="kw">def</span> <span class="fn">_pinned_qa_group</span>(questions):
+    pinned = [q <span class="kw">for</span> q <span class="kw">in</span> questions <span class="kw">if</span> q[<span class="str">"pin"</span>]]
+    rest   = [q <span class="kw">for</span> q <span class="kw">in</span> questions <span class="kw">if</span> <span class="kw">not</span> q[<span class="str">"pin"</span>]]
+    seen, out = set(), []
+    <span class="kw">for</span> q <span class="kw">in</span> pinned + rest:          <span class="cm"># pinned first, order preserved</span>
+        <span class="kw">if</span> q[<span class="str">"id"</span>] <span class="kw">not in</span> seen:      <span class="cm"># dedupe by value, not object identity</span>
+            seen.add(q[<span class="str">"id"</span>])
+            out.append(q)
+    <span class="kw">return</span> out</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12 · first-principles decomposition -->
+  <section class="artifact">
+    <span class="node" aria-hidden="true"></span>
+    <div class="plate">
+      <div class="plate-tab"><span class="tab">first principles</span>
+        <span class="plate-note">decompose → recompose</span>
+      </div>
+      <div class="fp-body">
+        <p class="fp-claim"><b>Claim:</b> Why does the duplicate survive <code>pinned + rest</code>?</p>
+        <div class="atom-wrap">
+          <p class="atom">A list <code>+</code> copies references — it compares nothing.</p>
+          <p class="atom">Two dicts with the same <code>id</code> field are still separate objects.</p>
+          <p class="atom">So <code>q in seen</code> on objects checks identity, which is always unique.</p>
+        </div>
+        <p class="rebuild">Dedupe on the value you mean (<code>q["id"]</code>), never the object.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 13 · concept evolution -->
+  <section class="artifact">
+    <span class="node" aria-hidden="true"></span>
+    <div class="plate">
+      <div class="plate-tab"><span class="tab">concept evolution</span>
+        <span class="plate-note">how one idea changed</span>
+      </div>
+      <div class="ev-body">
+        <ol class="stages">
+          <li class="stage"><span class="at">Probe 1</span><p class="belief">Equality is about identity (<code>is</code>).<sup>superseded</sup></p></li>
+          <li class="stage"><span class="at">Dive · identity</span><p class="belief"><code>==</code> compares value, <code>is</code> compares the object.<sup>superseded</sup></p></li>
+          <li class="stage"><span class="at">Now</span><p class="belief">Dedupe by the id field's value — not the dict object.</p></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- chat input -->
+<div class="inputbar">
+  <div class="inner">
+    <textarea rows="1" placeholder="Answer in your own words…" aria-label="Your answer"></textarea>
+    <button class="send" type="button">Send</button>
+  </div>
+</div>
+
+<script>
+  // the collapsible code must actually toggle
+  const t = document.getElementById('codeToggle');
+  const body = document.getElementById('codeBody');
+  t.addEventListener('click', () => {
+    const open = body.classList.toggle('collapsed') === false;
+    t.setAttribute('aria-expanded', String(open));
+    t.querySelector('[data-label]').textContent = open ? 'collapse' : 'expand';
+    t.querySelector('.chev').textContent = open ? '▾' : '▸';
+  });
+</script>
+</body>
+</html>

@@ -91,6 +91,9 @@ class JourneyReader:
             },
             "learner_notes": self.db.query(
                 "SELECT * FROM learner_notes WHERE journey_id=? ORDER BY id", (journey_id,)),
+            "tool_calls": self.db.query(
+                "SELECT id,unit_id,turn_id,step,agent,capability,arguments_json,refused,ordinal,created_at "
+                "FROM tool_calls WHERE journey_id=? ORDER BY id", (journey_id,)),
             "axis_wording": AXIS_WORDING,
         }
 

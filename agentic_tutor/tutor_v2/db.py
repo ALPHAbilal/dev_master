@@ -9,7 +9,7 @@ from typing import Iterator
 
 from .errors import InvariantError
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 
 
@@ -74,6 +74,11 @@ class Database:
             except sqlite3.OperationalError as exc:
                 if "duplicate column" not in str(exc).lower():
                     raise
+            return
+        if version == 6:
+            # Tool-call capture (observability). The additive tool_calls table is created
+            # idempotently by schema.sql (executescript runs on every init), so no
+            # transform is required here — fresh AND existing DBs both gain the table.
             return
         raise RuntimeError(f"no migration implementation for schema {version}")
 

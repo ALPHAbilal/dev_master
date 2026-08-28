@@ -30,7 +30,7 @@ def test_fresh_database_has_authoritative_mutable_stones_and_version():
     assert {"schema_migrations", "units", "axes", "stack", "meta", "probes", "learner", "handoff", "events"} <= tables
     assert {"journeys", "conversation_messages", "journey_events",
             "semantic_nodes", "semantic_edges", "learner_notes"} <= tables
-    assert db.one("SELECT MAX(version) AS version FROM schema_migrations") == {"version": 5}
+    assert db.one("SELECT MAX(version) AS version FROM schema_migrations") == {"version": 6}
 
 
 def test_file_database_enables_wal_and_reopens_cleanly():
@@ -40,7 +40,7 @@ def test_file_database_enables_wal_and_reopens_cleanly():
         assert db.one("PRAGMA journal_mode")["journal_mode"] == "wal"
         db.close()
         reopened = Database(path)
-        assert reopened.one("SELECT MAX(version) AS version FROM schema_migrations") == {"version": 5}
+        assert reopened.one("SELECT MAX(version) AS version FROM schema_migrations") == {"version": 6}
         reopened.close()
 
 
@@ -74,7 +74,7 @@ def test_v1_events_migrate_to_monotonic_ids_without_losing_rows():
         legacy.connection.commit()
         legacy.close()
         db = Database(path)
-        assert db.one("SELECT MAX(version) AS version FROM schema_migrations") == {"version": 5}
+        assert db.one("SELECT MAX(version) AS version FROM schema_migrations") == {"version": 6}
         assert db.one("SELECT id FROM events") == {"id": 7}
         assert "AUTOINCREMENT" in db.one(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='events'"

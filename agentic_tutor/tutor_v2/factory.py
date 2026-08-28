@@ -20,6 +20,7 @@ from .journey_reader import JourneyReader
 from .learner_model import LearnerModelService
 from .orchestrator import TurnOrchestrator
 from .packets import WakeupBuilder
+from .recorders import ToolCallRecorder
 from .routing import Router
 from .semantics import SemanticGraphService
 from .services import ArchiveService, EventRecorder, WorkspaceService
@@ -55,6 +56,7 @@ def build_session(config: TutorConfig, agent_run: AgentRun) -> AppContext:
         unit_archive=ArchiveService(db, config, workspace, events),
         learner_model=LearnerModelService(db, config),
         graph_projection=GraphProjection(graph),
+        tool_calls_recorder=ToolCallRecorder(db, config),
     )
     session = SessionRunner(config, WakeupBuilder(db, config), orchestrator, agent_run)
     reader = JourneyReader(db, config)

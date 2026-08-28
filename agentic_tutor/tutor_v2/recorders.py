@@ -12,6 +12,7 @@ from typing import Any
 
 from .config import TutorConfig
 from .db import Database
+from .domain import ToolCall
 from .errors import InvariantError, ValidationError
 
 
@@ -82,6 +83,35 @@ class ConversationRecorder:
             "SELECT * FROM conversation_messages WHERE journey_id=? AND turn_id=? AND role='learner'",
             (journey_id, turn_id),
         )
+
+
+class ToolCallRecorder:
+    """Best-effort capture of what tools the model actually called during one agent wakeup."""
+
+    def __init__(self, db: Database, config: TutorConfig) -> None:
+        self.db = db
+        self.config = config
+
+    def record(self, *, journey_id: int, unit_id: int | None, turn_id: str, step: str,
+               agent: str, tool_calls: list["ToolCall"]) -> None:
+        if not tool_calls:
+            return
+        with self.db.transaction():
+            # Idempotent under crash-recovery replay: this (journey, turn) was already
+            # captured, so re-recording it would duplicate the rows. Skip — the rest of
+            # the turn is likewise idempotent.
+            already = self.db.connection.execute(
+                "SELECT 1 FROM tool_calls WHERE journey_id=? AND turn_id=? LIMIT 1",
+                (journey_id, turn_id),
+            ).fetchone()
+            if already:
+                return
+            for tc in tool_calls:
+                self.db.connection.execute(
+                    "INSERT INTO tool_calls(journey_id,unit_id,turn_id,step,agent,capability,"
+                    "arguments_json,refused,ordinal) VALUES(?,?,?,?,?,?,?,?,?)",
+                    (journey_id, unit_id, turn_id, step, agent, tc.capability,
+                     _json(tc.arguments), 1 if tc.refused else 0, tc.ordinal))
 
 
 class ProbeRecorder:
