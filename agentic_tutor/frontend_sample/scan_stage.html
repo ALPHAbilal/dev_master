@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MAPPER — scan stage</title>
+<!--
+  MAPPER scan stage. Two flat boxes: Agent log (left) + Bag of units (right); title above.
+  · Stepper + Generate live at the BOTTOM from the first load, centered across both boxes.
+  · Changing the number PREVIEWS ghost pills (empty domed placeholders) in the bag — appended
+    under any already-generated units. Generate flies real pills into those ghost slots.
+  · The live-step line (thinking-state shimmer/swap) reserves its space from the start, so it
+    never pushes content when it appears or clears.
+  Motion = stream + travel + settle + label-swap. No jitter/heartbeat.
+-->
+<style>
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+html{ height:100%; }
+:root{
+  --ink:#1e2024; --ink-2:#4a4d53; --ink-3:#7a7d84; --ink-4:#a8a6a0;
+  --canvas:#f4f4f2; --surface:#ffffff; --field:#f3f2ef; --hover:#efeeeb; --hover-2:#e9e8e4;
+  --line:#e2e0d9; --line-strong:#d3d1c9;
+  --accent:#4f7290; --accent-tint:rgba(79,114,144,0.13); --accent-ink:#385876; --green:#4a7a4a;
+  --r-chip:9999px; --r-ctrl:7px; --r-card:12px; --r-box:16px;
+  --ease:cubic-bezier(0.23,1,0.32,1);
+  --ui:"Segoe UI",Tahoma,sans-serif; --mono:"Cascadia Code","JetBrains Mono","SF Mono","Consolas",monospace;
+  --think-swap:150ms; --think-distance:8px; --think-blur:2px; --think-shimmer:2000ms;
+  --think-base:var(--ink-4); --think-highlight:var(--ink); --think-ease:ease-in-out;
+}
+body{ height:100%; background:var(--canvas); color:var(--ink); font-family:var(--ui); -webkit-font-smoothing:antialiased; line-height:1.5; }
+.app{ height:100vh; display:flex; }
+
+/* ── LEFT sidebar — same as the tutor: folders → units, collapsible to a 52px rail ── */
+.left{ position:relative; width:246px; flex-shrink:0; background:var(--canvas); border-right:1px solid var(--line); overflow:hidden; transition:width 200ms var(--ease); }
+.left.collapsed{ width:52px; }
+.left-inner{ width:246px; height:100%; display:flex; flex-direction:column; transition:opacity 170ms ease; }
+.left.collapsed .left-inner{ opacity:0; pointer-events:none; }
+.left-expand{ position:absolute; left:13px; top:13px; z-index:2; width:26px; height:26px; border:0; background:none; border-radius:7px; display:grid; place-items:center; color:var(--ink-3); opacity:0; pointer-events:none; cursor:pointer; transition:opacity 170ms ease, background 120ms, color 120ms; }
+.left-expand:hover{ background:var(--hover-2); color:var(--ink); }
+.left.collapsed .left-expand{ opacity:1; pointer-events:auto; }
+.left-head{ padding:12px 8px 6px; display:flex; align-items:center; }
+.collapse-btn{ margin-left:auto; width:26px; height:26px; border:0; background:none; border-radius:7px; color:var(--ink-3); display:grid; place-items:center; cursor:pointer; transition:background 120ms,color 120ms; }
+.collapse-btn:hover{ background:var(--hover-2); color:var(--ink); }
+.side-nav{ padding:2px 8px 0; }
+.nav-row{ display:flex; align-items:center; gap:10px; height:34px; width:100%; padding:0 8px; border:0; background:none; border-radius:7px; color:var(--ink-2); cursor:pointer; transition:background 120ms,color 120ms; }
+.nav-row:hover{ background:var(--hover-2); color:var(--ink); }
+.nav-row .ic{ width:18px; height:18px; display:grid; place-items:center; color:var(--ink-4); flex-shrink:0; }
+.nav-row:hover .ic{ color:var(--ink); }
+.nav-row .ic svg{ width:18px; height:18px; }
+.nav-row .lb{ font-size:13.5px; font-weight:500; }
+.side-label{ padding:14px 16px 4px; font-size:11.5px; font-weight:600; color:var(--ink-4); }
+.tree{ flex:1; min-height:0; overflow-y:auto; padding:0 8px 10px; scrollbar-width:thin; scrollbar-color:var(--line-strong) transparent; }
+.tree::-webkit-scrollbar{ width:10px; }
+.tree::-webkit-scrollbar-thumb{ background:var(--line-strong); border-radius:999px; border:3px solid var(--canvas); }
+.cb{ margin-bottom:1px; }
+.cb-row{ display:flex; align-items:center; gap:10px; height:34px; padding:0 8px; border-radius:7px; cursor:pointer; transition:background 120ms; }
+.cb-row:hover{ background:var(--hover-2); }
+.cb-caret{ width:18px; height:18px; flex-shrink:0; color:var(--ink-4); display:grid; place-items:center; transition:transform 180ms ease; }
+.cb-caret svg{ display:block; }
+.cb.open .cb-caret{ transform:rotate(90deg); }
+.cb-name{ flex:1; min-width:0; font-size:13.5px; font-weight:600; color:var(--ink); font-family:var(--mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cb-count{ flex-shrink:0; font-size:11px; color:var(--ink-4); font-variant-numeric:tabular-nums; }
+.units{ display:grid; grid-template-rows:0fr; transition:grid-template-rows 220ms cubic-bezier(0.16,1,0.3,1); }
+.cb.open .units{ grid-template-rows:1fr; }
+.units-clip{ overflow:hidden; }
+.unit{ position:relative; display:flex; align-items:center; height:30px; padding:0 10px 0 36px; border-radius:7px; cursor:pointer; transition:background 120ms; }
+.unit::before{ content:""; position:absolute; left:17px; top:0; bottom:0; width:1px; background:var(--line); }
+.u-name{ flex:1; min-width:0; font-size:12.5px; color:var(--ink-2); font-family:var(--mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.unit:hover{ background:var(--hover-2); }
+.unit.current{ background:var(--accent-tint); }
+.unit.current .u-name{ color:var(--accent-ink); font-weight:600; }
+.unit.owned .u-name{ color:var(--ink-3); }
+.unit.locked{ cursor:not-allowed; }
+.unit.locked .u-name{ color:var(--ink-4); }
+.unit.locked:hover{ background:none; }
+.u-arrow{ flex-shrink:0; margin-left:6px; color:var(--accent); opacity:0; display:grid; place-items:center; transition:opacity 140ms ease; }
+.u-arrow svg{ display:block; }
+.unit.current .u-arrow{ opacity:1; }
+.left-foot{ padding:6px 8px 10px; border-top:1px solid var(--line); }
+
+.canvas{ flex:1; min-width:0; display:flex; align-items:center; justify-content:center; padding:34px; overflow:auto; }
+.stage{ width:100%; max-width:840px; position:relative; }
+
+/* ── import step (simulation) — shown first; on Import the scan is revealed ── */
+#scanView{ display:none; }
+#scanView.on{ display:block; }
+/* Grid skeleton isn't needed here — one centered card. The field is a flex ROW
+ * (align-items:center puts the input text + browse button on the same optical
+ * line); the card is a block STACK with one consistent 14px rhythm between rows. */
+.import-view{ display:flex; justify-content:center; padding:8px 0; }
+.import-view.gone{ display:none; }
+.import-card{ width:100%; max-width:440px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-box); padding:24px; }
+.import-eyebrow{ font-size:11px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--ink-4); margin:0 0 16px; }
+.import-field{ display:flex; align-items:center; height:44px; padding:0 6px 0 14px; border-radius:var(--r-ctrl); background:var(--field); box-shadow:inset 0 0 0 1px var(--line); transition:box-shadow 140ms; }
+.import-field:focus-within{ box-shadow:inset 0 0 0 1.5px var(--accent); }
+/* input fills the row height so its own line box centers the text against the button */
+.import-field input{ flex:1; min-width:0; height:100%; border:0; background:none; outline:none; font-family:var(--mono); font-size:13px; color:var(--ink); }
+.import-field input::placeholder{ color:var(--ink-4); }
+.import-field .browse{ flex-shrink:0; width:32px; height:32px; border:0; background:none; border-radius:6px; color:var(--ink-4); display:grid; place-items:center; cursor:pointer; transition:background 120ms,color 120ms; }
+.import-field .browse:hover{ background:var(--hover-2); color:var(--ink); }
+.import-field .browse svg{ width:16px; height:16px; }
+.import-go{ display:flex; align-items:center; justify-content:center; width:100%; height:44px; margin-top:14px; border:0; border-radius:var(--r-ctrl); background:var(--accent); color:#fff; font-family:var(--ui); font-size:13.5px; font-weight:600; cursor:pointer; transition:background 130ms, transform 90ms; }
+.import-go:hover{ background:var(--accent-ink); } .import-go:active{ transform:scale(.99); }
+.import-go:disabled{ background:var(--hover-2); color:var(--ink-4); cursor:default; }
+/* indexing line takes the button's exact slot (same height + margin) so nothing jumps */
+.import-prog{ display:flex; align-items:center; justify-content:center; gap:9px; height:44px; margin-top:14px; font-family:var(--mono); font-size:12.5px; color:var(--ink-3); }
+.import-prog .spin{ width:14px; height:14px; border-radius:50%; border:2px solid var(--line-strong); border-top-color:var(--accent); animation:impSpin 720ms linear infinite; }
+@keyframes impSpin{ to{ transform:rotate(360deg); } }
+.title-row{ display:flex; align-items:baseline; gap:12px; padding:0 4px 14px; }
+.title-row .fn{ font-family:var(--mono); font-size:17px; font-weight:600; letter-spacing:-0.01em; }
+.title-row .path{ font-size:12px; color:var(--ink-4); font-family:var(--mono); }
+
+.boxes{ display:grid; grid-template-columns:300px 1fr; gap:16px; height:min(540px,72vh); }
+.box{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r-box); display:flex; flex-direction:column; overflow:hidden; }
+.box-label{ font-size:10px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--ink-4); padding:14px 17px 8px; flex-shrink:0; }
+
+/* live step — space RESERVED from the start (fixed height, never pushes) */
+.think{ height:24px; padding:0 17px; flex-shrink:0; }
+.t-think{ position:relative; display:inline-block; text-align:left; font-family:var(--mono); font-size:12.5px; }
+.t-think-sizer{ display:block; visibility:hidden; white-space:nowrap; }
+.t-think-text{ position:absolute; top:0; left:0; right:0; display:block; color:var(--think-base); white-space:nowrap;
+  transform:translateY(0); filter:blur(0); opacity:1;
+  transition:transform var(--think-swap) var(--think-ease), filter var(--think-swap) var(--think-ease), opacity var(--think-swap) var(--think-ease); will-change:transform,filter,opacity; }
+.t-think-text::before{ content:attr(data-text); position:absolute; inset:0; pointer-events:none;
+  background-image:linear-gradient(90deg,transparent 0,transparent 40%,var(--think-highlight) 50%,transparent 60%,transparent 100%);
+  background-size:400% 100%; background-repeat:no-repeat; -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-fill-color:transparent;
+  animation:think-shimmer var(--think-shimmer) linear infinite; }
+@keyframes think-shimmer{ 0%{background-position:100% 0;} 100%{background-position:0 0;} }
+.t-think.idle .t-think-text::before{ animation:none; }
+.t-think-text.is-exit{ transform:translateY(calc(var(--think-distance)*-1)); filter:blur(var(--think-blur)); opacity:0; }
+.t-think-text.is-enter-start{ transition:none; transform:translateY(var(--think-distance)); filter:blur(var(--think-blur)); opacity:0; }
+
+.log-list{ padding:2px 17px 16px; display:flex; flex-direction:column; gap:3px; overflow-y:auto; flex:1; }
+.chip{ display:flex; align-items:baseline; gap:9px; font-family:var(--mono); font-size:11.5px; line-height:1.9; color:var(--ink-2); animation:chipIn 260ms var(--ease); }
+@keyframes chipIn{ from{opacity:0; transform:translateX(-5px);} to{opacity:1; transform:none;} }
+.chip .ic{ color:var(--accent-ink); align-self:center; } .chip .arg{ color:var(--ink-4); } .chip.spent{ opacity:0.4; }
+
+/* BAG box */
+.bag-box{ position:relative; }
+.bag-scroll{ flex:1; position:relative; overflow:hidden; }
+.bag{ position:absolute; inset:0; overflow-y:auto; padding:12px 18px 22px; display:flex; flex-wrap:wrap; align-items:flex-start; align-content:flex-start; gap:7px; }
+.bag-fade{ position:absolute; left:0; right:0; bottom:0; height:46px; pointer-events:none; opacity:0; transition:opacity 200ms; background:linear-gradient(transparent,var(--surface)); }
+.bag-fade.on{ opacity:1; }
+.bag-caps{ display:flex; justify-content:space-between; padding:8px 20px 0; font-size:9px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-4); flex-shrink:0; }
+.bag-caps:last-of-type{ padding:0 20px 12px; }
+.bag-caps.hidden{ visibility:hidden; }
+
+/* pills */
+.pill{ display:inline-flex; align-items:center; gap:7px; padding:7px 13px 7px 10px; border-radius:var(--r-chip);
+  background:var(--surface); border:1px solid var(--line-strong); cursor:pointer;
+  transform:rotate(var(--rot,0deg)) translateY(var(--dy,0)); transform-origin:center;
+  transition:box-shadow 150ms var(--ease), transform 150ms var(--ease), border-color 150ms; }
+.pill:hover{ border-color:var(--accent); box-shadow:0 4px 14px rgba(0,0,0,0.07); transform:rotate(0deg) translateY(calc(var(--dy,0) - 2px)); z-index:5; }
+.pill.land{ animation:land 300ms var(--ease) both; }
+@keyframes land{ 0%{transform:rotate(0deg) translateY(var(--dy,0)) scale(1.07);} 100%{transform:rotate(var(--rot,0deg)) translateY(var(--dy,0)) scale(1);} }
+.pill .g{ width:13px; height:13px; flex-shrink:0; position:relative; border-radius:50%; }
+.g.done{ background:var(--accent-tint); }
+.g.done::after{ content:""; position:absolute; inset:0; background:var(--accent); border-radius:50%;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23000' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round' d='M20 6L9 17l-5-5'/%3E%3C/svg%3E") center/11px no-repeat; }
+.g.now::before{ content:""; position:absolute; inset:2.5px; border-radius:50%; background:var(--accent); }
+.g.now::after{ content:""; position:absolute; inset:-1.5px; border-radius:50%; border:1.5px solid var(--accent); opacity:0.42; animation:ring 1.7s ease-out infinite; }
+@keyframes ring{ 0%{transform:scale(.7); opacity:.5;} 100%{transform:scale(1.35); opacity:0;} }
+.g.pend::before{ content:""; position:absolute; inset:3px; border-radius:50%; border:1.5px solid var(--line-strong); }
+.pill .slug{ font-family:var(--mono); font-size:12px; color:var(--ink); white-space:nowrap; }
+.pill .flag{ font-size:8.5px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; padding:2px 6px; border-radius:var(--r-chip); color:#fff; background:var(--accent); }
+
+/* GHOST pill — the domed empty preview of an expected unit */
+.pill.ghost{ cursor:default; background:var(--field); border:1px dashed var(--line-strong);
+  animation:ghostIn 220ms var(--ease) both; }
+@keyframes ghostIn{ from{opacity:0; transform:rotate(var(--rot,0deg)) translateY(calc(var(--dy,0) + 6px)) scale(0.96);} to{opacity:1; transform:rotate(var(--rot,0deg)) translateY(var(--dy,0)) scale(1);} }
+.pill.ghost:hover{ border-color:var(--line-strong); box-shadow:none; transform:rotate(var(--rot,0deg)) translateY(var(--dy,0)); }
+.ghost-dot{ width:13px; height:13px; flex-shrink:0; border-radius:50%; border:1.5px dashed var(--line-strong); }
+.ghost-bar{ height:8px; border-radius:5px; background:var(--hover-2); width:var(--gw,64px); }
+
+/* flyer */
+.flyer{ position:fixed; z-index:60; display:inline-flex; align-items:center; gap:7px; padding:7px 13px 7px 10px; border-radius:var(--r-chip);
+  background:var(--surface); border:1px solid var(--accent); box-shadow:0 8px 22px rgba(79,114,144,0.22); pointer-events:none;
+  transition:transform 440ms var(--ease), opacity 440ms ease; will-change:transform,opacity; }
+.flyer .g{ width:13px; height:13px; position:relative; border-radius:50%; } .flyer .slug{ font-family:var(--mono); font-size:12px; }
+
+/* bottom control — centered across both boxes, present from first load */
+.gen-row{ display:flex; align-items:center; justify-content:center; height:60px; padding:0 2px; }
+.req{ display:inline-flex; align-items:center; gap:10px; }
+.stepper{ display:inline-flex; align-items:center; background:var(--surface); border:1px solid var(--line-strong); border-radius:var(--r-ctrl); overflow:hidden; }
+.stepper button{ width:32px; height:36px; display:grid; place-items:center; color:var(--ink-3); font-size:17px; background:none; border:none; cursor:pointer; transition:background 120ms,color 120ms; }
+.stepper button:hover{ background:var(--hover-2); color:var(--ink); }
+.stepper button:disabled{ color:var(--line-strong); cursor:default; background:none; }
+.stepper .st-in{ width:40px; height:36px; text-align:center; border:none; outline:none; background:none; font-family:var(--mono); font-size:13.5px; color:var(--ink); border-left:1px solid var(--line); border-right:1px solid var(--line); -moz-appearance:textfield; }
+.stepper .st-in::-webkit-outer-spin-button,.stepper .st-in::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+.req-unit{ font-size:11.5px; color:var(--ink-4); }
+.req-go{ display:inline-flex; align-items:center; gap:7px; padding:9px 17px; border-radius:var(--r-ctrl); background:var(--accent); color:#fff; font-size:12.5px; font-weight:600; cursor:pointer; border:none; transition:background 120ms,transform 120ms; }
+.req-go:hover{ background:#5b82a3; } .req-go:active{ transform:scale(0.98); } .req-go svg{ width:14px; height:14px; }
+.gen-busy{ display:inline-flex; align-items:center; gap:9px; font-size:11.5px; color:var(--ink-3); font-family:var(--mono); }
+.gen-busy .mini{ width:12px; height:12px; border-radius:50%; border:1.6px solid var(--line-strong); border-top-color:var(--accent); animation:spin .7s linear infinite; }
+@keyframes spin{ to{ transform:rotate(360deg); } }
+.gen-complete{ font-size:11.5px; color:var(--ink-4); font-family:var(--mono); display:inline-flex; align-items:center; gap:8px; }
+.gen-complete svg{ width:13px; height:13px; color:var(--accent); }
+
+/* detail */
+.detail{ position:absolute; inset:0; top:38px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-box); display:flex; flex-direction:column; transform:translateX(12px); opacity:0; pointer-events:none; transition:transform 260ms var(--ease), opacity 200ms ease; }
+.detail.on{ transform:none; opacity:1; pointer-events:auto; }
+.detail-bar{ display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid var(--line); flex-shrink:0; }
+.back{ display:inline-flex; align-items:center; gap:7px; padding:7px 12px 7px 9px; border-radius:var(--r-ctrl); background:var(--field); color:var(--ink-2); font-size:12px; font-weight:500; cursor:pointer; border:1px solid var(--line); transition:background 120ms,color 120ms; }
+.back:hover{ background:var(--hover-2); color:var(--ink); } .back svg{ width:14px; height:14px; }
+.open-lesson{ margin-left:auto; display:inline-flex; align-items:center; gap:8px; padding:9px 16px; border-radius:var(--r-ctrl); background:var(--accent); color:#fff; font-size:12px; font-weight:600; cursor:pointer; transition:background 120ms,transform 120ms; }
+.open-lesson:hover{ background:#5b82a3; } .open-lesson:active{ transform:scale(0.98); } .open-lesson.locked{ background:var(--hover-2); color:var(--ink-4); cursor:not-allowed; } .open-lesson svg{ width:14px; height:14px; }
+.detail-body{ flex:1; overflow-y:auto; padding:24px 30px; }
+.detail-slug{ font-family:var(--mono); font-size:19px; font-weight:600; margin-bottom:5px; }
+.detail-sub{ font-size:12.5px; color:var(--ink-3); font-family:var(--mono); margin-bottom:22px; }
+.meta-grid{ display:grid; grid-template-columns:auto 1fr; gap:10px 22px; margin-bottom:24px; }
+.meta-grid .k{ font-size:12px; color:var(--ink-3); } .meta-grid .v{ font-size:12.5px; color:var(--ink); font-family:var(--mono); }
+.axes{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:24px; }
+.axis{ font-size:11px; padding:3px 10px; border-radius:var(--r-chip); background:var(--field); color:var(--ink-2); border:1px solid var(--line); }
+.sec-l{ font-size:9.5px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--ink-4); margin:0 0 10px; }
+.code{ background:var(--field); border:1px solid var(--line); border-radius:var(--r-card); padding:14px 0; font-family:var(--mono); font-size:12.5px; overflow-x:auto; }
+.code .cl{ display:flex; line-height:1.75; } .code .ln{ flex:0 0 3em; text-align:right; padding:0 14px 0 10px; color:var(--ink-4); user-select:none; }
+.code .src{ white-space:pre; padding:0 16px; color:var(--ink); }
+.code .k{ color:var(--accent-ink); font-weight:600; } .code .s{ color:var(--green); } .code .c{ color:var(--ink-4); font-style:italic; }
+
+@media (prefers-reduced-motion:reduce){ *{ animation:none !important; transition:none !important; } .t-think-text::before{ display:none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="left" id="left">
+    <button class="left-expand" id="leftExpand" title="Expand sidebar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/></svg></button>
+    <div class="left-inner">
+      <div class="left-head">
+        <button class="collapse-btn" id="collapseLeft" title="Collapse"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+      </div>
+      <div class="side-nav">
+        <button class="nav-row" id="importRow" title="Add a new codebase to scan">
+          <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg></span>
+          <span class="lb">Add new codebase</span>
+        </button>
+      </div>
+      <div class="side-label">Codebases</div>
+      <div class="tree" id="tree"></div>
+      <div class="left-foot">
+        <button class="nav-row" id="settingsRow" title="Settings">
+          <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+          <span class="lb">Settings</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="canvas">
+    <div class="stage">
+
+      <!-- IMPORT STEP (simulation) — first thing shown; on Import → reveals the scan -->
+      <div class="import-view" id="importView">
+        <div class="import-card">
+          <div class="import-eyebrow">Import codebase</div>
+          <div class="import-field">
+            <input id="importInput" spellcheck="false" placeholder="Repo URL or local path">
+            <button class="browse" id="browseBtn" title="Choose a folder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2"/><path d="M3 9h18v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button>
+          </div>
+          <button class="import-go" id="importGo" disabled>Import</button>
+          <input type="file" id="dirPicker" webkitdirectory directory multiple hidden>
+        </div>
+      </div>
+
+      <!-- SCAN (revealed after import) -->
+      <div id="scanView">
+      <div class="title-row"><span class="fn" id="scanFn">run_prompts.py</span><span class="path" id="scanPath">~/code/soufiane_prompts</span></div>
+
+      <div class="boxes">
+        <div class="box" id="logBox">
+          <div class="box-label">Agent log</div>
+          <div class="think"><span class="t-think idle" id="thinkRoot"><span class="t-think-sizer">Tracing dependencies…</span><span class="t-think-text" id="thinkText" data-text=""></span></span></div>
+          <div class="log-list" id="logList"></div>
+        </div>
+
+        <div class="box bag-box">
+          <div class="box-label">Bag of units</div>
+          <div class="bag-caps hidden" id="capTop"><span>first</span></div>
+          <div class="bag-scroll" id="bagScroll">
+            <div class="bag" id="bag"></div>
+            <div class="bag-fade" id="bagFade"></div>
+          </div>
+          <div class="bag-caps hidden" id="capBot"><span class="last">latest generated</span></div>
+        </div>
+      </div>
+
+      <div class="gen-row" id="genRow"></div>
+      </div><!-- /#scanView -->
+
+      <div class="detail" id="detail">
+        <div class="detail-bar">
+          <button class="back" id="backBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg> Back</button>
+          <button class="open-lesson" id="openLesson"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg> Open lesson</button>
+        </div>
+        <div class="detail-body" id="detailBody"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const bag=document.getElementById("bag"), logList=document.getElementById("logList"),
+      detail=document.getElementById("detail"), detailBody=document.getElementById("detailBody"), openLesson=document.getElementById("openLesson"),
+      logBox=document.getElementById("logBox"), genRow=document.getElementById("genRow"), bagScroll=document.getElementById("bagScroll"),
+      bagFade=document.getElementById("bagFade"), thinkRoot=document.getElementById("thinkRoot"), thinkText=document.getElementById("thinkText"),
+      capTop=document.getElementById("capTop"), capBot=document.getElementById("capBot");
+
+const SAMPLE_CODE=`def _pinned_qa_group(questions):
+    pinned = [q for q in questions if q["pin"]]
+    rest   = [q for q in questions if not q["pin"]]
+    seen, out = set(), []
+    for q in pinned + rest:
+        if q["id"] not in seen:
+            seen.add(q["id"])
+            out.append(q)
+    return out`;
+const INTENTS=["what the caller expects back","the invariant it must hold","why this order matters","where it can silently break","how it connects upstream","the shape it returns"];
+const V=["load","normalize","dedupe","build","resolve","merge","validate","emit","cache","index","parse","route"];
+const N=["prompts","row","by_id","batch","header","token","group","schema","record","stack","axis","unit"];
+const POOL_SIZE=24;
+function makePool(n){ const out=[]; for(let i=0;i<n;i++){
+  const slug=i===2?"_pinned_qa_group":`${V[(i*3)%V.length]}_${N[(i*5+3)%N.length]}`;
+  const k=2+(i%5), axes=["COMPREHEND","MECHANISM","RATIONALE","JUDGMENT","ROBUSTNESS","INTEGRATION","EVOLUTION"].slice(0,k);
+  out.push({slug,intent:INTENTS[i%INTENTS.length],file:"run_prompts.py",lo:8+i*6,hi:12+i*6,axes,code:i===2?SAMPLE_CODE:null});
+} return out; }
+const POOL=makePool(POOL_SIZE);
+let loaded=0, ownedUpTo=2, scanning=false, want=8;
+const DY=[0,4,-3,5,-2,3,-4,2], ROT=[-3.5,2.5,-1.5,3,-2.5,1.5,-3,2], GW=[64,82,52,74,90,58,78,66];
+const CHIP_SCRIPT=[["read_code_slice","L1–40"],["search_repository",'"entrypoints"'],["read_code_slice","L40–120"],["search_repository",'"callers"']];
+
+function stateOf(i){ return i<ownedUpTo?"done" : i===ownedUpTo?"now" : "pend"; }
+function remaining(){ return POOL_SIZE-loaded; }
+function setVar(el,i){ el.style.setProperty("--dy",DY[i%DY.length]+"px"); el.style.setProperty("--rot",ROT[i%ROT.length]+"deg"); }
+
+/* ── live step (thinking-state swap), space reserved always ── */
+let thinkTimer=null;
+function thinkSet(txt){ thinkText.textContent=txt; thinkText.setAttribute("data-text",txt); }
+function thinkSwap(txt){ const t=thinkText; t.classList.add("is-exit");
+  setTimeout(()=>{ thinkSet(txt); t.classList.add("is-enter-start"); void t.offsetWidth; t.classList.remove("is-exit","is-enter-start"); },150); }
+function startThinking(n){ thinkRoot.classList.remove("idle");
+  const steps=["Reading run_prompts.py","Scanning entrypoints","Tracing dependencies",`Mapping ${n} units`,"Ordering the ladder"];
+  thinkSet(steps[0]); let i=0; thinkTimer=setInterval(()=>{ i=(i+1)%steps.length; thinkSwap(steps[i]); },1150); }
+function stopThinking(){ if(thinkTimer){ clearInterval(thinkTimer); thinkTimer=null; } thinkSwap(""); thinkRoot.classList.add("idle"); }
+
+/* ── pills ── */
+function pillInner(u,idx){ const st=stateOf(idx); const flag=st==="now"?'<span class="flag">current</span>':''; return `<span class="g ${st}"></span><span class="slug">${u.slug}</span>${flag}`; }
+function makePill(u,idx){ const st=stateOf(idx); const el=document.createElement("div"); el.className=`pill ${st}`; setVar(el,idx); el.dataset.idx=idx; el.innerHTML=pillInner(u,idx); el.onclick=()=>openDetail(idx); return el; }
+function makeGhost(i){ const el=document.createElement("div"); el.className="pill ghost"; setVar(el,i); el.style.setProperty("--gw",GW[i%GW.length]+"px"); el.dataset.ghost="1"; el.innerHTML=`<span class="ghost-dot"></span><span class="ghost-bar"></span>`; return el; }
+
+function caps(show){ capTop.classList.toggle("hidden",!show); capBot.classList.toggle("hidden",!show); }
+function updateFade(){ const o=bag.scrollHeight-bag.clientHeight; bagFade.classList.toggle("on", o>6 && bag.scrollTop < o-4); }
+bag.addEventListener("scroll", updateFade);
+
+/* ghost preview of the pending request — appended UNDER the loaded real pills.
+ * Incremental: only the delta ghosts appear/leave, so existing ones never flicker. */
+function renderGhosts(count){
+  const take=Math.min(count,remaining());       // can only preview units that exist
+  const ghosts=bag.querySelectorAll(".pill.ghost");
+  const have=ghosts.length;
+  if(take>have){ for(let i=have;i<take;i++) bag.appendChild(makeGhost(loaded+i)); }   // add only the new
+  else if(take<have){ for(let i=have-1;i>=take;i--) ghosts[i].remove(); }             // trim only the extra
+  caps(loaded>0 || take>0); updateFade();
+}
+
+/* ── requester (stepper + generate), rebuilt into the bottom row ── */
+function renderGen(){
+  genRow.innerHTML="";
+  if(loaded>=POOL_SIZE){ genRow.innerHTML=`<span class="gen-complete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> ladder complete</span>`; return; }
+  want=Math.max(1,want);
+  const wrap=document.createElement("div"); wrap.className="req";
+  wrap.innerHTML=`
+    <div class="stepper">
+      <button data-dec aria-label="Fewer">−</button>
+      <input class="st-in" type="number" min="1" value="${want}">
+      <button data-inc aria-label="More">+</button>
+    </div>
+    <span class="req-unit">units</span>
+    <button class="req-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg> Generate</button>`;
+  genRow.appendChild(wrap);
+  const input=wrap.querySelector(".st-in"), dec=wrap.querySelector("[data-dec]"), inc=wrap.querySelector("[data-inc]");
+  // no upper cap — you may ask for more than remains; the agent pulls what it can.
+  const apply=()=>{ let v=parseInt(input.value||"1",10); if(isNaN(v))v=1; v=Math.max(1,v); input.value=v; want=v;
+    dec.disabled=v<=1; renderGhosts(v); };  // ← ghosts update live (incrementally) with the number
+  dec.onclick=()=>{ input.value=(parseInt(input.value,10)||1)-1; apply(); };
+  inc.onclick=()=>{ input.value=(parseInt(input.value,10)||1)+1; apply(); };
+  input.oninput=apply;
+  wrap.querySelector(".req-go").onclick=()=>{ apply(); generate(want); };
+  apply();  // seed ghosts on first paint
+}
+
+/* ── generate: fly real pills into the ghost slots ── */
+function generate(n){
+  if(scanning) return; scanning=true;
+  const ghosts=[...bag.querySelectorAll(".pill.ghost")];
+  const take=Math.min(n,ghosts.length,remaining());
+  genRow.innerHTML=`<span class="gen-busy"><span class="mini"></span> generating ${take}…</span>`;
+  startThinking(take); logList.innerHTML="";
+  let c=0;
+  const ct=setInterval(()=>{
+    if(c<CHIP_SCRIPT.length){ logList.querySelectorAll(".chip").forEach(x=>x.classList.add("spent"));
+      const t=CHIP_SCRIPT[c++]; const el=document.createElement("div"); el.className="chip"; el.innerHTML=`<span class="ic">⌁</span>${t[0]} <span class="arg">${t[1]}</span>`;
+      logList.appendChild(el); logList.scrollTop=logList.scrollHeight;
+    } else { clearInterval(ct); emerge(); }
+  },300);
+
+  function emerge(){
+    const start=loaded; let k=0;
+    const et=setInterval(()=>{
+      if(k<take){ fillGhost(POOL[start+k],start+k,ghosts[k]); k++; }
+      else { clearInterval(et); loaded=start+take; scanning=false;
+        setTimeout(()=>{ stopThinking(); logList.querySelectorAll(".chip").forEach(x=>x.classList.add("spent")); renderGen(); }, 460); }
+    },170);
+  }
+}
+
+/* one pill flies from the log box into its ghost slot; below-the-fold → fade at the bottom edge */
+function fillGhost(u,idx,ghostEl){
+  const to=ghostEl.getBoundingClientRect(), sr=bagScroll.getBoundingClientRect();
+  const visible = to.top>=sr.top-2 && to.bottom<=sr.bottom+2;
+  const lb=logBox.getBoundingClientRect();
+  const flyer=document.createElement("div"); flyer.className="flyer"; flyer.innerHTML=pillInner(u,idx);
+  flyer.style.left=(lb.right-40)+"px"; flyer.style.top=(lb.top+lb.height*0.42)+"px";
+  document.body.appendChild(flyer); const fr=flyer.getBoundingClientRect();
+  const dx=(visible?to.left:sr.left+28)-fr.left, dy=(visible?to.top:sr.bottom-44)-fr.top;
+  // place the real pill where the ghost was (so scrolling reveals settled pills even off-fold)
+  const real=makePill(u,idx);
+  if(visible){ real.style.visibility="hidden"; ghostEl.replaceWith(real); }
+  else { ghostEl.replaceWith(real); }
+  requestAnimationFrame(()=>{ flyer.style.transform=`translate(${dx}px,${dy}px)`; if(!visible) flyer.style.opacity="0"; });
+  flyer.addEventListener("transitionend",()=>{ flyer.remove(); if(visible){ real.style.visibility="visible"; real.classList.add("land"); } updateFade(); },{once:true});
+}
+
+/* ── detail ── */
+function openDetail(idx){
+  const u=POOL[idx], st=stateOf(idx), reachable=st!=="pend";
+  detailBody.innerHTML=`
+    <div class="detail-slug">${u.slug}</div>
+    <div class="detail-sub">${u.file} · L${u.lo}–${u.hi}</div>
+    <div class="meta-grid">
+      <span class="k">State</span><span class="v">${st==="done"?"OWNED":st==="now"?"CURRENT":"LOCKED"}</span>
+      <span class="k">Position</span><span class="v">#${idx+1} in dependency order</span>
+      <span class="k">Depth</span><span class="v">0 · top-level</span>
+    </div>
+    <div class="sec-l">Axes that fire · ${u.axes.length}/7</div>
+    <div class="axes">${u.axes.map(a=>`<span class="axis">${a}</span>`).join("")}</div>
+    ${u.code?`<div class="sec-l">Source · L${u.lo}–${u.hi}</div><div class="code">${codeHtml(u.code,u.lo)}</div>`:""}`;
+  openLesson.className=reachable?"open-lesson":"open-lesson locked";
+  openLesson.innerHTML=reachable
+    ?`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg> Open lesson`
+    :`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Locked`;
+  openLesson.onclick=reachable?()=>{ window.location.href="tutor.html"; }:null;
+  detail.classList.add("on");
+}
+function codeHtml(code,lo){ return code.split("\n").map((ln,i)=>{
+  const h=ln.replace(/\b(def|for|if|not|in|return)\b/g,'<span class="k">$1</span>').replace(/(".*?")/g,'<span class="s">$1</span>').replace(/(#.*)$/,'<span class="c">$1</span>');
+  return `<div class="cl"><span class="ln">${lo+i}</span><span class="src">${h||" "}</span></div>`;
+}).join(""); }
+document.getElementById("backBtn").onclick=()=>detail.classList.remove("on");
+
+/* ── import step (simulation) — land here first; Import reveals the scan ── */
+const importView=document.getElementById("importView"),
+      scanView=document.getElementById("scanView"),
+      importInput=document.getElementById("importInput"),
+      importGo=document.getElementById("importGo"),
+      browseBtn=document.getElementById("browseBtn"),
+      dirPicker=document.getElementById("dirPicker");
+function syncImportBtn(){ importGo.disabled = importInput.value.trim()===""; }
+importInput.addEventListener("input",syncImportBtn);
+browseBtn.addEventListener("click",()=>dirPicker.click());
+dirPicker.addEventListener("change",()=>{
+  const f=dirPicker.files&&dirPicker.files[0];
+  if(f){ const top=(f.webkitRelativePath||f.name).split("/")[0]; importInput.value=top||f.name; syncImportBtn(); }
+});
+function projName(src){ const s=(src||"").trim().replace(/\/+$/,"").split(/[\\/]/).pop(); return s||"codebase"; }
+function beginScan(src){
+  document.getElementById("scanFn").textContent=projName(src);
+  document.getElementById("scanPath").textContent=src;
+  importView.classList.add("gone");
+  scanView.classList.add("on");
+  renderGen();                       // controls + ghost preview appear with the scan
+}
+function doImport(){
+  const src=importInput.value.trim(); if(!src) return;
+  // simulate indexing: the button becomes a live progress line, then the scan opens
+  const prog=document.createElement("div"); prog.className="import-prog";
+  prog.innerHTML=`<span class="spin"></span><span id="impStep">Connecting…</span>`;
+  importGo.replaceWith(prog);
+  const steps=["Reading "+projName(src)+"…","Parsing files…","Indexing symbols…","Ordering the ladder…"];
+  const stepEl=prog.querySelector("#impStep"); let i=0;
+  const iv=setInterval(()=>{ stepEl.textContent=steps[i++%steps.length]; },420);
+  setTimeout(()=>{ clearInterval(iv); beginScan(src); },1900);
+}
+importGo.addEventListener("click",doImport);
+importInput.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); doImport(); }});
+
+/* ── LEFT sidebar — same component + data contract as tutor.html ────────────
+ *   Codebase = { name, open, units: Unit[] }
+ *   Unit     = { slug, state:'OWNED'|'ACTIVE'|'QUEUED'|'PARKED', current?:bool } */
+const CODEBASES = [
+  { name:"run_prompts.py", open:true, units:[
+    { slug:"load_prompts", state:"OWNED" }, { slug:"normalize_row", state:"OWNED" },
+    { slug:"_pinned_qa_group", state:"ACTIVE", current:true }, { slug:"_dedupe_by_id", state:"QUEUED" },
+    { slug:"build_prompt_batch", state:"QUEUED" }, { slug:"run_prompts", state:"QUEUED" },
+  ]},
+  { name:"schema_loader.py", open:false, units:[
+    { slug:"read_schema", state:"PARKED" }, { slug:"validate_row", state:"QUEUED" },
+  ]},
+];
+const CHEV='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
+const tree=document.getElementById("tree");
+CODEBASES.forEach(cb=>{
+  const wrap=document.createElement("div"); wrap.className="cb"+(cb.open?" open":"");
+  const owned=cb.units.filter(u=>u.state==="OWNED").length;
+  const rows=cb.units.map(u=>{
+    const locked=u.state==="QUEUED";
+    const cls=u.current?"current":(u.state==="OWNED"?"owned":(locked?"locked":""));
+    return `<div class="unit ${cls}" data-slug="${u.slug}"${locked?' data-locked="1"':""}>
+      <span class="u-name">${u.slug}</span><span class="u-arrow">${CHEV}</span></div>`;
+  }).join("");
+  wrap.innerHTML=`<div class="cb-row"><span class="cb-caret">${CHEV}</span>
+    <span class="cb-name">${cb.name}</span><span class="cb-count">${owned}/${cb.units.length}</span></div>
+    <div class="units"><div class="units-clip">${rows}</div></div>`;
+  wrap.querySelector(".cb-row").addEventListener("click",()=>wrap.classList.toggle("open"));
+  wrap.querySelectorAll(".unit").forEach(el=>el.addEventListener("click",()=>{
+    if(el.dataset.locked) return;
+    window.location.href="tutor.html";
+  }));
+  tree.appendChild(wrap);
+});
+
+/* collapse ⇄ rail — identical behaviour to the tutor sidebar */
+const left=document.getElementById("left");
+document.getElementById("collapseLeft").addEventListener("click",()=>left.classList.add("collapsed"));
+document.getElementById("leftExpand").addEventListener("click",()=>left.classList.remove("collapsed"));
+/* "Add new codebase" → back to a fresh import */
+document.getElementById("importRow").addEventListener("click",()=>{
+  detail.classList.remove("on"); scanView.classList.remove("on"); importView.classList.remove("gone");
+  importInput.focus();
+});
+</script>
+</body>
+</html>

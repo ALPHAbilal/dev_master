@@ -111,7 +111,8 @@
       "Bash(python3 -m pytest tests_v2/test_driver.py -q)",
       "Read(//home/kingbilal/.claude/skills/**)",
       "Read(//home/kingbilal/.claude/plugins/**)",
-      "Read(//home/kingbilal/.claude/**)"
+      "Read(//home/kingbilal/.claude/**)",
+      "WebSearch"
     ]
   }
 }

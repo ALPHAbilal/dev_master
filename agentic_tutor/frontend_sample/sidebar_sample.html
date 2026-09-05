@@ -1,0 +1,267 @@
+<title>Sidebar — codebases & units</title>
+<style>
+*{ margin:0; padding:0; box-sizing:border-box; }
+:root{
+  --ink:#1e2024; --ink-2:#4a4d53; --ink-3:#7a7d84; --ink-4:#a8a6a0;
+  --canvas:#f4f4f2; --surface:#ffffff; --field:#f3f2ef; --hover:#efeeeb; --hover-2:#e9e8e4;
+  --line:#e2e0d9; --line-strong:#d3d1c9;
+  --accent:#4f7290; --accent-tint:rgba(79,114,144,0.13); --accent-ink:#385876;
+  --r-ctrl:7px; --r-row:8px;
+  --ui:"Segoe UI",Tahoma,sans-serif; --mono:"Cascadia Code","JetBrains Mono","SF Mono","Consolas",monospace;
+  --ease:cubic-bezier(0.16,1,0.3,1);
+  --w-open:236px; --w-shut:52px; --dur:280ms; --copy-dur:170ms; --copy-off:8px;
+}
+body{ height:100vh; background:var(--canvas); color:var(--ink); font-family:var(--ui); -webkit-font-smoothing:antialiased; line-height:1.45; display:flex; }
+svg{ display:block; }
+
+/* ── shell ── */
+.aside{
+  position:relative; flex-shrink:0; height:100vh; overflow:hidden; background:var(--canvas);
+  border-right:1px solid var(--line);
+  width:var(--w-open); transition:width var(--dur) var(--ease);
+}
+.aside[data-shut="true"]{ width:var(--w-shut); }
+.inner{ width:var(--w-open); height:100%; display:flex; flex-direction:column; padding:10px 0 12px; }
+
+/* copy that fades out when collapsed */
+.copy{ transition:opacity var(--copy-dur) var(--ease), transform var(--copy-dur) var(--ease); }
+.aside[data-shut="true"] .copy{ opacity:0; transform:translateX(calc(var(--copy-off) * -1)); pointer-events:none; }
+
+/* ── header / workspace ── */
+.head{ position:relative; height:36px; margin:0 8px 8px; flex-shrink:0; }
+.ws{
+  position:absolute; left:0; top:0; display:flex; align-items:center; gap:8px;
+  height:36px; width:176px; padding:0 8px; border-radius:var(--r-row); border:0; background:none;
+  cursor:pointer; text-align:left; transition:background 120ms; font:inherit;
+}
+.ws:hover{ background:var(--hover-2); }
+.ws .mono-badge{ width:22px; height:22px; border-radius:6px; flex-shrink:0; background:linear-gradient(140deg,#5a5a5a,#2a2a2a);
+  display:grid; place-items:center; color:#fff; font-size:11px; font-weight:700; box-shadow:inset 0 1px 0 rgba(255,255,255,.14); }
+.ws .ws-name{ flex:1; min-width:0; font-size:14px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ws .ws-chev{ color:var(--ink-4); flex-shrink:0; }
+.collapse{
+  position:absolute; right:0; top:2px; width:32px; height:32px; border:0; background:none; cursor:pointer;
+  border-radius:var(--r-row); color:var(--ink-3); display:grid; place-items:center; transition:background 120ms,color 120ms,opacity var(--copy-dur);
+}
+.collapse:hover{ background:var(--hover-2); color:var(--ink); }
+.aside[data-shut="true"] .collapse{ opacity:0; pointer-events:none; }
+/* expand affordance, shown only when collapsed */
+.expand{
+  position:absolute; left:10px; top:2px; width:32px; height:32px; border:0; background:none; cursor:pointer;
+  border-radius:var(--r-row); color:var(--ink-3); display:grid; place-items:center; opacity:0; pointer-events:none;
+  transition:background 120ms,color 120ms,opacity var(--copy-dur);
+}
+.expand:hover{ background:var(--hover-2); color:var(--ink); }
+/* centred in the 52px rail: (52-32)/2 = 10px from aside edge, head is offset 8px */
+.aside[data-shut="true"] .expand{ opacity:1; pointer-events:auto; left:2px; }
+
+/* ── nav group (glide highlight lives here) ── */
+.group{ position:relative; padding:0 0; }
+.glide{
+  position:absolute; left:8px; right:8px; height:32px; border-radius:var(--r-row); background:var(--hover-2);
+  opacity:0; transform:translateY(0); pointer-events:none;
+  transition:transform 160ms var(--ease), opacity 130ms var(--ease);
+}
+.row{
+  position:relative; z-index:1; display:flex; align-items:center; gap:8px; height:32px;
+  margin:0 8px; padding:0 8px; border-radius:var(--r-row); border:0; background:none; width:calc(100% - 16px);
+  cursor:pointer; text-align:left; font:inherit; color:var(--ink-2);
+}
+.row .ic{ width:18px; height:18px; flex-shrink:0; color:var(--ink-3); display:grid; place-items:center; }
+.row .lb{ flex:1; min-width:0; font-size:14px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.row .rt{ flex-shrink:0; font-size:12px; font-weight:500; color:var(--ink-3); font-variant-numeric:tabular-nums; }
+.row.on{ color:var(--ink); }
+.row.on .ic{ color:var(--ink); }
+
+/* ── list header (Codebases + search) ── */
+.list-wrap{ flex:1; min-height:0; overflow-y:auto; margin-top:10px; }
+.list-wrap::-webkit-scrollbar{ width:8px; } .list-wrap::-webkit-scrollbar-thumb{ background:var(--line-strong); border-radius:8px; border:2px solid var(--canvas); }
+.lhead{ position:relative; height:32px; margin:0 8px 2px; }
+.lhead .lbl{ position:absolute; inset:0; display:flex; align-items:center; gap:6px; padding:0 8px;
+  font-size:12px; font-weight:600; letter-spacing:.02em; color:var(--ink-3); text-transform:none;
+  transition:opacity 170ms var(--ease), transform 170ms var(--ease); }
+.lhead[data-search="true"] .lbl{ opacity:0; transform:translateX(-4px); pointer-events:none; }
+.lhead .search-btn{ position:absolute; right:0; top:0; width:32px; height:32px; border:0; background:none; cursor:pointer;
+  border-radius:var(--r-row); color:var(--ink-3); display:grid; place-items:center; transition:background 120ms,color 120ms,opacity 170ms; }
+.lhead .search-btn:hover{ background:var(--hover-2); color:var(--ink); }
+.lhead[data-search="true"] .search-btn{ opacity:0; pointer-events:none; }
+.lhead .field{ position:absolute; right:0; top:0; height:32px; display:flex; align-items:center; overflow:hidden;
+  width:32px; border-radius:var(--r-row); background:var(--field); box-shadow:inset 0 0 0 1px var(--line);
+  opacity:0; pointer-events:none; transition:width 170ms var(--ease), opacity 170ms var(--ease); }
+.lhead[data-search="true"] .field{ width:100%; opacity:1; pointer-events:auto; }
+.lhead .field .mg{ margin-left:8px; color:var(--ink-3); flex-shrink:0; }
+.lhead .field input{ flex:1; min-width:0; border:0; background:none; outline:none; font:inherit; font-size:13px; color:var(--ink); margin-left:7px; }
+.lhead .field input::placeholder{ color:var(--ink-3); }
+.lhead .field .x{ width:30px; height:30px; border:0; background:none; cursor:pointer; color:var(--ink-3); display:grid; place-items:center; border-radius:var(--r-row); flex-shrink:0; }
+.lhead .field .x:hover{ color:var(--ink); }
+
+/* ── folder (codebase) ── */
+.folder{ position:relative; }
+.folder-row{ display:flex; align-items:center; gap:7px; height:32px; margin:0 8px; padding:0 8px; border-radius:var(--r-row);
+  border:0; background:none; width:calc(100% - 16px); cursor:pointer; text-align:left; font:inherit; color:var(--ink); position:relative; z-index:1; }
+.folder-row:hover{ background:var(--hover-2); }
+.folder-row .fchev{ width:14px; height:14px; flex-shrink:0; color:var(--ink-4); transition:transform 180ms var(--ease); }
+.folder[data-open="true"] .fchev{ transform:rotate(90deg); }
+.folder-row .fname{ flex:1; min-width:0; font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.folder-row .fmeta{ flex-shrink:0; font-size:11.5px; font-weight:500; color:var(--ink-4); font-variant-numeric:tabular-nums; }
+
+/* nested units — grid collapse */
+.units{ display:grid; grid-template-rows:0fr; transition:grid-template-rows 220ms var(--ease); }
+.folder[data-open="true"] .units{ grid-template-rows:1fr; }
+.units-clip{ overflow:hidden; }
+.unit{
+  display:flex; align-items:center; height:30px; margin:0 8px; padding:0 8px 0 29px; border-radius:var(--r-row);
+  border:0; background:none; width:calc(100% - 16px); cursor:pointer; text-align:left; font:inherit; position:relative;
+}
+/* structural guide line for nesting — subtle, not a dot */
+.unit::before{ content:""; position:absolute; left:16px; top:0; bottom:0; width:1px; background:var(--line); }
+.unit .uname{ flex:1; min-width:0; font-size:13px; font-weight:500; color:var(--ink-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.unit:hover{ background:var(--hover-2); }
+/* opened unit — the one live in the map view: tint fill + accent text + arrow, no bar */
+.unit.on{ background:var(--accent-tint); }
+.unit.on .uname{ color:var(--accent-ink); font-weight:600; }
+.unit.on .uarrow{ opacity:1; }
+.unit .uarrow{ flex-shrink:0; margin-left:6px; color:var(--accent); opacity:0; transition:opacity 140ms var(--ease); }
+.unit.owned .uname{ color:var(--ink-3); }
+.unit.locked{ cursor:not-allowed; }
+.unit.locked .uname{ color:var(--ink-4); }
+.unit.locked:hover{ background:none; }
+
+.empty{ margin:6px 16px; font-size:12.5px; color:var(--ink-3); }
+
+/* ── footer ── */
+.foot{ margin:10px 12px 0; padding-top:12px; border-top:1px solid var(--line); flex-shrink:0; }
+.foot .imp{ display:flex; align-items:center; justify-content:center; gap:7px; height:34px; width:100%;
+  border:0; border-radius:var(--r-ctrl); background:var(--hover-2); color:var(--ink); font:inherit; font-size:13px; font-weight:600;
+  cursor:pointer; transition:background 130ms, transform 90ms; }
+.foot .imp:hover{ background:var(--line-strong); } .foot .imp:active{ transform:scale(.985); }
+
+/* ── page stage (context only) ── */
+.stage{ flex:1; display:grid; place-items:center; color:var(--ink-4); font-size:13px; }
+.stage b{ color:var(--ink-2); font-weight:600; }
+</style>
+
+<aside class="aside" id="aside" data-shut="false">
+  <div class="inner">
+
+    <div class="head">
+      <button class="collapse" id="collapseBtn" type="button" aria-label="Collapse">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/></svg>
+      </button>
+      <button class="expand" id="expandBtn" type="button" aria-label="Expand">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/></svg>
+      </button>
+    </div>
+
+    <div class="group" id="navGroup">
+      <div class="glide" id="navGlide"></div>
+      <button class="row" data-glide type="button">
+        <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M4 12h16"/></svg></span>
+        <span class="lb copy">Import codebase</span>
+      </button>
+    </div>
+
+    <div class="list-wrap">
+      <div class="lhead copy">
+        <span class="lbl">Codebases</span>
+      </div>
+      <div class="copy" id="folders"></div>
+    </div>
+
+
+  </div>
+</aside>
+
+<div class="stage"><div>Sidebar sample — pick a unit on the left.<br><b id="pick">soufiane_prompts · _pinned_qa_group</b></div></div>
+
+<script>
+// state: owned < current(reachable) < locked. exactly one current per ladder.
+const DATA = [
+  { name:"soufiane_prompts", open:true, units:[
+    { slug:"run_prompts entry", st:"owned" },
+    { slug:"prompt registry", st:"owned" },
+    { slug:"_pinned_qa_group", st:"current" },
+    { slug:"template resolver", st:"locked" },
+    { slug:"batch dispatch", st:"locked" },
+    { slug:"response collate", st:"locked" },
+  ]},
+  { name:"tutor_v2", open:false, units:[
+    { slug:"app bootstrap", st:"owned" },
+    { slug:"TurnDriver", st:"current" },
+    { slug:"Router", st:"locked" },
+    { slug:"WakeupBuilder", st:"locked" },
+  ]},
+  { name:"structure_extractor", open:false, units:[
+    { slug:"AST walk", st:"current" },
+    { slug:"semantic nodes", st:"locked" },
+  ]},
+];
+
+const foldersEl = document.getElementById('folders');
+const pick = document.getElementById('pick');
+
+function stateCount(units){
+  const owned = units.filter(u=>u.st==='owned').length;
+  return owned + " / " + units.length;
+}
+
+function render(filter=""){
+  const q = filter.trim().toLowerCase();
+  foldersEl.innerHTML = "";
+  const shown = DATA.filter(f => !q || f.name.toLowerCase().includes(q));
+  if(shown.length===0){ foldersEl.innerHTML = '<div class="empty">No codebases found</div>'; return; }
+  shown.forEach(f=>{
+    const open = q ? true : f.open;   // searching auto-expands
+    const folder = document.createElement('div');
+    folder.className = 'folder';
+    folder.dataset.open = open;
+
+    const row = document.createElement('button');
+    row.className = 'folder-row'; row.type='button';
+    row.innerHTML =
+      '<span class="fchev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>'+
+      '<span class="fname">'+f.name+'</span>'+
+      '<span class="fmeta">'+stateCount(f.units)+'</span>';
+    row.onclick = ()=>{ f.open = folder.dataset.open !== 'true'; folder.dataset.open = f.open; };
+    folder.appendChild(row);
+
+    const units = document.createElement('div');
+    units.className = 'units';
+    const clip = document.createElement('div');
+    clip.className = 'units-clip';
+    f.units.forEach(u=>{
+      const b = document.createElement('button');
+      b.className = 'unit ' + (u.st==='current'?'on': u.st);
+      b.type='button';
+      if(u.st==='locked') b.disabled = true;
+      b.innerHTML = '<span class="uname">'+u.slug+'</span>'+
+        '<span class="uarrow"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>';
+      if(u.st!=='locked') b.onclick = ()=>{ pick.textContent = f.name + ' · ' + u.slug;
+        document.querySelectorAll('.unit.on').forEach(e=> e.classList.remove('on'));
+        b.classList.add('on');   // opened unit gets the special sidebar treatment
+      };
+      clip.appendChild(b);
+    });
+    units.appendChild(clip);
+    folder.appendChild(units);
+    foldersEl.appendChild(folder);
+  });
+}
+render();
+
+// ── collapse / expand rail ──
+const aside = document.getElementById('aside');
+document.getElementById('collapseBtn').onclick = ()=>{ aside.dataset.shut = 'true'; };
+document.getElementById('expandBtn').onclick   = ()=>{ aside.dataset.shut = 'false'; };
+
+// ── glide highlight on nav group ──
+const navGroup = document.getElementById('navGroup');
+const glide = document.getElementById('navGlide');
+const rows = [...navGroup.querySelectorAll('[data-glide]')];
+function moveGlide(el){ const gr = navGroup.getBoundingClientRect(); const r = el.getBoundingClientRect();
+  glide.style.transform = 'translateY(' + (r.top - gr.top) + 'px)'; glide.style.opacity = '1'; }
+rows.forEach(r=> r.addEventListener('pointerenter', ()=>moveGlide(r)));
+navGroup.addEventListener('pointerleave', ()=>{ glide.style.opacity='0'; });
+// rest on active row initially
+requestAnimationFrame(()=>{ const on = navGroup.querySelector('.row.on'); if(on){ const gr=navGroup.getBoundingClientRect(), r=on.getBoundingClientRect(); glide.style.transform='translateY('+(r.top-gr.top)+'px)'; } });
+</script>

@@ -36,36 +36,89 @@ textarea { border: none; outline: none; }
 /* collapse handles */
 .collapse-btn { width:26px; height:26px; border-radius:7px; display:grid; place-items:center; color:var(--text-muted); transition:var(--transition-fast); }
 .collapse-btn:hover { background:var(--bg-surface); color:var(--text-secondary); }
-.reopen { position:fixed; top:14px; z-index:40; width:30px; height:30px; border-radius:8px; background:var(--bg-surface); display:none; place-items:center; color:var(--text-secondary); box-shadow:0 2px 8px rgba(0,0,0,0.4); }
-.reopen.show { display:grid; }
-#reopenLeft { left:12px; } #reopenRight { right:12px; }
+/* collapsed-panel handle — a half-circle tab flush to the right edge, bulging in.
+ * Minimal: no floating box; it reads as an edge you can pull the panel out from. */
+/* collapsed-panel handle — an accent half-circle tab flush to the right edge.
+ * Accent fill + white chevron make it obviously a control; a soft one-shot nudge
+ * on appear draws the eye without turning into a persistent heartbeat. */
+.reopen { position:fixed; z-index:40; display:none; align-items:center; justify-content:center;
+  background:var(--accent); color:var(--on-accent);
+  transition:width 160ms cubic-bezier(0.4,0,0.2,1), background var(--transition-fast); }
+.reopen.show { display:flex; animation:tabNudge 520ms cubic-bezier(0.34,1.56,0.64,1) 1; }
+#reopenRight { top:64px; right:0; width:30px; height:58px; padding-right:5px;
+  border-radius:999px 0 0 999px; box-shadow:-4px 3px 14px rgba(79,114,144,0.32); }
+#reopenRight:hover { width:36px; background:var(--accent-dim); }
+#reopenRight svg { width:16px; height:16px; }
+@keyframes tabNudge { 0%{ transform:translateX(14px); } 60%{ transform:translateX(-2px); } 100%{ transform:translateX(0); } }
 
-/* ─── LEFT — codebase tree ───────────────────────────────────────────────── */
-.left { background:var(--bg-app); display:flex; flex-direction:column; overflow:hidden; }
-.left-head { padding:14px 14px 10px; display:flex; align-items:center; gap:9px; }
-.logo { width:26px; height:26px; border-radius:7px; background:linear-gradient(140deg,#4a4a4a,#2a2a2a); display:grid; place-items:center; box-shadow:inset 0 1px 0 rgba(255,255,255,0.1); flex-shrink:0; }
-.left-head .t { font-size:13px; font-weight:600; }
+/* ─── LEFT — sidebar: import + codebase folders → units ──────────────────────
+ * Clean rows, no state dots / no "here" badges. Nesting shown by indentation +
+ * one hairline guide. The opened unit (live in the map) reads by accent tint +
+ * accent text + a small chevron — nothing else. */
+/* container clips; the inner keeps its full width and just gets clipped to the
+ * 52px rail when collapsed (same collapsed UI as the standalone sidebar demo). */
+.left { position:relative; background:var(--bg-app); overflow:hidden; }
+.left-inner { width:246px; height:100%; display:flex; flex-direction:column; transition:opacity 170ms ease; }
+.left.collapsed .left-inner { opacity:0; pointer-events:none; }
+/* rail expand affordance — centred in the 52px rail, shown only when collapsed */
+.left-expand { position:absolute; left:13px; top:13px; z-index:2; width:26px; height:26px; border-radius:7px;
+  display:grid; place-items:center; color:var(--text-muted); opacity:0; pointer-events:none;
+  transition:opacity 170ms ease, background var(--transition-fast), color var(--transition-fast); }
+.left-expand:hover { background:var(--bg-surface); color:var(--text-secondary); }
+.left.collapsed .left-expand { opacity:1; pointer-events:auto; }
+/* Shared rhythm so every left edge lines up: each list sits in an 8px-padded
+ * container; each row adds 8px inner padding; the leading slot (logo/icon/caret)
+ * is 18px wide with a 10px gap. So ALL top-level text lands at 8+8+18+10 = 44px,
+ * and hover pills share the same 8px inset on both edges. */
+.left-head { padding:12px 8px 6px; display:flex; align-items:center; }
 .left-head .collapse-btn { margin-left:auto; }
-.tree { flex:1; overflow-y:auto; padding:6px 8px; }
-.cb { margin-bottom:2px; }
-.cb-row { display:flex; align-items:center; gap:7px; padding:7px 8px; border-radius:7px; cursor:pointer; transition:var(--transition-fast); }
+
+/* import entry */
+.side-nav { padding:2px 8px 0; }
+.nav-row { display:flex; align-items:center; gap:10px; height:34px; width:100%; padding:0 8px; border-radius:8px; color:var(--text-secondary); transition:var(--transition-fast); }
+.nav-row:hover { background:var(--bg-surface); color:var(--text-primary); }
+.nav-row .ic { width:18px; height:18px; display:grid; place-items:center; color:var(--text-muted); flex-shrink:0; }
+.nav-row:hover .ic { color:var(--text-primary); }
+.nav-row .lb { font-size:13.5px; font-weight:500; }
+
+.side-label { padding:14px 16px 4px; font-size:11.5px; font-weight:600; color:var(--text-muted); }
+
+.tree { flex:1; min-height:0; overflow-y:auto; padding:0 8px 10px; }
+/* subtle scrollbar so long codebase lists never show heavy chrome */
+.tree::-webkit-scrollbar { width:10px; }
+.tree::-webkit-scrollbar-thumb { background:var(--bg-elevated); border-radius:999px; border:3px solid var(--bg-app); }
+.tree::-webkit-scrollbar-thumb:hover { background:var(--bg-hover); }
+.tree { scrollbar-width:thin; scrollbar-color:var(--bg-elevated) transparent; }
+/* settings pinned to the bottom of the sidebar */
+.left-foot { padding:6px 8px 10px; border-top:1px solid var(--bg-surface); }
+.cb { margin-bottom:1px; }
+.cb-row { display:flex; align-items:center; gap:10px; height:34px; padding:0 8px; border-radius:8px; cursor:pointer; transition:var(--transition-fast); }
 .cb-row:hover { background:var(--bg-surface); }
-.cb-caret { color:var(--text-muted); transition:transform 150ms ease; font-size:9px; width:10px; }
+.cb-caret { width:18px; height:18px; flex-shrink:0; color:var(--text-disabled); display:grid; place-items:center; transition:transform 180ms ease; }
+.cb-caret svg { display:block; }
 .cb.open .cb-caret { transform:rotate(90deg); }
-.cb-name { font-size:12.5px; font-weight:600; color:var(--text-secondary); font-family:var(--font-code); }
-.cb-count { margin-left:auto; font-size:10px; color:var(--text-disabled); background:var(--bg-surface); border-radius:9999px; padding:1px 7px; }
-.units { display:none; padding:2px 0 4px 20px; }
-.cb.open .units { display:block; }
-.unit { display:flex; align-items:center; gap:8px; padding:5px 8px; border-radius:6px; cursor:pointer; transition:var(--transition-fast); }
+.cb-name { flex:1; min-width:0; font-size:13.5px; font-weight:600; color:var(--text-primary); font-family:var(--font-code); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cb-count { flex-shrink:0; font-size:11px; color:var(--text-disabled); font-variant-numeric:tabular-nums; }
+
+/* nested units — grid collapse, no dots */
+.units { display:grid; grid-template-rows:0fr; transition:grid-template-rows 220ms cubic-bezier(0.16,1,0.3,1); }
+.cb.open .units { grid-template-rows:1fr; }
+.units-clip { overflow:hidden; }
+/* units nest under the folder name: text lands at 44px too (8 tree + 36 pad), with
+ * the guide line at the caret's centre (~25px) marking the parent relationship */
+.unit { position:relative; display:flex; align-items:center; height:30px; padding:0 10px 0 36px; border-radius:8px; cursor:pointer; transition:var(--transition-fast); }
+.unit::before { content:""; position:absolute; left:17px; top:0; bottom:0; width:1px; background:var(--bg-elevated); }
+.u-name { flex:1; min-width:0; font-size:12.5px; color:var(--text-secondary); font-family:var(--font-code); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .unit:hover { background:var(--bg-surface); }
 .unit.current { background:var(--accent-soft); }
-.u-state { width:7px; height:7px; border-radius:50%; flex-shrink:0; background:var(--text-disabled); }
-.u-state.OWNED { background:var(--accent); }
-.u-state.ACTIVE { background:var(--accent); box-shadow:0 0 0 3px rgba(79,114,144,0.28); }
-.u-state.PARKED { background:transparent; box-shadow:inset 0 0 0 1.5px var(--text-muted); }
-.u-name { font-size:12px; color:var(--text-secondary); font-family:var(--font-code); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.unit.current .u-name { color:var(--text-primary); }
-.u-here { margin-left:auto; font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--on-accent); background:var(--accent); border-radius:4px; padding:1px 5px; }
+.unit.current .u-name { color:var(--accent-dim); font-weight:600; }
+.unit.owned .u-name { color:var(--text-muted); }
+.unit.locked { cursor:not-allowed; }
+.unit.locked .u-name { color:var(--text-disabled); }
+.unit.locked:hover { background:none; }
+.u-arrow { flex-shrink:0; margin-left:6px; color:var(--accent); opacity:0; display:grid; place-items:center; transition:opacity 140ms ease; }
+.u-arrow svg { display:block; }
+.unit.current .u-arrow { opacity:1; }
 
 /* ─── MIDDLE — map / conversation ────────────────────────────────────────── */
 .mid { background:var(--bg-app); display:flex; flex-direction:column; min-width:0; min-height:0; }
@@ -90,6 +143,9 @@ textarea { border: none; outline: none; }
 .unit-story .fg { color:var(--text-primary); }
 .unit-story .b  { font-weight:700; }
 .unit-story i   { font-style:italic; }
+/* clickable side-question anchor in the map → jumps to its thread in the conversation */
+.unit-story .story-aside { cursor:pointer; border-radius:5px; padding:1px 6px; transition:background 120ms; }
+.unit-story .story-aside:hover { background:var(--accent-soft); }
 /* the line the learner is working on now: a soft accent sheen sliding across it */
 .unit-story .hl-here { border-radius:5px; padding:2px 6px; background:linear-gradient(100deg,transparent 8%,var(--accent-soft) 30%,transparent 62%); background-size:220% 100%; animation:hereSweep 2.8s linear infinite; }
 @keyframes hereSweep { 0%{background-position:130% 0;} 100%{background-position:-30% 0;} }
@@ -105,10 +161,10 @@ textarea { border: none; outline: none; }
 .convo-inner { max-width:780px; margin:0 auto; padding:26px 36px 12px; display:flex; flex-direction:column; gap:18px; }
 .turn { display:flex; flex-direction:column; gap:6px; max-width:90%; transition:opacity 200ms ease; }
 .turn.learner { align-self:flex-end; align-items:flex-end; }
-.turn .who { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); }
 .turn .say { font-size:15px; line-height:1.7; color:var(--text-secondary); }
 .turn.tutor .say { color:var(--text-primary); }
-.turn.learner .say { background:var(--bg-card); border-radius:var(--radius-md); padding:12px 16px; }
+/* learner message: a chat bubble with a bottom-right tail (asymmetric radius) */
+.turn.learner .say { background:var(--bg-card); border-radius:16px 16px 4px 16px; padding:11px 15px; }
 .turn .say code { font-family:var(--font-code); font-size:13.5px; background:var(--bg-surface); color:var(--text-primary); padding:1px 5px; border-radius:4px; }
 
 /* agent-run trace — only the GROUNDING reads surface here (read_code_slice,
@@ -139,11 +195,10 @@ textarea { border: none; outline: none; }
 .feedback .agent { margin-left:auto; font-size:9px; color:var(--text-disabled); font-family:var(--font-code); }
 
 /* ── AI teaching artifacts in the conversation ──────────────────────────────
- * Structured blocks the tutor emits inside the chat: generated code (collapsible),
- * and pedagogical templates (first-principles decomposition, concept evolution).
- * Each is a quiet notebook card led by a tracked-mono eyebrow — no colored side
- * rule; gold shows at most once per card. Prose around them stays normal weight.
- * These map to a future backend "teaching block" type (structured present_teaching). */
+ * The one structured block the tutor emits inside the chat: generated code
+ * (collapsible), led by a tracked-mono eyebrow — no colored side rule; gold shows
+ * at most once per card. Prose around it stays normal weight.
+ * Maps to a future backend "teaching block" type (structured present_teaching). */
 .tblk { align-self:flex-start; max-width:92%; }
 .tblk-eyebrow { font-family:var(--font-code); font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); display:flex; align-items:center; gap:7px; margin-bottom:7px; }
 .tblk-eyebrow .gl { color:var(--accent-dim); font-weight:400; }   /* the one restrained gold touch */
@@ -182,38 +237,74 @@ textarea { border: none; outline: none; }
 @media (prefers-reduced-motion:reduce){
   .ai-code .code-head, .ai-code .code-body, .ai-code .code-inner { transition:none; } }
 
-/* first-principles — decompose to atoms, then rebuild (numbering IS the sequence) */
-.tq { background:var(--bg-card); border-radius:var(--radius-md); padding:13px 15px; }
-.tq-claim { font-size:14px; color:var(--text-primary); line-height:1.55; margin-bottom:11px; }
-.tq-atoms { list-style:none; display:flex; flex-direction:column; gap:8px; margin:0 0 2px; }
-.tq-atoms li { display:flex; gap:10px; font-size:13px; color:var(--text-secondary); line-height:1.5; }
-.tq-atoms .n { flex-shrink:0; font-family:var(--font-code); font-size:11px; color:var(--text-muted); width:16px; text-align:right; padding-top:1px; }
-.tq-rebuild { display:flex; gap:9px; font-size:13.5px; color:var(--text-primary); line-height:1.55; margin-top:12px; padding-top:11px; border-top:1px solid var(--bg-elevated); }
-.tq-rebuild .arrow { color:var(--accent-dim); flex-shrink:0; font-weight:700; }
-
-/* concept evolution — how the learner's understanding changed over turns */
-.evo { background:var(--bg-card); border-radius:var(--radius-md); padding:5px 15px; }
-.evo-row { display:grid; grid-template-columns:104px 1fr; gap:12px; padding:9px 0; align-items:baseline; }
-.evo-row + .evo-row { border-top:1px solid var(--bg-elevated); }
-.evo-stage { font-family:var(--font-code); font-size:10.5px; color:var(--text-muted); white-space:nowrap; }
-.evo-belief { font-size:13px; line-height:1.5; }
-.evo-row.past .evo-belief { color:var(--text-disabled); text-decoration:line-through; }
-.evo-row.now .evo-belief { color:var(--text-primary); }
-.evo-row.now .evo-stage::after { content:" ●"; color:var(--accent); }
+/* ── side question ("aside") ────────────────────────────────────────────────
+ * An off-the-record mini-thread the learner spins up from the main conversation
+ * (via "@…" or by highlighting code). It is NOT graded / not part of the main
+ * transcript — marked by a dashed rule + muted eyebrow — and it collapses/expands
+ * exactly like the code cell (grid-rows 1fr↔0fr) so it can be folded and revisited. */
+.aside { align-self:stretch; max-width:100%; }
+.aside-eyebrow { font-family:var(--font-code); font-size:10px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); display:flex; align-items:center; gap:7px; margin-bottom:6px; }
+.aside-cell { border:1px dashed var(--bg-hover); border-radius:var(--radius-sm); background:var(--bg-app); overflow:hidden; }
+.aside-head { display:flex; align-items:center; gap:10px; width:100%; text-align:left; cursor:pointer; padding:10px 14px; color:var(--text-primary); transition:background var(--transition-fast); }
+.aside-head:hover { background:var(--bg-surface); }
+.aside-head .ah-title { font-size:13px; font-weight:600; }
+.aside-head .ah-caret { margin-left:auto; font-size:13px; color:var(--text-muted); width:1em; text-align:center; }
+.aside-body { display:grid; grid-template-rows:1fr; transition:grid-template-rows 240ms ease; }
+.aside-inner { overflow:hidden; min-height:0; }
+.aside.collapsed .aside-body { grid-template-rows:0fr; }
+.aside-pad { padding:2px 14px 13px; display:flex; flex-direction:column; gap:10px; }
+.aside-quote { font-family:var(--font-code); font-size:12px; color:var(--text-secondary); background:var(--bg-deepest); border-left:2px solid var(--bg-hover); border-radius:0 6px 6px 0; padding:6px 10px; white-space:pre; overflow-x:auto; }
+.aside-quote .qf { display:block; font-size:9.5px; letter-spacing:0.06em; color:var(--text-disabled); text-transform:uppercase; margin-bottom:3px; }
+/* same left/right split as the main conversation: learner right (bubble), tutor left (plain) */
+.aside-qa { display:flex; max-width:88%; }
+.aside-qa.learner { align-self:flex-end; }
+.aside-qa.tutor { align-self:flex-start; }
+.aside-qa .say { font-size:13.5px; line-height:1.55; color:var(--text-secondary); }
+.aside-qa.tutor .say { color:var(--text-primary); }
+.aside-qa.learner .say { background:var(--bg-elevated); border-radius:14px 14px 4px 14px; padding:8px 12px; color:var(--text-primary); }
+.aside-qa .say code { font-family:var(--font-code); font-size:12.5px; background:var(--bg-surface); color:var(--text-primary); padding:1px 5px; border-radius:4px; }
+.aside-ask { display:flex; align-items:flex-end; gap:8px; background:var(--bg-surface); border-radius:10px; padding:8px 8px 8px 12px; }
+.aside-ask textarea { flex:1; background:transparent; color:var(--text-primary); font-family:var(--font-ui); font-size:13px; line-height:1.5; resize:none; min-height:20px; max-height:120px; }
+.aside-ask .send { width:28px; height:28px; border-radius:50%; background:var(--accent); color:var(--on-accent); display:grid; place-items:center; flex-shrink:0; }
+.aside-ask .send:hover { background:#6a90b0; }
 .convo-inner.focused .turn:not(.ev), .convo-inner.focused .feedback:not(.ev), .convo-inner.focused .agent-run:not(.ev) { opacity:0.22; }
-/* chat input (conversation mode) */
-.chatbar-wrap { padding:8px 10px 14px; display:flex; justify-content:center; }
-.chatbar { width:100%; max-width:708px; background:var(--bg-surface); border-radius:14px; padding:12px 12px 12px 16px; display:flex; align-items:flex-end; gap:10px; transition:box-shadow 200ms ease; }
-.chatbar:focus-within { box-shadow:0 0 0 1.5px rgba(0,0,0,0.14); }
-.chat-input { flex:1; background:transparent; color:var(--text-primary); font-family:var(--font-ui); font-size:14px; line-height:1.6; resize:none; min-height:26px; max-height:180px; overflow-y:auto; padding:2px 0; }
+/* composer (conversation mode) — modern agent pattern: auto-grow textarea on top,
+ * a control row beneath (mode switch left, send right). Column stack; the two rows
+ * never fight for the same line, so nothing reflows as the textarea grows. */
+.chatbar-wrap { padding:8px 12px 16px; display:flex; justify-content:center; }
+.composer { width:100%; max-width:720px; background:var(--bg-deepest); border:1px solid var(--bg-elevated); border-radius:18px;
+  padding:10px 10px 8px; display:flex; flex-direction:column; gap:6px; transition:border-color 160ms ease, box-shadow 160ms ease; }
+.composer:focus-within { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+.composer[data-mode="aside"] { border-color:var(--accent-dim); box-shadow:0 0 0 3px var(--accent-soft); }
+.chat-input { width:100%; background:transparent; border:0; outline:none; resize:none;
+  color:var(--text-primary); font-family:var(--font-ui); font-size:14px; line-height:1.55;
+  min-height:24px; max-height:180px; overflow-y:auto; padding:4px 8px 0; }
 .chat-input::placeholder { color:var(--text-disabled); }
-.chat-send { width:33px; height:33px; border-radius:50%; background:var(--accent); color:var(--on-accent); display:grid; place-items:center; flex-shrink:0; transition:var(--transition-fast); }
+.chat-input::-webkit-scrollbar-button { display:none; width:0; height:0; }  /* kill scrollbar up/down arrows */
+.composer-bar { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+/* Answer ⇄ Side-question segmented switch */
+.mode-switch { display:inline-flex; gap:2px; background:var(--bg-surface); border-radius:10px; padding:3px; }
+.ms-opt { font-size:11.5px; font-weight:600; color:var(--text-muted); padding:5px 12px; border-radius:7px; transition:var(--transition-fast); }
+.ms-opt:hover { color:var(--text-secondary); }
+.ms-opt.on { color:var(--on-accent); background:var(--accent); }
+.composer[data-mode="aside"] .ms-opt.on { background:var(--accent-dim); }
+.chat-send { width:34px; height:34px; border-radius:50%; background:var(--accent); color:var(--on-accent); display:grid; place-items:center; flex-shrink:0; transition:var(--transition-fast); }
 .chat-send:hover { background:#6a90b0; }
+.chat-send:disabled { background:var(--bg-elevated); color:var(--text-disabled); cursor:default; }
+/* floating "Ask aside" that appears when you select code in the Codebase view */
+.ask-aside-pop { position:fixed; z-index:60; font-size:11px; font-weight:600; color:var(--on-accent); background:var(--accent); border-radius:7px; padding:5px 10px; box-shadow:0 3px 12px rgba(0,0,0,0.20); transform:translateY(-100%); white-space:nowrap; }
+.ask-aside-pop:hover { background:var(--accent-dim); }
 
 /* ─── RIGHT — editor / codebase / metadata ───────────────────────────────── */
-.right { background:var(--bg-deepest); display:flex; flex-direction:column; min-width:0; overflow:hidden; }
+.right { position:relative; background:var(--bg-deepest); display:flex; flex-direction:column; min-width:0; overflow:hidden; }
+/* drag the left edge to resize the panel wider/narrower */
+.right-resizer { position:absolute; left:-3px; top:0; bottom:0; width:9px; z-index:15; cursor:col-resize; }
+.right-resizer::before { content:""; position:absolute; left:3px; top:0; bottom:0; width:1px; background:var(--bg-elevated); transition:background 120ms, width 120ms; }
+.right-resizer:hover::before, .right-resizer.dragging::before { background:var(--accent); width:2px; }
 .right-head { display:flex; align-items:center; gap:8px; padding:12px; }
 .right-head .seg { margin:0 auto; }
+/* phantom balances the 26px collapse button on the left so the toggle sits truly centred */
+.right-head::after { content:""; width:26px; flex-shrink:0; }
 .rview { display:none; flex:1; min-height:0; overflow:auto; }
 .rview.on { display:block; }
 .codebase { font-family:var(--font-code); font-size:12.5px; line-height:1.7; padding:8px 0 12px; }
@@ -233,12 +324,15 @@ textarea { border: none; outline: none; }
 .explorer.collapsed { width:38px; }
 .explorer.collapsed .ex-label { display:none; }
 .explorer.collapsed .ex-tree { display:none; }
-.explorer-head { flex-shrink:0; display:flex; align-items:center; gap:8px; padding:11px 13px; font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); cursor:pointer; user-select:none; }
+/* header left edge matches the tree rows' base indent (10px) so the caret column lines up */
+.explorer-head { flex-shrink:0; display:flex; align-items:center; gap:8px; height:36px; padding:0 10px; font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); cursor:pointer; user-select:none; }
 .explorer-head:hover { color:var(--text-secondary); }
 .explorer-head .ex-caret { font-size:9px; transition:transform 150ms ease; }
 .explorer.collapsed .ex-caret { transform:rotate(-90deg); }
 .ex-tree { flex:1; overflow:auto; padding:2px 0 8px; }
-.ex-row { display:flex; align-items:center; gap:7px; padding:5px 10px; cursor:pointer; font-family:var(--font-code); font-size:13px; color:var(--text-secondary); transition:var(--transition-fast); }
+/* fixed 28px row, vertically centered (not vertical padding) so icon + text share a line;
+ * the left indent is set per-row in JS (base 10 + 14 per depth) */
+.ex-row { display:flex; align-items:center; gap:8px; height:28px; padding:0 10px; cursor:pointer; font-family:var(--font-code); font-size:13px; color:var(--text-secondary); transition:var(--transition-fast); }
 .ex-row:hover { background:var(--bg-surface); }
 .ex-row.on { background:var(--accent-soft); color:var(--text-primary); }
 .ex-caret2 { width:11px; flex-shrink:0; font-size:9px; color:var(--text-muted); transition:transform 150ms ease; }
@@ -255,7 +349,18 @@ textarea { border: none; outline: none; }
 .ex-name.scrolling { animation:exMarquee var(--dur,3s) linear infinite alternate; }
 @keyframes exMarquee { from{transform:translateX(0);} to{transform:translateX(var(--shift,0));} }
 .ex-count { flex-shrink:0; margin-left:6px; font-size:10px; color:var(--text-disabled); background:var(--bg-app); border-radius:9999px; padding:1px 7px; }
-.cb-code { flex:1; min-width:0; min-height:0; overflow:auto; }
+.cb-code { flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; }
+.cb-toolbar { flex-shrink:0; display:flex; align-items:center; justify-content:flex-end; padding:7px 14px; border-bottom:1px solid var(--bg-app); }
+.cb-scroll { flex:1; min-height:0; overflow:auto; }
+/* focus toggle — off: every unit range highlighted (overlaps read normally);
+ * on: only the current unit's range is highlighted, everything else plain. */
+.ftoggle { display:inline-flex; align-items:center; gap:8px; font-size:11.5px; color:var(--text-muted); transition:color var(--transition-fast); }
+.ftoggle:hover { color:var(--text-secondary); }
+.ftoggle[aria-checked="true"] { color:var(--text-primary); }
+.ftoggle-track { position:relative; width:30px; height:17px; border-radius:999px; background:var(--bg-elevated); transition:background 160ms; flex-shrink:0; }
+.ftoggle-knob { position:absolute; top:2px; left:2px; width:13px; height:13px; border-radius:50%; background:var(--bg-deepest); box-shadow:0 1px 2px rgba(0,0,0,0.22); transition:transform 160ms cubic-bezier(0.4,0,0.2,1); }
+.ftoggle[aria-checked="true"] .ftoggle-track { background:var(--accent); }
+.ftoggle[aria-checked="true"] .ftoggle-knob { transform:translateX(13px); }
 .ln { width:44px; flex-shrink:0; text-align:right; padding-right:14px; color:var(--text-disabled); user-select:none; }
 .code { color:var(--text-secondary); white-space:pre; }
 .file-sep { font-family:var(--font-ui); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); padding:4px 16px 6px; }
@@ -299,19 +404,32 @@ textarea { border: none; outline: none; }
 </style>
 </head>
 <body>
-<button class="reopen" id="reopenLeft" title="Show sidebar"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
-<button class="reopen" id="reopenRight" title="Show panel"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+<button class="reopen" id="reopenRight" title="Show panel"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
 
 <div class="shell" id="shell">
 
   <!-- LEFT: codebase tree -->
   <nav class="left" id="left">
-    <div class="left-head">
-      <span class="logo"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#dcdcdc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8c2.2 2 3 5.2 3 8-3 0-6-.8-8-3-2.2-2.4-3-5.5-3-8.5 3.2 0 6 1 8 3.5z"/></svg></span>
-      <span class="t">Tutor</span>
-      <button class="collapse-btn" id="collapseLeft" title="Collapse"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+    <button class="left-expand" id="leftExpand" title="Expand sidebar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/></svg></button>
+    <div class="left-inner">
+      <div class="left-head">
+        <button class="collapse-btn" id="collapseLeft" title="Collapse"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+      </div>
+      <div class="side-nav">
+        <button class="nav-row" id="importRow" title="Add a new codebase to scan">
+          <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg></span>
+          <span class="lb">Add new codebase</span>
+        </button>
+      </div>
+      <div class="side-label">Codebases</div>
+      <div class="tree" id="tree"></div>
+      <div class="left-foot">
+        <button class="nav-row" id="settingsRow" title="Settings">
+          <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+          <span class="lb">Settings</span>
+        </button>
+      </div>
     </div>
-    <div class="tree" id="tree"></div>
   </nav>
 
   <!-- MIDDLE: map / conversation -->
@@ -338,9 +456,15 @@ textarea { border: none; outline: none; }
       </div>
       <div class="convo-scroll"><div class="convo-inner" id="convo"></div></div>
       <div class="chatbar-wrap">
-        <div class="chatbar">
-          <textarea class="chat-input" rows="1" placeholder="Write your answer…"></textarea>
-          <button class="chat-send" title="Send"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        <div class="composer" id="composer" data-mode="answer">
+          <textarea class="chat-input" rows="1" placeholder="Answer…"></textarea>
+          <div class="composer-bar">
+            <div class="mode-switch" id="modeSwitch" role="tablist" aria-label="Message mode">
+              <button class="ms-opt on" data-mode="answer" role="tab" aria-selected="true">Answer</button>
+              <button class="ms-opt" data-mode="aside" role="tab" aria-selected="false">Side question</button>
+            </div>
+            <button class="chat-send" id="chatSend" title="Send" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V5M6 11l6-6 6 6"/></svg></button>
+          </div>
         </div>
       </div>
     </div>
@@ -348,6 +472,7 @@ textarea { border: none; outline: none; }
 
   <!-- RIGHT: editor / codebase / metadata -->
   <aside class="right" id="right">
+    <div class="right-resizer" id="rightResizer" title="Drag to resize"></div>
     <div class="right-head">
       <button class="collapse-btn" id="collapseRight" title="Collapse"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
       <div class="seg" id="rightSeg">
@@ -375,7 +500,15 @@ textarea { border: none; outline: none; }
         <div class="explorer-head" id="cbExplorerHead"><span class="ex-caret">▾</span><span class="ex-label">Explorer</span></div>
         <div class="ex-tree" id="cbTree"></div>
       </div>
-      <div class="cb-code"><div class="codebase" id="codebase"></div></div>
+      <div class="cb-code">
+        <div class="cb-toolbar">
+          <button class="ftoggle" id="focusToggle" role="switch" aria-checked="false" title="Show only the current unit's highlight">
+            <span class="ftoggle-track"><span class="ftoggle-knob"></span></span>
+            <span class="ftoggle-label">Focus current unit</span>
+          </button>
+        </div>
+        <div class="cb-scroll"><div class="codebase" id="codebase"></div></div>
+      </div>
     </div>
   </aside>
 </div>
@@ -424,33 +557,49 @@ const STREAM = [
             out.append(q)
     return out
 ` },
-  { t:'technique', id:'t7', label:'First principles', claim:'Why does the duplicate survive <code>pinned + rest</code>?', atoms:[
-      'A list <code>+</code> copies references — it compares nothing.',
-      'Two dicts with the same <code>id</code> field are still separate objects.',
-      'So testing <code>q in seen</code> on objects checks identity, which is always unique.',
-    ], rebuild:'Dedupe on the value you mean (<code>q["id"]</code>), never the object.' },
-  { t:'evolution', id:'e7', label:'How your understanding changed', stages:[
-      { at:'Probe 1', belief:'Equality is about identity (<code>is</code>).' },
-      { at:'Dive · identity', belief:'<code>==</code> compares value, <code>is</code> compares the object.' },
-      { at:'Now', belief:'Dedupe by the id field’s value — not the dict object.' },
-    ] },
+  // side question — off the record, not part of the graded conversation, collapsible
+  { t:'aside', id:'a1', title:'How does list.append differ from +?', collapsed:true,
+    quote:{ fname:'_pinned_qa_group.py', code:'out.append(q)' },
+    qa:[ { role:'learner', text:'Quick one — why <code>out.append(q)</code> and not <code>out = out + [q]</code>?' },
+         { role:'tutor', text:'<code>append</code> mutates the same list in place (O(1)); <code>+</code> builds a new list each time (O(n)). In a loop, append is the one you want.' } ] },
 ];
 
-/* tree */
+/* ── Sidebar (portable component) ──────────────────────────────────────────
+ * Data contract — one array drives the whole tree, so a port to React/Vue/etc.
+ * is mechanical: <Sidebar codebases={CODEBASES}/> → <FolderRow/> → <UnitRow/>.
+ *   Codebase = { name, open, units: Unit[] }
+ *   Unit     = { slug, state:'OWNED'|'ACTIVE'|'QUEUED'|'PARKED', current?:bool }
+ * State → row class (the only presentation rule to reproduce):
+ *   current === true        → 'current'  (accent tint + accent text + chevron)
+ *   state 'OWNED'           → 'owned'    (muted, still openable)
+ *   state 'QUEUED'          → 'locked'   (disabled — cannot open at all)
+ *   otherwise (PARKED, …)   → ''         (neutral, openable)
+ * No state dots / no "here" badge: the opened unit reads by tint + chevron only. */
 const tree=document.getElementById('tree');
+const CHEV='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
 CODEBASES.forEach(cb=>{
   const wrap=document.createElement('div'); wrap.className='cb'+(cb.open?' open':'');
   const owned=cb.units.filter(u=>u.state==='OWNED').length;
-  wrap.innerHTML=`<div class="cb-row"><span class="cb-caret">▶</span>
+  const rows=cb.units.map(u=>{
+    const locked=u.state==='QUEUED';
+    const cls=u.current?'current':(u.state==='OWNED'?'owned':(locked?'locked':''));
+    return `<div class="unit ${cls}" data-slug="${u.slug}"${locked?' data-locked="1"':''}>
+      <span class="u-name">${u.slug}</span><span class="u-arrow">${CHEV}</span></div>`;
+  }).join('');
+  wrap.innerHTML=`<div class="cb-row"><span class="cb-caret">${CHEV}</span>
     <span class="cb-name">${cb.name}</span><span class="cb-count">${owned}/${cb.units.length}</span></div>
-    <div class="units">${cb.units.map(u=>`<div class="unit${u.current?' current':''}" data-slug="${u.slug}">
-      <span class="u-state ${u.state}"></span><span class="u-name">${u.slug}</span>
-      ${u.current?'<span class="u-here">here</span>':''}</div>`).join('')}</div>`;
+    <div class="units"><div class="units-clip">${rows}</div></div>`;
   wrap.querySelector('.cb-row').addEventListener('click',()=>wrap.classList.toggle('open'));
   wrap.querySelectorAll('.unit').forEach(el=>el.addEventListener('click',()=>{
+    if(el.dataset.locked) return;              // locked → can't open at all
     showMid('map'); renderStory(el.dataset.slug);
   }));
   tree.appendChild(wrap);
+});
+
+/* import entry → the scan stage (import a codebase, watch the MAPPER build units) */
+document.getElementById('importRow').addEventListener('click',()=>{
+  window.location.href='scan_stage.html';
 });
 
 /* ── MAP: one unit's journey, in plain English ─────────────────────────────
@@ -480,6 +629,7 @@ const UNITS={
      ["proved",0,"you can read pinned-first ordering","COMPREHEND"],
      ["proved",0,"the order survives because the two groups are joined","MECHANISM"],
      ["note",0,"de-dupe across groups — worth doing, but it doesn't block you"],
+     ["aside",0,"How does list.append differ from +?","a1"],
      ["gap",0,"the same id can appear in both groups — nothing removes the duplicate","ROBUSTNESS"],
      ["dive",0,"Dict identity vs value","you needed this first"],
        ["learned",1,"`is` checks identity, `==` checks value"],
@@ -538,6 +688,8 @@ function line(row){
      * same axis was later proved — the "you were wrong, then cleared it up" moment */
     case "resolved": return rail+S("✓ ","gr")+S("Cleared up — ","gr b")+`<s class="dm">`+esc(a)+`</s>`+at(b);
     case "note":    return rail+S("○ ","dm")+S("Noted for later","dm")+"  "+S(a,"dm");
+    /* side question anchored on the unit — clickable, opens its thread in the conversation */
+    case "aside":   return rail+`<span class="story-aside" data-aside="${b}">`+S("@ ","dm")+S("aside","dm")+"  "+S(a,"cy")+`</span>`;
     case "dive":    return rail+S("↳ ","g")+S((d>0?"Needed first":"Went to learn first")+" — ","g")+S(a,"cy b")+(b?S("   ("+b+")","dm"):"");
     case "sealed":  return rail+S("★ ","o")+S("Sealed — you own ","o")+S(a,"cy");
     case "return":  {
@@ -559,6 +711,14 @@ function renderStory(slug){
   document.getElementById('story').innerHTML=u.story.map(line).join("\n");
   document.querySelectorAll('.unit').forEach(el=>
     el.classList.toggle('current',el.dataset.slug===slug));
+  // side-question anchors in the map open their thread in the conversation
+  document.getElementById('story').querySelectorAll('.story-aside').forEach(el=>el.addEventListener('click',()=>{
+    showMid('conversation');
+    const t=convo.querySelector('.aside[data-id="'+el.dataset.aside+'"]');
+    if(t){ t.classList.remove('collapsed'); const c=t.querySelector('.ah-caret'); if(c) c.textContent='−'; t.scrollIntoView({block:'center'}); }
+  }));
+  // in focus mode the codebase highlight tracks whichever unit is open
+  if(focusMode && currentFile) renderCodeFile(currentFile);
 }
 
 /* conversation */
@@ -568,8 +728,7 @@ const convo=document.getElementById('convo');
 STREAM.forEach(item=>{
   if(item.t==='msg'){
     const d=document.createElement('div'); d.className='turn '+item.role; d.dataset.id=item.id;
-    const who=item.role==='tutor'?'Tutor':item.role==='learner'?'You':'System';
-    d.innerHTML=`<div class="who">${who}</div><div class="say">${item.text}</div>`;
+    d.innerHTML=`<div class="say">${item.text}</div>`;  // no name label — side carries who
     convo.appendChild(d);
   } else if(item.t==='run'){
     // conversation shows ONLY the grounding tools — the ones done TO the learner's work
@@ -607,25 +766,9 @@ STREAM.forEach(item=>{
     head.addEventListener('click',()=>{ const c=el.classList.toggle('collapsed');
       head.setAttribute('aria-expanded',String(!c)); caret.textContent=c?'+':'−'; });
     convo.appendChild(d);
-  } else if(item.t==='technique'){
-    // template UI — first-principles decomposition. `atoms` is an ordered break-down,
-    // `rebuild` the synthesis. A future AI would pick a template and fill these slots.
-    const atoms=item.atoms.map((a,i)=>`<li><span class="n">${i+1}</span><span>${a}</span></li>`).join('');
-    const d=document.createElement('div'); d.className='tblk'; d.dataset.id=item.id;
-    d.innerHTML=`<div class="tblk-eyebrow"><span class="gl">⚛</span>${item.label||'First principles'}</div>
-      <div class="tq"><div class="tq-claim">${item.claim}</div>
-        <ol class="tq-atoms">${atoms}</ol>
-        <div class="tq-rebuild"><span class="arrow">⇒</span><span>${item.rebuild}</span></div></div>`;
-    convo.appendChild(d);
-  } else if(item.t==='evolution'){
-    // template UI — how a concept changed in the learner's mind over turns.
-    const rows=item.stages.map((s,i)=>
-      `<div class="evo-row ${i===item.stages.length-1?'now':'past'}">
-         <span class="evo-stage">${s.at}</span><span class="evo-belief">${s.belief}</span></div>`).join('');
-    const d=document.createElement('div'); d.className='tblk'; d.dataset.id=item.id;
-    d.innerHTML=`<div class="tblk-eyebrow"><span class="gl">◷</span>${item.label||'How your understanding changed'}</div>
-      <div class="evo">${rows}</div>`;
-    convo.appendChild(d);
+  } else if(item.t==='aside'){
+    // side question — off the record, collapsible like the code cell (see buildAside)
+    convo.appendChild(buildAside(item));
   }
 });
 
@@ -638,6 +781,49 @@ function hl(line){
   s=s.replace(/(#[^<]*)$/,'<span class="c">$1</span>');
   s=s.replace(/\b(def|return|for|if|not|in|and|or|else|None|True|False)\b/g,'<span class="k">$1</span>');
   return s;
+}
+
+/* ── side questions ("asides") ─────────────────────────────────────────────
+ * Off-the-record threads created from the main conversation (type "@ …" in the
+ * chatbar, or highlight code → "Ask aside"). Each is a collapsible cell (same
+ * fold mechanic as the code cell) so it can be tucked away and reopened. They
+ * live in the transcript but are marked not-graded and carry no engine events. */
+function buildAside(item){
+  const d=document.createElement('div'); d.className='aside'+(item.collapsed?' collapsed':''); if(item.id) d.dataset.id=item.id;
+  const quote=item.quote?`<div class="aside-quote"><span class="qf">${esc(item.quote.fname||'code')}</span>${esc(item.quote.code)}</div>`:'';
+  const qa=(item.qa||[]).map(t=>`<div class="aside-qa ${t.role}"><span class="say">${t.text}</span></div>`).join('');
+  d.innerHTML=`<div class="aside-eyebrow">aside</div>
+    <div class="aside-cell">
+      <button class="aside-head"><span class="ah-title">${esc(item.title||'Side question')}</span><span class="ah-caret" aria-hidden="true">${item.collapsed?'+':'−'}</span></button>
+      <div class="aside-body"><div class="aside-inner"><div class="aside-pad">
+        ${quote}${qa}
+        <div class="aside-ask"><textarea rows="1" placeholder="Ask a follow-up…"></textarea>
+          <button class="send" title="Ask"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
+      </div></div></div>
+    </div>`;
+  const head=d.querySelector('.aside-head'), caret=d.querySelector('.ah-caret');
+  head.addEventListener('click',()=>{ const c=d.classList.toggle('collapsed'); caret.textContent=c?'+':'−'; });
+  const pad=d.querySelector('.aside-pad'), ask=d.querySelector('.aside-ask'),
+        ta=ask.querySelector('textarea'), send=ask.querySelector('.send');
+  function submit(){ const v=ta.value.trim(); if(!v) return;
+    const q=document.createElement('div'); q.className='aside-qa learner'; q.innerHTML=`<span class="say">${esc(v)}</span>`;
+    const a=document.createElement('div'); a.className='aside-qa tutor'; a.innerHTML=`<span class="say">…</span>`;
+    pad.insertBefore(q,ask); pad.insertBefore(a,ask); ta.value=''; ta.style.height='auto';
+    setTimeout(()=>{ a.querySelector('.say').textContent='(demo) short off-record answer to: '+v; },320);
+  }
+  send.addEventListener('click',submit);
+  ta.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); submit(); }});
+  ta.addEventListener('input',()=>{ ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; });
+  return d;
+}
+/* spin up a new aside in the conversation (optionally seeded with a Q+A / a code quote) */
+function createAside(title, quote, seedText){
+  const item={ title:title||'Side question', collapsed:false, quote:quote||null, qa:[] };
+  if(seedText) item.qa=[{role:'learner',text:esc(seedText)},{role:'tutor',text:'(demo) off-record answer.'}];
+  const el=buildAside(item); convo.appendChild(el);
+  el.scrollIntoView({block:'end',behavior:'smooth'});
+  const ta=el.querySelector('.aside-ask textarea'); if(ta && !seedText) ta.focus();
+  return el;
 }
 
 /* middle toggle */
@@ -697,6 +883,7 @@ const FILES = {
 };
 
 let currentFile=null;
+let focusMode=false;   // false → all unit ranges highlighted; true → only the current unit
 function renderCodeFile(path){
   const f=FILES[path]; if(!f) return;
   currentFile=path;
@@ -705,14 +892,28 @@ function renderCodeFile(path){
     const unit=f.units.find(u=>ln>=u.lo && ln<=u.hi);
     let cls='', tag='';
     if(unit){
-      cls=unit.state==='ACTIVE'?' hl':' hl2';
-      if(ln===unit.lo) tag=`<span class="utag">${unit.slug}</span>`;
+      const isCurrent = unit.slug===currentSlug || unit.state==='ACTIVE';
+      if(focusMode){
+        // isolate: only the current unit shows; every other range goes plain
+        if(isCurrent){ cls=' hl'; if(ln===unit.lo) tag=`<span class="utag">${unit.slug}</span>`; }
+      } else {
+        // normal: all ranges lit — current strongest, the rest faint (they may overlap)
+        cls=isCurrent?' hl':' hl2';
+        if(ln===unit.lo) tag=`<span class="utag">${unit.slug}</span>`;
+      }
     }
     const esc=raw.replace(/&/g,'&amp;').replace(/</g,'&lt;');
     return `<div class="code-line${cls}"><span class="ln">${ln}</span><span class="code">${esc||' '}</span>${tag}</div>`;
   }).join('');
   document.querySelectorAll('.ex-file .ex-row').forEach(el=>el.classList.toggle('on',el.dataset.path===path));
 }
+/* focus toggle wiring */
+const focusToggle=document.getElementById('focusToggle');
+focusToggle.addEventListener('click',()=>{
+  focusMode=!focusMode;
+  focusToggle.setAttribute('aria-checked',String(focusMode));
+  if(currentFile) renderCodeFile(currentFile);
+});
 
 /* ── VSCode-style file explorer ────────────────────────────────────────────
  * Folders collapse from their caret; files (real names, keyed into FILES) open
@@ -741,7 +942,7 @@ function attachMarquee(row){
   row.addEventListener('mouseleave',()=>{ name.classList.remove('scrolling'); name.style.transform=''; });
 }
 function renderTree(node, depth, parentEl){
-  const pad=8+depth*14;
+  const pad=10+depth*14;   // base indent matches the Explorer header's 10px left edge
   if(node.file){
     const wrap=document.createElement('div'); wrap.className='ex-file';
     const count=FILES[node.name]?FILES[node.name].units.length:'';
@@ -908,28 +1109,103 @@ editorTabs.addEventListener('wheel',e=>{
 },{passive:false});
 selectFile(0);
 
-/* chat input auto-grows from one line up to its CSS max-height, then scrolls */
+/* composer — auto-grow textarea + mode switch (Answer ⇄ Side question) + send */
+const composer=document.getElementById('composer');
 const chatInput=document.querySelector('.chat-input');
+const chatSend=document.getElementById('chatSend');
+const modeSwitch=document.getElementById('modeSwitch');
+const PLACEHOLDER={ answer:'Answer…', aside:'Side question…' };
 function autosize(){ chatInput.style.height='auto'; chatInput.style.height=chatInput.scrollHeight+'px'; }
-chatInput.addEventListener('input',autosize);
-autosize();
+function syncSend(){ chatSend.disabled = chatInput.value.trim()===''; }
+chatInput.addEventListener('input',()=>{ autosize(); syncSend(); });
+autosize(); syncSend();
+
+// switch modes — the composer restyles and the placeholder changes; no @ needed
+modeSwitch.addEventListener('click',e=>{
+  const b=e.target.closest('.ms-opt'); if(!b) return;
+  composer.dataset.mode=b.dataset.mode;
+  modeSwitch.querySelectorAll('.ms-opt').forEach(o=>{ const on=o===b; o.classList.toggle('on',on); o.setAttribute('aria-selected',String(on)); });
+  chatInput.placeholder=PLACEHOLDER[b.dataset.mode];
+  chatInput.focus();
+});
+function send(){
+  const v=chatInput.value.trim(); if(!v) return;
+  if(composer.dataset.mode==='aside'){ createAside(v, null, v); }   // off-record thread
+  else {
+    const d=document.createElement('div'); d.className='turn learner';
+    d.innerHTML=`<div class="say">${esc(v)}</div>`;
+    convo.appendChild(d); d.scrollIntoView({block:'end',behavior:'smooth'});
+  }
+  chatInput.value=''; autosize(); syncSend();
+}
+chatSend.addEventListener('click',send);
+chatInput.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); send(); }});
+
+/* highlight code in the Codebase view → floating "Ask aside" → seeds an aside
+ * quoting the selection, then jumps to the conversation so it can be answered */
+const codebaseEl=document.getElementById('codebase');
+let askBtn=null;
+function removeAskBtn(){ if(askBtn){ askBtn.remove(); askBtn=null; } }
+codebaseEl.addEventListener('mouseup',e=>{
+  const text=(window.getSelection().toString()||'').trim();
+  removeAskBtn();
+  if(!text) return;
+  const quote={ fname:currentFile||'code', code:text };
+  askBtn=document.createElement('button'); askBtn.className='ask-aside-pop'; askBtn.textContent='@ Ask aside';
+  askBtn.style.left=(e.clientX+8)+'px'; askBtn.style.top=(e.clientY-4)+'px';
+  document.body.appendChild(askBtn);
+  askBtn.addEventListener('click',()=>{
+    const el=createAside('About this snippet', quote, null);
+    removeAskBtn(); window.getSelection().removeAllRanges();
+    showMid('conversation'); el.scrollIntoView({block:'center'});
+  });
+});
+document.addEventListener('mousedown',e=>{ if(askBtn && !askBtn.contains(e.target)) removeAskBtn(); });
 
 /* ── collapsible sidebars ─────────────────────────────────────────────────── */
 const shell=document.getElementById('shell');
-const LEFT_W='246px', RIGHT_W='36%';
-let leftOpen=true, rightOpen=true;
+// left collapses to a 52px RAIL (like the sidebar demo), not to zero; right still
+// collapses to zero with the edge handle. rightW: null → default %, else a dragged px.
+const LEFT_W='246px', LEFT_RAIL='52px', RIGHT_W='36%';
+let leftOpen=true, rightOpen=true, rightW=null;
+function rightCol(){ return rightOpen ? (rightW!=null ? rightW+'px' : RIGHT_W) : '0px'; }
 function applyGrid(){
-  shell.style.gridTemplateColumns=`${leftOpen?LEFT_W:'0px'} 1fr ${rightOpen?RIGHT_W:'0px'}`;
-  document.getElementById('left').style.visibility=leftOpen?'visible':'hidden';
+  shell.style.gridTemplateColumns=`${leftOpen?LEFT_W:LEFT_RAIL} 1fr ${rightCol()}`;
+  document.getElementById('left').classList.toggle('collapsed',!leftOpen);
   document.getElementById('right').style.visibility=rightOpen?'visible':'hidden';
-  document.getElementById('reopenLeft').classList.toggle('show',!leftOpen);
   document.getElementById('reopenRight').classList.toggle('show',!rightOpen);
 }
 document.getElementById('collapseLeft').addEventListener('click',()=>{leftOpen=false;applyGrid();});
-document.getElementById('reopenLeft').addEventListener('click',()=>{leftOpen=true;applyGrid();});
+document.getElementById('leftExpand').addEventListener('click',()=>{leftOpen=true;applyGrid();});
 document.getElementById('collapseRight').addEventListener('click',()=>{rightOpen=false;applyGrid();});
 document.getElementById('reopenRight').addEventListener('click',()=>{rightOpen=true;applyGrid();});
 applyGrid();
+
+/* ── resize the right panel by dragging its left edge ─────────────────────── */
+const rightResizer=document.getElementById('rightResizer');
+let dragging=false;
+rightResizer.addEventListener('pointerdown',e=>{
+  if(!rightOpen) return;
+  dragging=true; rightResizer.classList.add('dragging');
+  rightResizer.setPointerCapture(e.pointerId);
+  document.body.style.userSelect='none';
+  shell.style.transition='none';   // follow the cursor 1:1 while dragging
+  e.preventDefault();
+});
+rightResizer.addEventListener('pointermove',e=>{
+  if(!dragging) return;
+  const min=300, max=Math.min(window.innerWidth*0.72, 960);
+  rightW=Math.max(min,Math.min(max, window.innerWidth-e.clientX));
+  applyGrid();
+});
+function endDrag(e){
+  if(!dragging) return;
+  dragging=false; rightResizer.classList.remove('dragging');
+  try{ rightResizer.releasePointerCapture(e.pointerId); }catch(_){}
+  document.body.style.userSelect=''; shell.style.transition='';
+}
+rightResizer.addEventListener('pointerup',endDrag);
+rightResizer.addEventListener('pointercancel',endDrag);
 
 /* open the map on the current unit */
 renderStory('_pinned_qa_group');

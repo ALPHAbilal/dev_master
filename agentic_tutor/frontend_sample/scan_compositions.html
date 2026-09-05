@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MAPPER — layout compositions</title>
+<!--
+  LAYOUT COMPOSITIONS for the MAPPER scan page, in the inspirations' design language.
+  Tokens/motion ported from: agent_mapper_1 (Records Table — rows resolve),
+  to_collapse_show_log_agent_map (ToolChips — collapsible agent log),
+  sidebar (collapse-to-rail nav).
+  INVARIANT (your taste): the ladder is centered, inside a box.
+  VARIABLES: (1) ladder form — list vs table/grid  (2) where the collapsible log attaches.
+  Each frame is real components at small scale. The log collapse toggle works (grid-rows 1fr↔0fr).
+  Motion = stagger + disclosure + a resolve pulse. No jitter/shimmer/heartbeat.
+-->
+<style>
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+:root{
+  --ink:#1e2024; --ink-2:#4a4d53; --ink-3:#7a7d84; --ink-4:#a8a6a0;
+  --canvas:#f4f4f2; --surface:#ffffff; --field:#f3f2ef; --hover:#efeeeb; --hover-2:#e9e8e4;
+  --line:#e7e5df; --line-strong:#d8d6cf;
+  --accent:#4f7290; --accent-tint:rgba(79,114,144,0.13); --accent-ink:#385876;
+  --green:#4a7a4a; --green-tint:rgba(74,122,74,0.12); --orange:#b5651d; --red:#a24a3a;
+  --r-chip:9999px; --r-ctrl:7px; --r-card:12px; --r-box:16px;
+  --sh-hair:inset 0 0 0 1px var(--line);
+  --sh-btn:0 1px 2px rgba(0,0,0,0.04), inset 0 0 0 1px var(--line);
+  --sh-over:0 10px 34px rgba(0,0,0,0.12), inset 0 0 0 1px var(--line);
+  --ease:cubic-bezier(0.23,1,0.32,1); --ease2:cubic-bezier(0.16,1,0.3,1);
+  --ui:"Segoe UI",Tahoma,sans-serif; --mono:"Cascadia Code","JetBrains Mono","SF Mono","Consolas",monospace;
+}
+body{ background:var(--canvas); color:var(--ink); font-family:var(--ui); line-height:1.5; padding:40px 32px 90px; -webkit-font-smoothing:antialiased; }
+.wrap{ max-width:1200px; margin:0 auto; }
+h1{ font-size:22px; font-weight:600; letter-spacing:-0.01em; margin-bottom:6px; }
+.lede{ font-size:13px; color:var(--ink-3); max-width:720px; line-height:1.6; margin-bottom:24px; }
+.lede b{ color:var(--ink-2); font-weight:600; }
+.sec{ font-family:var(--mono); font-size:10px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--ink-4); margin:0 0 14px; }
+
+/* taste strip — the token/motion vocabulary in one line */
+.taste{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:30px; }
+.tk{ display:inline-flex; align-items:center; gap:7px; font-size:11px; color:var(--ink-2); background:var(--surface); box-shadow:var(--sh-hair); border-radius:var(--r-ctrl); padding:6px 10px; }
+.tk .sw{ width:13px; height:13px; border-radius:4px; }
+.tk .dot{ width:8px; height:8px; border-radius:50%; }
+
+/* gallery */
+.gallery{ display:grid; grid-template-columns:1fr; gap:26px; }
+@media(min-width:900px){ .gallery{ grid-template-columns:1fr 1fr; } }
+.comp{ }
+.comp-head{ display:flex; align-items:baseline; gap:9px; margin-bottom:4px; }
+.comp-head .id{ font-family:var(--mono); font-size:11px; font-weight:700; color:var(--accent-ink); }
+.comp-head .name{ font-size:14.5px; font-weight:600; }
+.comp-head .tag{ margin-left:auto; font-size:9px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; padding:2px 7px; border-radius:var(--r-chip); color:var(--accent-ink); background:var(--accent-tint); }
+.comp-desc{ font-size:11.5px; color:var(--ink-3); line-height:1.5; margin-bottom:11px; }
+.comp-desc b{ color:var(--ink-2); font-weight:600; }
+.combo{ display:flex; gap:5px; margin-bottom:11px; flex-wrap:wrap; }
+.combo .c{ font-family:var(--mono); font-size:9.5px; padding:2px 7px; border-radius:5px; background:var(--hover-2); color:var(--ink-3); }
+
+/* the mini app frame */
+.frame{ height:340px; border-radius:14px; overflow:hidden; box-shadow:var(--sh-over); background:var(--canvas); display:flex; }
+.rail{ width:46px; flex-shrink:0; background:var(--canvas); border-right:1px solid var(--line); display:flex; flex-direction:column; align-items:center; gap:8px; padding:12px 0; }
+.rail .logo{ width:22px; height:22px; border-radius:6px; background:linear-gradient(140deg,#4a4a4a,#2a2a2a); }
+.rail .ri{ width:26px; height:26px; border-radius:7px; display:grid; place-items:center; color:var(--ink-3); }
+.rail .ri.on{ background:var(--hover-2); color:var(--ink); }
+.rail .ri svg{ width:15px; height:15px; }
+.rail .spacer{ flex:1; }
+
+.canvas{ flex:1; min-width:0; display:flex; flex-direction:column; position:relative; overflow:hidden; }
+/* centered box — the invariant */
+.stage{ flex:1; display:flex; align-items:center; justify-content:center; padding:20px; min-height:0; }
+.box{ width:100%; max-width:340px; max-height:100%; background:var(--surface); border-radius:var(--r-box); box-shadow:var(--sh-btn); display:flex; flex-direction:column; overflow:hidden; }
+.box-head{ display:flex; align-items:center; gap:8px; padding:11px 13px; border-bottom:1px solid var(--line); flex-shrink:0; }
+.box-head .fn{ font-family:var(--mono); font-size:12px; font-weight:600; color:var(--ink); }
+.box-head .st{ margin-left:auto; font-size:10px; color:var(--ink-3); display:inline-flex; align-items:center; gap:6px; }
+.box-head .st .p{ width:6px; height:6px; border-radius:50%; background:var(--accent); animation:pulse 1.1s ease-in-out infinite; }
+@keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+/* ladder — list form */
+.rows{ padding:6px; overflow-y:auto; flex:1; }
+.lrow{ display:flex; align-items:center; gap:10px; padding:7px 8px; border-radius:8px; transition:background 120ms; }
+.lrow:hover{ background:var(--hover); }
+.g{ width:13px; height:13px; flex-shrink:0; position:relative; border-radius:50%; }
+.g.done{ background:var(--accent-tint); }
+.g.done::after{ content:""; position:absolute; inset:0; background:var(--accent); border-radius:50%;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23000' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round' d='M20 6L9 17l-5-5'/%3E%3C/svg%3E") center/11px no-repeat; }
+.g.now::before{ content:""; position:absolute; inset:2.5px; border-radius:50%; background:var(--accent); }
+.g.now::after{ content:""; position:absolute; inset:-1px; border-radius:50%; border:1.5px solid var(--accent); opacity:0.4; animation:ring 1.6s ease-out infinite; }
+@keyframes ring{ 0%{transform:scale(.7);opacity:.5;} 100%{transform:scale(1.3);opacity:0;} }
+.g.pend::before{ content:""; position:absolute; inset:3px; border-radius:50%; border:1.5px solid var(--line-strong); }
+.slug{ font-family:var(--mono); font-size:12px; color:var(--ink); }
+.lrow.pend .slug{ color:var(--ink-4); }
+.intent{ font-size:11px; color:var(--ink-3); margin-left:auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:44%; }
+.calc{ margin-left:auto; display:inline-flex; align-items:center; gap:6px; font-size:10.5px; color:var(--ink-4); }
+.calc .cp{ width:22px; height:5px; border-radius:3px; background:linear-gradient(90deg,var(--hover-2) 25%,var(--line-strong) 50%,var(--hover-2) 75%); background-size:200% 100%; animation:sk 1.1s linear infinite; }
+@keyframes sk{ 0%{background-position:180% 0;} 100%{background-position:-80% 0;} }
+
+/* ladder — table form */
+.tbl{ flex:1; overflow:auto; }
+.tbl table{ width:100%; border-collapse:collapse; }
+.tbl th{ font-size:9px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-4); text-align:left; padding:8px 10px 6px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--surface); }
+.tbl td{ font-size:11px; padding:7px 10px; border-bottom:1px solid var(--line); color:var(--ink-2); }
+.tbl td.s{ font-family:var(--mono); color:var(--ink); }
+.tbl tr:last-child td{ border-bottom:0; }
+.mini-ax{ display:inline-flex; gap:3px; }
+.mini-ax i{ width:6px; height:6px; border-radius:2px; background:var(--accent-tint); box-shadow:inset 0 0 0 1px rgba(79,114,144,0.3); }
+
+/* the collapsible agent log (ToolChips pattern) */
+.log{ background:var(--surface); }
+.log.above{ margin:0 0 0; border-bottom:1px solid var(--line); }
+.log-toggle{ display:flex; align-items:center; gap:8px; width:100%; padding:9px 13px; font-size:11.5px; color:var(--ink-2); cursor:pointer; background:none; border:none; font-family:var(--ui); }
+.log-toggle .cv{ width:11px; height:11px; color:var(--ink-3); transition:transform 200ms var(--ease); }
+.log.collapsed .log-toggle .cv{ transform:rotate(-90deg); }
+.log-toggle .n{ font-variant-numeric:tabular-nums; }
+.log-toggle .live{ margin-left:auto; width:6px; height:6px; border-radius:50%; background:var(--accent); animation:pulse 1.1s ease-in-out infinite; }
+.log-body{ display:grid; grid-template-rows:1fr; transition:grid-template-rows 300ms var(--ease); }
+.log.collapsed .log-body{ grid-template-rows:0fr; }
+.log-inner{ overflow:hidden; min-height:0; }
+.log-list{ padding:0 13px 10px; display:flex; flex-direction:column; gap:2px; }
+.chip{ display:flex; align-items:center; gap:9px; font-family:var(--mono); font-size:11px; color:var(--ink-2); padding:3px 0; }
+.chip .ic{ color:var(--accent-ink); }
+.chip .arg{ color:var(--ink-4); }
+
+/* footer log variant sits at bottom inside the box */
+.box .log{ border-top:1px solid var(--line); flex-shrink:0; }
+
+/* right drawer log */
+.drawer{ width:150px; flex-shrink:0; background:var(--surface); border-left:1px solid var(--line); display:flex; flex-direction:column; transition:width 280ms var(--ease2); overflow:hidden; }
+.drawer.collapsed{ width:34px; }
+.drawer-h{ display:flex; align-items:center; gap:7px; padding:11px 12px; font-size:10px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-3); white-space:nowrap; cursor:pointer; }
+.drawer-h .live{ width:6px; height:6px; border-radius:50%; background:var(--accent); animation:pulse 1.1s ease-in-out infinite; flex-shrink:0; }
+.drawer-list{ padding:0 12px; display:flex; flex-direction:column; gap:6px; }
+.drawer.collapsed .drawer-h span, .drawer.collapsed .drawer-list{ display:none; }
+
+/* floating HUD log */
+.hud{ position:absolute; right:14px; bottom:14px; width:186px; background:var(--surface); border-radius:var(--r-card); box-shadow:var(--sh-over); padding:10px 12px; }
+.hud-h{ display:flex; align-items:center; gap:7px; font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-3); margin-bottom:7px; }
+.hud-h .live{ width:6px; height:6px; border-radius:50%; background:var(--accent); animation:pulse 1.1s ease-in-out infinite; }
+
+/* two-pane inside one box */
+.box.wide{ max-width:400px; }
+.split{ display:flex; flex:1; min-height:0; }
+.split .rows{ flex:1; border-right:1px solid var(--line); }
+.split .side-log{ width:132px; flex-shrink:0; padding:9px 11px; display:flex; flex-direction:column; gap:6px; }
+.split .side-log .h{ font-size:9px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-4); display:flex; align-items:center; gap:6px; }
+.split .side-log .h .live{ width:5px; height:5px; border-radius:50%; background:var(--accent); animation:pulse 1.1s infinite; }
+
+.foot{ margin-top:40px; padding:18px 20px; background:var(--surface); border-radius:12px; box-shadow:var(--sh-hair); font-size:12.5px; color:var(--ink-2); line-height:1.6; }
+.foot b{ color:var(--ink); }
+@media (prefers-reduced-motion:reduce){ *{ animation:none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>MAPPER — layout compositions</h1>
+  <div class="lede">Built in your taste, ported from the three references. <b>Invariant:</b> the ladder is centered, inside a box. <b>Variables:</b> ladder form (list vs table) × where the collapsible agent-log attaches. The log is a <b>disclosure</b> (ToolChips), never a permanent strip — that’s the fix for “the log position is bad.” Click any log header to collapse it.</div>
+
+  <div class="sec">the taste · tokens & motion vocabulary</div>
+  <div class="taste">
+    <span class="tk"><span class="sw" style="background:var(--surface);box-shadow:var(--sh-hair);"></span>surface box</span>
+    <span class="tk"><span class="sw" style="background:var(--field);"></span>field inset</span>
+    <span class="tk"><span class="sw" style="background:var(--accent);"></span>accent</span>
+    <span class="tk"><span class="dot" style="background:var(--green);"></span>green</span>
+    <span class="tk"><span class="dot" style="background:var(--orange);"></span>orange</span>
+    <span class="tk"><span class="dot" style="background:var(--red);"></span>red</span>
+    <span class="tk">radii 7 / 12 / 16</span>
+    <span class="tk">pop-in 160ms</span>
+    <span class="tk">grid-rows 1fr↔0fr collapse</span>
+    <span class="tk">row resolve · pulse</span>
+  </div>
+
+  <div class="sec">five compositions</div>
+  <div class="gallery" id="gallery"></div>
+
+  <div class="foot"><b>How to choose:</b> C1 is closest to your plan (centered box, list rows, log as a disclosure on top). C2 makes each unit a <b>row in a grid</b> that the agent fills column-by-column (the Records-Table idea). C3–C5 move the log: right drawer, floating HUD, or a second pane inside the box. Tell me which one to build into the full scan page — or mix (e.g. “C2 grid + C1’s top disclosure log”).</div>
+</div>
+
+<script>
+"use strict";
+const RAIL = `<div class="rail"><div class="logo"></div>
+  <div class="ri on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h5l2 3h11v9H3z"/></svg></div>
+  <div class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></div>
+  <div class="spacer"></div>
+  <div class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div>
+</div>`;
+
+const UNITS = [
+  {slug:"load_prompts", intent:"what the caller expects", st:"done"},
+  {slug:"normalize_row", intent:"the invariant it holds", st:"done"},
+  {slug:"_pinned_qa_group", intent:"", st:"now"},
+  {slug:"build_batch", intent:"", st:"pend"},
+  {slug:"run_prompts", intent:"", st:"pend"},
+];
+const CHIPS = [
+  ["read_code_slice",'L42–46'],
+  ["search_repository",'"callers"'],
+];
+
+function listRows(){
+  return `<div class="rows">${UNITS.map(u=>{
+    const tail = u.st==="done"?`<span class="intent">${u.intent}</span>`
+      : u.st==="now"?`<span class="calc"><span class="cp"></span>forming</span>`:"";
+    return `<div class="lrow ${u.st}"><span class="g ${u.st}"></span><span class="slug">${u.slug}</span>${tail}</div>`;
+  }).join("")}</div>`;
+}
+function tableRows(){
+  const cell=(u,col)=>{
+    if(u.st==="pend"||(u.st==="now"&&col!=="slug")) return `<span class="calc"><span class="cp"></span></span>`;
+    if(col==="slug") return u.slug;
+    if(col==="loc") return `L${40+Math.floor(Math.random()*8)}`;
+    if(col==="ax") return `<span class="mini-ax"><i></i><i></i><i></i></span>`;
+  };
+  return `<div class="tbl"><table>
+    <thead><tr><th>unit</th><th>range</th><th>axes</th></tr></thead>
+    <tbody>${UNITS.map(u=>`<tr>
+      <td class="s">${u.st==="pend"?'<span class="calc"><span class="cp"></span></span>':`<span style="display:inline-flex;align-items:center;gap:7px;"><span class="g ${u.st}"></span>${u.slug}</span>`}</td>
+      <td>${u.st==="done"?'L42–46':'<span class="calc"><span class="cp"></span></span>'}</td>
+      <td>${u.st==="done"?'<span class="mini-ax"><i></i><i></i><i></i></span>':'<span class="calc"><span class="cp"></span></span>'}</td>
+    </tr>`).join("")}</tbody></table></div>`;
+}
+function logBlock(cls){
+  return `<div class="log ${cls}"><button class="log-toggle">
+      <svg class="cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      <span class="n">2 tool calls</span><span class="live"></span></button>
+    <div class="log-body"><div class="log-inner"><div class="log-list">
+      ${CHIPS.map(c=>`<div class="chip"><span class="ic">⌁</span>${c[0]} <span class="arg">${c[1]}</span></div>`).join("")}
+    </div></div></div></div>`;
+}
+function boxHead(){ return `<div class="box-head"><span class="fn">run_prompts.py</span><span class="st"><span class="p"></span>scanning</span></div>`; }
+
+const COMPS = [
+  { id:"C1", name:"List + top disclosure", tag:"closest",
+    combo:["ladder: list","log: disclosure above","sidebar: rail"],
+    desc:"Centered box, units as <b>list rows</b> resolving top-down. The agent log is a <b>collapsible disclosure</b> pinned above the ladder — present, quiet, foldable to nothing.",
+    build:c=>`${RAIL}<div class="canvas"><div class="stage"><div class="box">${boxHead()}${logBlock("above")}${listRows()}</div></div></div>` },
+
+  { id:"C2", name:"Grid the agent fills", tag:"records",
+    combo:["ladder: table","log: footer","fills column-by-column"],
+    desc:"Each unit is a <b>row in a grid</b>; the agent fills columns (range, axes) cell-by-cell with the Calculating pulse — the Records-Table idea applied to the ladder. Log folds into the box footer.",
+    build:c=>`${RAIL}<div class="canvas"><div class="stage"><div class="box">${boxHead()}${tableRows()}${logBlock("collapsed")}</div></div></div>` },
+
+  { id:"C3", name:"List + right drawer", tag:"",
+    combo:["ladder: list","log: right drawer","drawer collapses"],
+    desc:"Box holds the pure ladder; the live log is a <b>right drawer</b> that collapses to a thin rail (sidebar-collapse pattern). Activity is beside the result, dismissible.",
+    build:c=>`${RAIL}<div class="canvas"><div class="stage"><div class="box">${boxHead()}${listRows()}</div></div></div>
+      <div class="drawer"><div class="drawer-h"><span class="live"></span><span>MAPPER</span></div>
+        <div class="drawer-list">${CHIPS.map(c=>`<div class="chip"><span class="ic">⌁</span>${c[0]}</div>`).join("")}</div></div>` },
+
+  { id:"C4", name:"List + floating HUD", tag:"",
+    combo:["ladder: list","log: floating HUD","dismisses on done"],
+    desc:"The box owns the stage; the agent log <b>floats as a HUD</b> in the corner and vanishes when the scan completes. Result is uninterrupted; activity is weightless.",
+    build:c=>`${RAIL}<div class="canvas"><div class="stage"><div class="box">${boxHead()}${listRows()}</div></div>
+      <div class="hud"><div class="hud-h"><span class="live"></span>MAPPER</div>
+        ${CHIPS.map(c=>`<div class="chip"><span class="ic">⌁</span>${c[0]} <span class="arg">${c[1]}</span></div>`).join("")}</div></div>` },
+
+  { id:"C5", name:"Two panes, one box", tag:"",
+    combo:["ladder: list","log: second pane","split inside box"],
+    desc:"One wider box <b>split in two</b>: ladder left, live log right. Both live in the same frame — honest separation of result and activity without a second surface.",
+    build:c=>`${RAIL}<div class="canvas"><div class="stage"><div class="box wide">${boxHead()}
+      <div class="split">${listRows()}
+        <div class="side-log"><div class="h"><span class="live"></span>MAPPER</div>
+          ${CHIPS.map(c=>`<div class="chip"><span class="ic">⌁</span>${c[0]}</div>`).join("")}</div>
+      </div></div></div></div>` },
+];
+
+const gallery=document.getElementById("gallery");
+COMPS.forEach(c=>{
+  const el=document.createElement("div"); el.className="comp";
+  el.innerHTML=`<div class="comp-head"><span class="id">${c.id}</span><span class="name">${c.name}</span>${c.tag?`<span class="tag">${c.tag}</span>`:""}</div>
+    <div class="combo">${c.combo.map(x=>`<span class="c">${x}</span>`).join("")}</div>
+    <div class="frame">${c.build(c)}</div>
+    <div class="comp-desc" style="margin-top:11px;margin-bottom:0;">${c.desc}</div>`;
+  gallery.appendChild(el);
+});
+// collapsible logs
+document.querySelectorAll(".log-toggle").forEach(t=>t.onclick=()=>t.closest(".log").classList.toggle("collapsed"));
+document.querySelectorAll(".drawer-h").forEach(h=>h.onclick=()=>h.closest(".drawer").classList.toggle("collapsed"));
+</script>
+</body>
+</html>

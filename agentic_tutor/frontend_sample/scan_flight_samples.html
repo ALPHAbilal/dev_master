@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pill flight — pick one</title>
+<!--
+  FLIGHT SAMPLER — the same log→bag pill travel, seven ways. Pick one; I wire it into the stage.
+  Uses the Web Animations API so each effect works from live coordinates.
+-->
+<style>
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+:root{
+  --ink:#1e2024; --ink-2:#4a4d53; --ink-3:#7a7d84; --ink-4:#a8a6a0;
+  --canvas:#f4f4f2; --surface:#ffffff; --field:#f3f2ef; --hover-2:#e9e8e4;
+  --line:#e2e0d9; --line-strong:#d3d1c9;
+  --accent:#4f7290; --accent-tint:rgba(79,114,144,0.13); --accent-ink:#385876;
+  --r-chip:9999px; --r-ctrl:7px; --r-box:16px;
+  --ease:cubic-bezier(0.23,1,0.32,1);
+  --ui:"Segoe UI",Tahoma,sans-serif; --mono:"Cascadia Code","JetBrains Mono","SF Mono","Consolas",monospace;
+}
+body{ background:var(--canvas); color:var(--ink); font-family:var(--ui); -webkit-font-smoothing:antialiased; line-height:1.5; padding:34px; }
+.wrap{ max-width:900px; margin:0 auto; }
+h1{ font-size:20px; font-weight:600; margin-bottom:4px; }
+.lede{ font-size:12.5px; color:var(--ink-3); margin-bottom:22px; }
+
+.effects{ display:flex; flex-wrap:wrap; gap:7px; margin-bottom:8px; }
+.eff{ font-size:12px; font-weight:500; padding:7px 14px; border-radius:var(--r-chip); background:var(--surface); border:1px solid var(--line); color:var(--ink-2); cursor:pointer; transition:all 120ms; }
+.eff:hover{ border-color:var(--line-strong); color:var(--ink); }
+.eff.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+.eff-desc{ font-size:12px; color:var(--ink-3); min-height:20px; margin-bottom:16px; }
+.eff-desc b{ color:var(--ink-2); }
+
+.controls{ display:flex; gap:9px; margin-bottom:18px; }
+.btn{ display:inline-flex; align-items:center; gap:8px; padding:9px 16px; border-radius:var(--r-ctrl); font-size:12.5px; font-weight:600; cursor:pointer; transition:all 120ms; }
+.btn.primary{ background:var(--accent); color:#fff; } .btn.primary:hover{ background:#5b82a3; }
+.btn.ghost{ background:var(--surface); border:1px solid var(--line); color:var(--ink-2); } .btn.ghost:hover{ background:var(--hover-2); color:var(--ink); }
+.btn svg{ width:14px; height:14px; }
+
+.demo{ display:grid; grid-template-columns:280px 1fr; gap:16px; height:420px; }
+.box{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r-box); display:flex; flex-direction:column; overflow:hidden; }
+.box-label{ font-size:10px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--ink-4); padding:14px 17px 9px; }
+.log-list{ padding:2px 17px 16px; display:flex; flex-direction:column; gap:3px; flex:1; overflow:hidden; }
+.chip{ display:flex; align-items:center; gap:9px; font-family:var(--mono); font-size:11.5px; line-height:1.9; color:var(--ink-2); }
+.chip .ic{ color:var(--accent-ink); } .chip .arg{ color:var(--ink-4); } .chip.spent{ opacity:0.4; }
+.bag{ flex:1; overflow-y:auto; padding:8px 24px 18px; display:flex; flex-direction:column; align-items:flex-start; gap:5px; }
+
+.pill{ display:inline-flex; align-items:center; gap:9px; padding:8px 15px 8px 12px; border-radius:var(--r-chip);
+  background:var(--surface); border:1px solid var(--line-strong);
+  transform:translateX(var(--dx,0)) rotate(var(--rot,0deg)); transform-origin:left center; }
+.pill.land{ animation:land 300ms var(--ease) both; }
+@keyframes land{ 0%{transform:translateX(var(--dx,0)) rotate(0deg) scale(1.06);} 100%{transform:translateX(var(--dx,0)) rotate(var(--rot,0deg)) scale(1);} }
+.g{ width:14px; height:14px; flex-shrink:0; position:relative; border-radius:50%; background:var(--accent-tint); }
+.g::after{ content:""; position:absolute; inset:0; background:var(--accent); border-radius:50%;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23000' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round' d='M20 6L9 17l-5-5'/%3E%3C/svg%3E") center/12px no-repeat; }
+.slug{ font-family:var(--mono); font-size:13px; color:var(--ink); white-space:nowrap; }
+
+.flyer{ position:fixed; z-index:60; display:inline-flex; align-items:center; gap:9px; padding:8px 15px 8px 12px; border-radius:var(--r-chip);
+  background:var(--surface); border:1px solid var(--accent); box-shadow:0 8px 22px rgba(79,114,144,0.22); pointer-events:none; will-change:transform,opacity; }
+.flyer .g{ background:var(--accent-tint); } .flyer .slug{ font-family:var(--mono); font-size:13px; }
+.flyer.trail{ opacity:0.5; box-shadow:none; border-color:var(--line-strong); }
+@media (prefers-reduced-motion:reduce){ *{ animation:none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Pill flight — pick one</h1>
+  <div class="lede">The same log→bag travel, seven ways. Click an effect, then <b>Fly</b> — or turn on auto-cycle to watch them loop. Tell me the winner.</div>
+
+  <div class="effects" id="effects"></div>
+  <div class="eff-desc" id="effDesc"></div>
+
+  <div class="controls">
+    <button class="btn primary" id="flyBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg> Fly a pill</button>
+    <button class="btn ghost" id="cycleBtn">Auto-cycle: off</button>
+    <button class="btn ghost" id="resetBtn">Reset bag</button>
+  </div>
+
+  <div class="demo">
+    <div class="box">
+      <div class="box-label">Agent log</div>
+      <div class="log-list" id="logList"></div>
+    </div>
+    <div class="box">
+      <div class="box-label">Bag of units</div>
+      <div class="bag" id="bag"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const bag=document.getElementById("bag"), logList=document.getElementById("logList"), effectsEl=document.getElementById("effects"), effDesc=document.getElementById("effDesc");
+const SLUGS=["load_prompts","normalize_row","_pinned_qa_group","dedupe_by_id","build_batch","resolve_axis","merge_stack","emit_record"];
+const DX=[0,10,4,14,2,12,6,16], ROT=[-3.5,2.5,-1.5,3,-2.5,1.5,-3,2];
+let n=0, busy=false;
+
+const EFFECTS={
+  glide:{ label:"Glide", desc:"Straight ease from log to slot. Calm, direct.",
+    frames:(dx,dy)=>[{transform:"translate(0,0)"},{transform:`translate(${dx}px,${dy}px)`}], opts:{duration:460,easing:"cubic-bezier(.23,1,.32,1)"} },
+  arc:{ label:"Arc toss", desc:"Rises then drops into the bag — like tossing it in.",
+    frames:(dx,dy)=>[{transform:"translate(0,0)"},{transform:`translate(${dx*0.5}px,${dy*0.5-72}px)`,offset:0.5},{transform:`translate(${dx}px,${dy}px)`}], opts:{duration:560,easing:"ease-in-out"} },
+  swoop:{ label:"Swoop", desc:"Overshoots right, then curves back into the slot.",
+    frames:(dx,dy)=>[{transform:"translate(0,0)"},{transform:`translate(${dx+60}px,${dy*0.35}px)`,offset:0.55},{transform:`translate(${dx}px,${dy}px)`}], opts:{duration:620,easing:"cubic-bezier(.5,0,.2,1)"} },
+  shrink:{ label:"Shrink-slot", desc:"Scales down as it travels, then pops to size on landing.",
+    frames:(dx,dy)=>[{transform:"translate(0,0) scale(1)"},{transform:`translate(${dx}px,${dy}px) scale(0.82)`}], opts:{duration:480,easing:"cubic-bezier(.4,0,.2,1)"} },
+  drop:{ label:"Drop-in", desc:"Lifts out of the log, then falls vertically into place.",
+    frames:(dx,dy)=>[{transform:"translate(0,0)"},{transform:`translate(${dx}px,${dy-56}px)`,offset:0.42},{transform:`translate(${dx}px,${dy}px)`}], opts:{duration:600,easing:"cubic-bezier(.3,.8,.3,1)"} },
+  trail:{ label:"Streak", desc:"Fast glide leaving faint afterimages behind it.",
+    frames:(dx,dy)=>[{transform:"translate(0,0)"},{transform:`translate(${dx}px,${dy}px)`}], opts:{duration:360,easing:"cubic-bezier(.4,0,.1,1)"}, trail:true },
+  fade:{ label:"Fade-drift", desc:"Barely travels — fades out at the log, fades in at the slot. Quietest.",
+    frames:(dx,dy)=>[{transform:"translate(0,0)",opacity:1},{transform:`translate(${dx*0.3}px,${dy*0.3}px)`,opacity:0}], opts:{duration:300,easing:"ease-out"}, fadeIn:true },
+};
+let current="arc";
+
+Object.entries(EFFECTS).forEach(([key,e])=>{
+  const b=document.createElement("button"); b.className="eff"+(key===current?" on":""); b.textContent=e.label; b.dataset.k=key;
+  b.onclick=()=>{ current=key; effectsEl.querySelectorAll(".eff").forEach(x=>x.classList.toggle("on",x.dataset.k===key)); effDesc.innerHTML="<b>"+e.label+"</b> — "+e.desc; };
+  effectsEl.appendChild(b);
+});
+effDesc.innerHTML="<b>"+EFFECTS[current].label+"</b> — "+EFFECTS[current].desc;
+
+function seedLog(){
+  logList.innerHTML="";
+  [["read_code_slice","L1–40"],["search_repository",'"entrypoints"'],["read_code_slice","L40–120"]].forEach((t,i)=>{
+    const el=document.createElement("div"); el.className="chip"+(i<2?" spent":""); el.innerHTML=`<span class="ic">⌁</span>${t[0]} <span class="arg">${t[1]}</span>`; logList.appendChild(el);
+  });
+}
+function makePill(i){
+  const el=document.createElement("div"); el.className="pill";
+  el.style.setProperty("--dx",DX[i%DX.length]+"px"); el.style.setProperty("--rot",ROT[i%ROT.length]+"deg");
+  el.innerHTML=`<span class="g"></span><span class="slug">${SLUGS[i%SLUGS.length]}</span>`; return el;
+}
+async function fly(){
+  if(busy) return; busy=true;
+  const idx=n++; const e=EFFECTS[current];
+  const pill=makePill(idx); pill.style.visibility="hidden"; bag.appendChild(pill);
+  const to=pill.getBoundingClientRect(), lb=document.querySelectorAll(".box")[0].getBoundingClientRect();
+  const flyer=makePill(idx); flyer.className="flyer";
+  flyer.style.left=(lb.right-46)+"px"; flyer.style.top=(lb.top+lb.height*0.42)+"px";
+  document.body.appendChild(flyer);
+  const fr=flyer.getBoundingClientRect();
+  const dx=to.left-fr.left, dy=to.top-fr.top;
+
+  if(e.trail){
+    for(let k=1;k<=3;k++) setTimeout(()=>{
+      const t=makePill(idx); t.className="flyer trail";
+      t.style.left=flyer.style.left; t.style.top=flyer.style.top;
+      document.body.appendChild(t);
+      t.animate(e.frames(dx,dy),{duration:e.opts.duration,easing:e.opts.easing}).finished.then(()=>t.remove());
+      t.animate([{opacity:0.45},{opacity:0}],{duration:e.opts.duration,easing:"ease-out"});
+    }, k*55);
+  }
+  const anim=flyer.animate(e.frames(dx,dy), e.opts);
+  await anim.finished;
+  flyer.remove();
+  pill.style.visibility="visible";
+  if(e.fadeIn){ pill.animate([{opacity:0,transform:`translateX(${DX[idx%DX.length]}px) translateY(6px) rotate(${ROT[idx%ROT.length]}deg)`},{opacity:1,transform:`translateX(${DX[idx%DX.length]}px) translateY(0) rotate(${ROT[idx%ROT.length]}deg)`}],{duration:260,easing:"ease-out"}); }
+  else pill.classList.add("land");
+  if(bag.children.length>7) setTimeout(reset,500);
+  busy=false;
+}
+function reset(){ bag.innerHTML=""; n=0; }
+
+document.getElementById("flyBtn").onclick=fly;
+document.getElementById("resetBtn").onclick=reset;
+let cycle=null;
+document.getElementById("cycleBtn").onclick=(ev)=>{
+  if(cycle){ clearInterval(cycle); cycle=null; ev.target.textContent="Auto-cycle: off"; }
+  else {
+    ev.target.textContent="Auto-cycle: on";
+    const keys=Object.keys(EFFECTS); let ci=keys.indexOf(current);
+    cycle=setInterval(()=>{ if(busy) return; current=keys[ci%keys.length]; ci++;
+      effectsEl.querySelectorAll(".eff").forEach(x=>x.classList.toggle("on",x.dataset.k===current));
+      effDesc.innerHTML="<b>"+EFFECTS[current].label+"</b> — "+EFFECTS[current].desc; fly();
+    }, 1100);
+  }
+};
+
+seedLog();
+</script>
+</body>
+</html>

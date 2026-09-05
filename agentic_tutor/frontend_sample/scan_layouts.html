@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MAPPER scan — layout possibility space</title>
+<!--
+  LAYOUT EXPLORER (schematic, not product). First-principles → pillars → candidate skeletons.
+  The subject is STRUCTURE: where NAV / ACTIVITY / LADDER / STATUS sit, given their lifespans.
+  Boxes + labels only, on purpose. Pick the skeletons to develop into the 5 full variations.
+-->
+<style>
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+:root{
+  --bg-deepest:#ffffff; --bg-app:#f4f4f2; --bg-surface:#ebeae6; --bg-card:#e3e1db; --bg-elevated:#d8d6cf; --bg-hover:#cfccc3;
+  --text-primary:#1e2024; --text-secondary:#4a4d53; --text-muted:#7a7d84; --text-disabled:#a8a6a0;
+  --accent:#4f7290; --accent-dim:#385876; --accent-soft:rgba(79,114,144,0.14);
+  --font-ui:"Segoe UI",Tahoma,sans-serif; --font-code:"Cascadia Code","JetBrains Mono","SF Mono","Consolas",monospace;
+  /* region colors — consistent across every wireframe */
+  --nav:#d8d6cf; --nav-ink:#7a7d84;
+  --act:rgba(56,88,118,0.16); --act-ink:#385876;      /* ephemeral = hatched blue */
+  --lad:rgba(79,114,144,0.10); --lad-ink:#4f7290;      /* result = soft solid */
+  --stat:#ebeae6; --stat-ink:#7a7d84;
+}
+body{ background:var(--bg-app); color:var(--text-primary); font-family:var(--font-ui); line-height:1.5; padding:40px 32px 80px; }
+.wrap{ max-width:1180px; margin:0 auto; }
+
+h1{ font-size:22px; font-weight:600; letter-spacing:-0.01em; margin-bottom:6px; }
+.lede{ font-size:13px; color:var(--text-muted); max-width:680px; line-height:1.6; margin-bottom:30px; }
+.lede b{ color:var(--text-secondary); font-weight:600; }
+.sec-label{ font-family:var(--font-code); font-size:10px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-disabled); margin:0 0 14px; }
+
+/* legend */
+.legend{ display:flex; flex-wrap:wrap; gap:10px 22px; padding:16px 18px; background:var(--bg-deepest); border-radius:12px; margin-bottom:34px; }
+.leg{ display:flex; align-items:center; gap:9px; font-size:12px; color:var(--text-secondary); }
+.leg .sw{ width:26px; height:16px; border-radius:4px; flex-shrink:0; }
+.leg .sw.nav{ background:var(--nav); }
+.leg .sw.act{ background:var(--act); background-image:repeating-linear-gradient(45deg,transparent 0 4px,rgba(56,88,118,0.18) 4px 5px); }
+.leg .sw.lad{ background:var(--lad); box-shadow:inset 0 0 0 1.5px rgba(79,114,144,0.4); }
+.leg .sw.stat{ background:var(--stat); }
+.leg b{ color:var(--text-primary); font-weight:600; }
+.leg .life{ color:var(--text-muted); font-size:11px; }
+
+/* pillars */
+.pillars{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-bottom:44px; }
+.pillar{ background:var(--bg-deepest); border-radius:12px; padding:15px 16px; }
+.pillar h3{ font-family:var(--font-code); font-size:11px; font-weight:700; letter-spacing:0.06em; color:var(--text-primary); margin-bottom:4px; }
+.pillar .sub{ font-size:11px; color:var(--text-muted); margin-bottom:10px; line-height:1.4; }
+.opts{ display:flex; flex-wrap:wrap; gap:5px; }
+.opt{ font-family:var(--font-code); font-size:10.5px; padding:3px 9px; border-radius:9999px; background:var(--bg-surface); color:var(--text-secondary); }
+.pillar.fixed .opt{ background:var(--accent-soft); color:var(--accent-dim); }
+
+/* skeleton grid */
+.grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:20px; }
+.tile{ background:var(--bg-deepest); border-radius:14px; overflow:hidden; transition:box-shadow 150ms ease, transform 150ms ease; }
+.tile:hover{ box-shadow:0 8px 30px rgba(0,0,0,0.08); transform:translateY(-2px); }
+.tile-head{ display:flex; align-items:baseline; gap:9px; padding:14px 16px 0; }
+.tile-head .id{ font-family:var(--font-code); font-size:11px; font-weight:700; color:var(--accent-dim); }
+.tile-head .name{ font-size:14px; font-weight:600; }
+.tile-head .flag{ margin-left:auto; font-size:9px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; padding:2px 7px; border-radius:9999px; }
+.flag.avoid{ color:#9a4a2a; background:rgba(181,101,29,0.14); }
+.flag.pick{ color:var(--accent-dim); background:var(--accent-soft); }
+
+/* the wireframe canvas — fixed aspect so all skeletons compare 1:1 */
+.wire{ margin:12px 16px; aspect-ratio:16/10; border-radius:10px; background:var(--bg-app); display:flex; overflow:hidden; box-shadow:inset 0 0 0 1px var(--bg-elevated); }
+.r{ display:flex; align-items:center; justify-content:center; font-family:var(--font-code); font-size:9px; font-weight:700; letter-spacing:0.06em; position:relative; }
+.r.nav{ background:var(--nav); color:var(--nav-ink); flex:0 0 44px; flex-direction:column; gap:4px; }
+.r.nav .n-item{ width:70%; height:5px; border-radius:2px; background:rgba(0,0,0,0.10); }
+.r.nav .n-item.sub{ width:52%; margin-left:14%; background:rgba(79,114,144,0.30); }
+.r.act{ color:var(--act-ink); background:var(--act); background-image:repeating-linear-gradient(45deg,transparent 0 5px,rgba(56,88,118,0.14) 5px 6px); }
+.r.lad{ color:var(--lad-ink); background:var(--lad); box-shadow:inset 0 0 0 1.5px rgba(79,114,144,0.32); flex-direction:column; gap:5px; padding:8px; }
+.r.lad .l-row{ width:100%; height:7px; border-radius:3px; background:rgba(79,114,144,0.22); }
+.r.lad .l-row.done{ background:rgba(79,114,144,0.5); }
+.r.lad .l-row.now{ background:rgba(79,114,144,0.5); box-shadow:0 0 0 1.5px rgba(79,114,144,0.4); }
+.r.lad .l-row.pend{ background:rgba(79,114,144,0.14); }
+.r.stat{ background:var(--stat); color:var(--stat-ink); flex:0 0 20px; }
+.col{ display:flex; flex-direction:column; flex:1; min-width:0; }
+.row{ display:flex; flex:1; min-width:0; }
+/* overlay / peripheral bits */
+.float{ position:absolute; border-radius:6px; background:var(--act); background-image:repeating-linear-gradient(45deg,transparent 0 5px,rgba(56,88,118,0.16) 5px 6px); box-shadow:0 3px 10px rgba(0,0,0,0.12); display:flex; align-items:center; justify-content:center; color:var(--act-ink); font-family:var(--font-code); font-size:8px; font-weight:700; }
+.inline-tag{ position:absolute; font-family:var(--font-code); font-size:8px; color:var(--act-ink); }
+
+.tile-body{ padding:0 16px 16px; }
+.choices{ display:flex; flex-wrap:wrap; gap:4px; margin-bottom:9px; }
+.choices .c{ font-family:var(--font-code); font-size:9.5px; padding:2px 7px; border-radius:5px; background:var(--bg-surface); color:var(--text-muted); }
+.feel{ font-size:12px; color:var(--text-secondary); line-height:1.5; }
+.feel b{ color:var(--text-primary); font-weight:600; }
+
+.foot{ margin-top:44px; padding:18px 20px; background:var(--bg-deepest); border-radius:12px; font-size:12.5px; color:var(--text-secondary); line-height:1.6; }
+.foot b{ color:var(--text-primary); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>MAPPER scan — layout possibility space</h1>
+  <div class="lede">Derived from first principles: an agent doing <b>timed work</b> that produces a <b>growing ordered list</b>. Four elements, four lifespans. The design error to avoid: giving <b>permanent space to an ephemeral thing</b> (the activity log). Each skeleton below is a point in the pillar space — schematic on purpose. Pick the ones to build out.</div>
+
+  <div class="sec-label">The four elements · lifespan is the constraint</div>
+  <div class="legend">
+    <div class="leg"><span class="sw nav"></span><b>NAV</b><span class="life">permanent · one</span></div>
+    <div class="leg"><span class="sw act"></span><b>ACTIVITY</b><span class="life">ephemeral · high churn — the agent “now”</span></div>
+    <div class="leg"><span class="sw lad"></span><b>LADDER</b><span class="life">permanent · ordered — the result</span></div>
+    <div class="leg"><span class="sw stat"></span><b>STATUS</b><span class="life">ambient · one</span></div>
+  </div>
+
+  <div class="sec-label">The pillars · the generator</div>
+  <div class="pillars">
+    <div class="pillar"><h3>1 · LOCUS</h3><div class="sub">where the ladder grows</div><div class="opts"><span class="opt">center</span><span class="opt">full-bleed</span><span class="opt">beside-log</span><span class="opt">in-sidebar</span></div></div>
+    <div class="pillar"><h3>2 · ACTIVITY↔RESULT</h3><div class="sub">spatial relation of the two</div><div class="opts"><span class="opt">stacked</span><span class="opt">adjacent</span><span class="opt">inline-evaporate</span><span class="opt">peripheral</span><span class="opt">overlay</span></div></div>
+    <div class="pillar"><h3>3 · READING AXIS</h3><div class="sub">direction of dependency order</div><div class="opts"><span class="opt">vertical</span><span class="opt">horizontal</span><span class="opt">radial</span></div></div>
+    <div class="pillar"><h3>4 · FOCUS</h3><div class="sub">attention model</div><div class="opts"><span class="opt">equal-weight list</span><span class="opt">single-focus theater</span></div></div>
+    <div class="pillar"><h3>5 · ACTIVITY LIFESPAN</h3><div class="sub">what happens to the log</div><div class="opts"><span class="opt">persists</span><span class="opt">evaporates</span><span class="opt">collapses-to-0</span></div></div>
+    <div class="pillar fixed"><h3>6 · MOTION</h3><div class="sub">fixed constraint</div><div class="opts"><span class="opt">state-change only</span><span class="opt">no heartbeat</span><span class="opt">no colored edges</span></div></div>
+  </div>
+
+  <div class="sec-label">Candidate skeletons · 8 points in the space</div>
+  <div class="grid" id="grid"></div>
+
+  <div class="foot">
+    <b>How to read these:</b> every skeleton is the same four regions, arranged differently. The question each answers is <b>“how much permanence does the ephemeral activity get?”</b> — from S1 (a whole strip) down to S2/S5 (near zero). Tell me which numbers to turn into the 5 full MAPPER variations — or name a pillar combination I didn’t draw and I’ll add it.
+  </div>
+</div>
+
+<script>
+"use strict";
+/* Each skeleton is described declaratively, then drawn as a labeled wireframe. */
+const L = {
+  navCol: `<div class="r nav"><div class="n-item"></div><div class="n-item sub"></div><div class="n-item sub"></div><div class="n-item"></div><div class="n-item sub"></div></div>`,
+  ladder: (o={}) => `<div class="r lad">${
+    (o.rows||["done","done","now","pend","pend"]).map(s=>`<div class="l-row ${s}"></div>`).join("")}</div>`,
+};
+
+const SKELETONS = [
+  { id:"S1", name:"Stacked strip", flag:"avoid",
+    choices:["locus: center","act: stacked","axis: vertical","life: collapses"],
+    feel:"<b>What we have.</b> Activity owns a full strip on top; the ladder is pushed down. Ephemeral thing, permanent real-estate — the error.",
+    wire:`${L.navCol}<div class="col"><div class="r act" style="flex:0 0 30%;">ACTIVITY</div>${L.ladder()}</div>` },
+
+  { id:"S2", name:"Inline-evaporate", flag:"pick",
+    choices:["locus: center","act: inline","axis: vertical","life: evaporates"],
+    feel:"Ladder owns the stage. The agent’s current read <b>attaches to the forming row</b>, then vanishes. Activity gets <b>zero</b> permanent space.",
+    wire:`${L.navCol}<div class="col"><div class="r lad" style="position:relative;"><div class="l-row done"></div><div class="l-row done"></div><div class="l-row now"></div><span class="inline-tag" style="top:44%;right:8px;">⌁ read L42–46</span><div class="l-row pend"></div><div class="l-row pend"></div></div></div>` },
+
+  { id:"S3", name:"Two-pane lifespans", flag:"",
+    choices:["locus: beside-log","act: adjacent","axis: vertical","life: persists"],
+    feel:"Split by lifespan: <b>live console left, result right</b>. Honest separation — but gives activity a permanent column it doesn’t earn once done.",
+    wire:`${L.navCol}<div class="row"><div class="r act" style="flex:1;">ACTIVITY</div>${L.ladder({rows:["done","now","pend","pend"]})}</div>` },
+
+  { id:"S4", name:"Stage + edge ticker", flag:"pick",
+    choices:["locus: full-bleed","act: peripheral","axis: vertical","life: collapses"],
+    feel:"Ladder is the whole stage. Activity is a <b>thin ticker at the bottom edge</b> — present but subordinate, gone when the scan ends.",
+    wire:`${L.navCol}<div class="col">${L.ladder({rows:["done","done","now","pend","pend"]})}<div class="r act" style="flex:0 0 16px;">⌁ ticker</div></div>` },
+
+  { id:"S5", name:"HUD overlay", flag:"",
+    choices:["locus: full-bleed","act: overlay","axis: vertical","life: evaporates"],
+    feel:"Ladder full-bleed. Activity <b>floats as a dismissible HUD</b> in a corner and disappears on completion. Max result, activity truly weightless.",
+    wire:`${L.navCol}<div class="col" style="position:relative;">${L.ladder()}<div class="float" style="right:10px;top:10px;width:38%;height:26%;">MAPPER ⌁</div></div>` },
+
+  { id:"S6", name:"Identity header", flag:"",
+    choices:["locus: center","act: inline","axis: vertical","focus: list"],
+    feel:"A quiet <b>status/identity band</b> (file · n/total) sits above the ladder; activity stays inline on the forming row. Calm, document-like.",
+    wire:`${L.navCol}<div class="col"><div class="r stat" style="flex:0 0 22px;">run_prompts · 3/24</div>${L.ladder()}</div>` },
+
+  { id:"S7", name:"Horizontal spine", flag:"",
+    choices:["locus: full-bleed","axis: horizontal","act: peripheral","focus: list"],
+    feel:"Dependency order reads <b>left→right</b> as a spine; nodes land as formed; activity sits under the active node. Graphic, unusual, still minimal.",
+    wire:`${L.navCol}<div class="col"><div class="r lad" style="flex-direction:row; align-items:center; gap:8px;"><div class="l-row done" style="width:14%;height:10px;"></div><div class="l-row done" style="width:14%;height:10px;"></div><div class="l-row now" style="width:14%;height:10px;"></div><div class="l-row pend" style="width:14%;height:10px;"></div><div class="l-row pend" style="width:14%;height:10px;"></div></div><div class="r act" style="flex:0 0 26%;">ACTIVITY · under active node</div></div>` },
+
+  { id:"S8", name:"Focus theater", flag:"",
+    choices:["locus: center","focus: theater","act: inline","axis: vertical"],
+    feel:"One <b>big focus zone</b> shows the unit forming now; resolved units collapse to a quiet rail on the side. Cinematic single-attention.",
+    wire:`${L.navCol}<div class="row"><div class="r lad" style="flex:0 0 34px; gap:4px;"><div class="l-row done" style="height:5px;"></div><div class="l-row done" style="height:5px;"></div><div class="l-row pend" style="height:5px;"></div></div><div class="r act" style="flex:1; background:var(--lad); background-image:none; box-shadow:inset 0 0 0 1.5px rgba(79,114,144,0.32); color:var(--lad-ink);">FORMING NOW</div></div>` },
+];
+
+const grid = document.getElementById("grid");
+SKELETONS.forEach(s=>{
+  const t=document.createElement("div"); t.className="tile";
+  const flag = s.flag==="avoid" ? `<span class="flag avoid">avoid</span>`
+             : s.flag==="pick"  ? `<span class="flag pick">strong</span>` : "";
+  t.innerHTML =
+    `<div class="tile-head"><span class="id">${s.id}</span><span class="name">${s.name}</span>${flag}</div>
+     <div class="wire">${s.wire}</div>
+     <div class="tile-body">
+       <div class="choices">${s.choices.map(c=>`<span class="c">${c}</span>`).join("")}</div>
+       <div class="feel">${s.feel}</div>
+     </div>`;
+  grid.appendChild(t);
+});
+</script>
+</body>
+</html>
