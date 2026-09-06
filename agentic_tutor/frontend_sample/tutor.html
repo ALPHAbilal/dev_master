@@ -301,7 +301,9 @@ textarea { border: none; outline: none; }
  * tray (removable), then shown as small rounded chips under the sent message. */
 .ref-tray { display:flex; flex-wrap:wrap; gap:6px; padding:0 4px 2px; }
 .ref-tray:empty { display:none; }
-.ref-chip { display:inline-flex; align-items:center; gap:6px; max-width:230px; height:24px; padding:0 4px 0 8px; border-radius:999px; background:var(--bg-surface); border:1px solid var(--bg-elevated); font-size:11px; color:var(--text-secondary); }
+.ref-chip { display:inline-flex; align-items:center; gap:6px; max-width:230px; height:24px; padding:0 4px 0 8px; border-radius:999px; background:var(--bg-surface); border:1px solid var(--bg-elevated); font-size:11px; color:var(--text-secondary); cursor:pointer; transition:border-color 120ms, background 120ms; }
+.ref-chip:hover { border-color:var(--accent-dim); }
+.ref-chip.open { border-color:var(--accent); background:var(--accent-soft); }
 .ref-chip .rc-ic { flex-shrink:0; width:12px; height:12px; color:var(--text-muted); display:grid; place-items:center; }
 .ref-chip .rc-ic svg { width:12px; height:12px; display:block; }
 .ref-chip .rc-lb { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-family:var(--font-code); }
@@ -312,6 +314,13 @@ textarea { border: none; outline: none; }
 .msg-refs { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
 .turn.learner .msg-refs { justify-content:flex-end; }
 .msg-refs .ref-chip { padding:0 8px; background:var(--bg-app); }
+/* preview card — shows the exact highlighted text a chip points to */
+.ref-pop { position:fixed; z-index:70; max-width:360px; background:var(--bg-deepest); border:1px solid var(--bg-elevated); border-radius:10px; box-shadow:0 8px 26px rgba(0,0,0,0.16); padding:9px 11px; }
+.ref-pop .rp-src { display:flex; align-items:center; gap:6px; font-size:9.5px; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:var(--text-disabled); margin-bottom:6px; }
+.ref-pop .rp-src svg { width:11px; height:11px; display:block; }
+.ref-pop pre { margin:0; font-family:var(--font-code); font-size:12px; line-height:1.55; color:var(--text-secondary); white-space:pre; overflow:auto; max-height:220px; max-width:338px; }
+.ref-pop pre::-webkit-scrollbar { height:8px; width:8px; }
+.ref-pop pre::-webkit-scrollbar-thumb { background:var(--bg-elevated); border-radius:999px; }
 
 /* ─── RIGHT — editor / codebase / metadata ───────────────────────────────── */
 .right { position:relative; background:var(--bg-deepest); display:flex; flex-direction:column; min-width:0; overflow:hidden; }
@@ -345,16 +354,21 @@ textarea { border: none; outline: none; }
 /* header left edge matches the tree rows' base indent (10px) so the caret column lines up */
 .explorer-head { flex-shrink:0; display:flex; align-items:center; gap:8px; height:36px; padding:0 10px; font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); cursor:pointer; user-select:none; }
 .explorer-head:hover { color:var(--text-secondary); }
-.explorer-head .ex-caret { font-size:9px; transition:transform 150ms ease; }
-.explorer.collapsed .ex-caret { transform:rotate(-90deg); }
+/* caret = SVG chevron in a fixed, grid-centered box → rotates cleanly about its
+ * own centre (a text glyph rotates around an off-centre box and visibly drifts) */
+.explorer-head .ex-caret { width:14px; height:14px; flex-shrink:0; display:grid; place-items:center; transform:rotate(90deg); transition:transform 160ms ease; }
+.explorer-head .ex-caret svg { width:10px; height:10px; display:block; }
+.explorer.collapsed .ex-caret { transform:rotate(0deg); }
 .ex-tree { flex:1; overflow:auto; padding:2px 0 8px; }
 /* fixed 28px row, vertically centered (not vertical padding) so icon + text share a line;
  * the left indent is set per-row in JS (base 10 + 14 per depth) */
 .ex-row { display:flex; align-items:center; gap:8px; height:28px; padding:0 10px; cursor:pointer; font-family:var(--font-code); font-size:13px; color:var(--text-secondary); transition:var(--transition-fast); }
 .ex-row:hover { background:var(--bg-surface); }
 .ex-row.on { background:var(--accent-soft); color:var(--text-primary); }
-.ex-caret2 { width:11px; flex-shrink:0; font-size:9px; color:var(--text-muted); transition:transform 150ms ease; }
-.ex-folder.closed > .ex-row .ex-caret2 { transform:rotate(-90deg); }
+.ex-caret2 { width:14px; height:14px; flex-shrink:0; display:grid; place-items:center; color:var(--text-muted); transition:transform 160ms ease; }
+.ex-caret2 svg { width:10px; height:10px; display:block; }
+/* open folder → chevron points down (rotate 90 from the right-pointing base); closed → right */
+.ex-folder:not(.closed) > .ex-row .ex-caret2 { transform:rotate(90deg); }
 .ex-folder.closed > .ex-children { display:none; }
 .ex-file .ex-caret2 { visibility:hidden; }
 .ex-svg { flex-shrink:0; display:block; }
@@ -516,7 +530,7 @@ textarea { border: none; outline: none; }
 
     <div class="rview" id="rview-codebase">
       <div class="explorer" id="cbExplorer">
-        <div class="explorer-head" id="cbExplorerHead"><span class="ex-caret">▾</span><span class="ex-label">Explorer</span></div>
+        <div class="explorer-head" id="cbExplorerHead"><span class="ex-caret"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span><span class="ex-label">Explorer</span></div>
         <div class="ex-tree" id="cbTree"></div>
       </div>
       <div class="cb-code">
@@ -758,10 +772,13 @@ const REF_ICON={
 };
 let pendingRefs=[];
 const refTray=document.getElementById('refTray');
-/* one chip; removable=true adds the × used in the composer tray (omitted for static under-message chips) */
+/* attribute-safe escaping so a snippet (quotes/newlines) survives inside data-* */
+const escAttr=s=>esc(s).replace(/"/g,'&quot;');
+/* one chip; removable=true adds the × used in the composer tray (omitted for static
+ * under-message chips). Clicking the chip body previews the exact highlighted text. */
 function refChip(ref, removable){
   const x=removable?`<span class="rc-x" title="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></span>`:'';
-  return `<span class="ref-chip" title="${esc(ref.snippet||ref.label)}"><span class="rc-ic">${REF_ICON[ref.kind]||REF_ICON.convo}</span><span class="rc-lb">${esc(ref.label)}</span>${x}</span>`;
+  return `<span class="ref-chip" data-kind="${ref.kind}" data-label="${escAttr(ref.label)}" data-snip="${escAttr(ref.snippet||ref.label)}"><span class="rc-ic">${REF_ICON[ref.kind]||REF_ICON.convo}</span><span class="rc-lb">${esc(ref.label)}</span>${x}</span>`;
 }
 function renderRefTray(){
   refTray.innerHTML=pendingRefs.map(r=>refChip(r,true)).join('');
@@ -769,6 +786,32 @@ function renderRefTray(){
   if(typeof syncSend==='function') syncSend();
 }
 function addRef(ref){ pendingRefs.push(ref); renderRefTray(); chatInput.focus(); }
+
+/* click any chip (staged or already sent) to preview the exact highlighted text.
+ * One shared popover — a quiet card echoing the aside-quote look — toggled per chip. */
+const REF_SRC={ code:'codebase', test:'test file', convo:'conversation' };
+let refPop=null, refPopAnchor=null;
+function closeRefPop(){ if(refPop){ refPop.remove(); refPop=null; } if(refPopAnchor){ refPopAnchor.classList.remove('open'); refPopAnchor=null; } }
+function openRefPop(chip){
+  closeRefPop();
+  const kind=chip.dataset.kind, snip=chip.dataset.snip||'', label=chip.dataset.label||REF_SRC[kind]||'';
+  refPop=document.createElement('div'); refPop.className='ref-pop';
+  refPop.innerHTML=`<div class="rp-src">${REF_ICON[kind]||REF_ICON.convo}<span>${esc(label)}</span></div><pre>${esc(snip)}</pre>`;
+  document.body.appendChild(refPop);
+  const r=chip.getBoundingClientRect(), pr=refPop.getBoundingClientRect();
+  let left=Math.max(8,Math.min(r.left+r.width/2-pr.width/2, window.innerWidth-pr.width-8));
+  let top=r.top-pr.height-8; if(top<8) top=r.bottom+8;
+  refPop.style.left=left+'px'; refPop.style.top=top+'px';
+  chip.classList.add('open'); refPopAnchor=chip;
+}
+document.addEventListener('click',e=>{
+  const chip=e.target.closest('.ref-chip');
+  if(chip && !e.target.closest('.rc-x')){ (chip===refPopAnchor)?closeRefPop():openRefPop(chip); return; }
+  if(refPop && !e.target.closest('.ref-pop')) closeRefPop();
+});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeRefPop(); });
+window.addEventListener('resize',closeRefPop);
+document.addEventListener('scroll',closeRefPop,true);
 
 STREAM.forEach(item=>{
   if(item.t==='msg'){
@@ -997,7 +1040,7 @@ function renderTree(node, depth, parentEl){
     const count=FILES[node.name]?FILES[node.name].units.length:'';
     const row=document.createElement('div'); row.className='ex-row'; row.dataset.path=node.name;
     row.style.paddingLeft=pad+'px';
-    row.innerHTML=`<span class="ex-caret2">▶</span>${ICON_FILE}<span class="ex-name-clip"><span class="ex-name">${esc(node.name)}</span></span>`+
+    row.innerHTML=`<span class="ex-caret2">${CHEV}</span>${ICON_FILE}<span class="ex-name-clip"><span class="ex-name">${esc(node.name)}</span></span>`+
       (count!==''?`<span class="ex-count">${count}</span>`:'');
     row.addEventListener('click',()=>renderCodeFile(node.name));
     attachMarquee(row);
@@ -1006,7 +1049,7 @@ function renderTree(node, depth, parentEl){
   }
   const wrap=document.createElement('div'); wrap.className='ex-folder'+(node.open?'':' closed');
   const row=document.createElement('div'); row.className='ex-row'; row.style.paddingLeft=pad+'px';
-  row.innerHTML=`<span class="ex-caret2">▶</span>${ICON_FOLDER}<span class="ex-name-clip"><span class="ex-name">${esc(node.name)}</span></span>`;
+  row.innerHTML=`<span class="ex-caret2">${CHEV}</span>${ICON_FOLDER}<span class="ex-name-clip"><span class="ex-name">${esc(node.name)}</span></span>`;
   const children=document.createElement('div'); children.className='ex-children';
   (node.children||[]).forEach(c=>renderTree(c,depth+1,children));
   row.addEventListener('click',()=>wrap.classList.toggle('closed'));
