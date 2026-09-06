@@ -112,7 +112,8 @@
       "Read(//home/kingbilal/.claude/skills/**)",
       "Read(//home/kingbilal/.claude/plugins/**)",
       "Read(//home/kingbilal/.claude/**)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(git -C /mnt/c/Users/dell/Desktop/Myprojects/dev_master status --short agentic_tutor)"
     ]
   }
 }
