@@ -256,9 +256,9 @@ textarea { border: none; outline: none; }
 .aside-quote { font-family:var(--font-code); font-size:12px; color:var(--text-secondary); background:var(--bg-deepest); border-left:2px solid var(--bg-hover); border-radius:0 6px 6px 0; padding:6px 10px; white-space:pre; overflow-x:auto; }
 .aside-quote .qf { display:block; font-size:9.5px; letter-spacing:0.06em; color:var(--text-disabled); text-transform:uppercase; margin-bottom:3px; }
 /* same left/right split as the main conversation: learner right (bubble), tutor left (plain) */
-.aside-qa { display:flex; max-width:88%; }
-.aside-qa.learner { align-self:flex-end; }
-.aside-qa.tutor { align-self:flex-start; }
+.aside-qa { display:flex; flex-direction:column; max-width:88%; }
+.aside-qa.learner { align-self:flex-end; align-items:flex-end; }
+.aside-qa.tutor { align-self:flex-start; align-items:flex-start; }
 .aside-qa .say { font-size:13.5px; line-height:1.55; color:var(--text-secondary); }
 .aside-qa.tutor .say { color:var(--text-primary); }
 .aside-qa.learner .say { background:var(--bg-elevated); border-radius:14px 14px 4px 14px; padding:8px 12px; color:var(--text-primary); }
@@ -291,9 +291,27 @@ textarea { border: none; outline: none; }
 .chat-send { width:34px; height:34px; border-radius:50%; background:var(--accent); color:var(--on-accent); display:grid; place-items:center; flex-shrink:0; transition:var(--transition-fast); }
 .chat-send:hover { background:#6a90b0; }
 .chat-send:disabled { background:var(--bg-elevated); color:var(--text-disabled); cursor:default; }
-/* floating "Ask aside" that appears when you select code in the Codebase view */
-.ask-aside-pop { position:fixed; z-index:60; font-size:11px; font-weight:600; color:var(--on-accent); background:var(--accent); border-radius:7px; padding:5px 10px; box-shadow:0 3px 12px rgba(0,0,0,0.20); transform:translateY(-100%); white-space:nowrap; }
+/* floating "Attach" that appears when you select code / a test / a message */
+.ask-aside-pop { position:fixed; z-index:60; display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; color:var(--on-accent); background:var(--accent); border-radius:7px; padding:5px 10px; box-shadow:0 3px 12px rgba(0,0,0,0.20); transform:translateY(-100%); white-space:nowrap; }
 .ask-aside-pop:hover { background:var(--accent-dim); }
+.ask-aside-pop svg { width:12px; height:12px; display:block; }
+
+/* ── highlight references (chips) — a message can pin many highlights, drawn
+ * from the codebase, a test file, or the conversation. Staged in the composer
+ * tray (removable), then shown as small rounded chips under the sent message. */
+.ref-tray { display:flex; flex-wrap:wrap; gap:6px; padding:0 4px 2px; }
+.ref-tray:empty { display:none; }
+.ref-chip { display:inline-flex; align-items:center; gap:6px; max-width:230px; height:24px; padding:0 4px 0 8px; border-radius:999px; background:var(--bg-surface); border:1px solid var(--bg-elevated); font-size:11px; color:var(--text-secondary); }
+.ref-chip .rc-ic { flex-shrink:0; width:12px; height:12px; color:var(--text-muted); display:grid; place-items:center; }
+.ref-chip .rc-ic svg { width:12px; height:12px; display:block; }
+.ref-chip .rc-lb { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-family:var(--font-code); }
+.ref-chip .rc-x { flex-shrink:0; width:15px; height:15px; border-radius:50%; display:grid; place-items:center; color:var(--text-muted); cursor:pointer; }
+.ref-chip .rc-x svg { width:9px; height:9px; display:block; }
+.ref-chip .rc-x:hover { background:var(--bg-elevated); color:var(--text-primary); }
+/* static chips beneath a sent message (no remove control) */
+.msg-refs { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+.turn.learner .msg-refs { justify-content:flex-end; }
+.msg-refs .ref-chip { padding:0 8px; background:var(--bg-app); }
 
 /* ─── RIGHT — editor / codebase / metadata ───────────────────────────────── */
 .right { position:relative; background:var(--bg-deepest); display:flex; flex-direction:column; min-width:0; overflow:hidden; }
@@ -457,6 +475,7 @@ textarea { border: none; outline: none; }
       <div class="convo-scroll"><div class="convo-inner" id="convo"></div></div>
       <div class="chatbar-wrap">
         <div class="composer" id="composer" data-mode="answer">
+          <div class="ref-tray" id="refTray"></div>
           <textarea class="chat-input" rows="1" placeholder="Answer…"></textarea>
           <div class="composer-bar">
             <div class="mode-switch" id="modeSwitch" role="tablist" aria-label="Message mode">
@@ -559,8 +578,9 @@ const STREAM = [
 ` },
   // side question — off the record, not part of the graded conversation, collapsible
   { t:'aside', id:'a1', title:'How does list.append differ from +?', collapsed:true,
-    quote:{ fname:'_pinned_qa_group.py', code:'out.append(q)' },
-    qa:[ { role:'learner', text:'Quick one — why <code>out.append(q)</code> and not <code>out = out + [q]</code>?' },
+    qa:[ { role:'learner', text:'Quick one — why <code>out.append(q)</code> and not <code>out = out + [q]</code>?',
+           refs:[ { kind:'code', label:'_pinned_qa_group.py', snippet:'out.append(q)' },
+                  { kind:'test', label:'test_pinned_qa.py', snippet:'return pinned + rest' } ] },
          { role:'tutor', text:'<code>append</code> mutates the same list in place (O(1)); <code>+</code> builds a new list each time (O(n)). In a loop, append is the one you want.' } ] },
 ];
 
@@ -725,6 +745,31 @@ function renderStory(slug){
 // only these two "grounding" tools surface in the conversation; the rest are map-only.
 const GROUNDING_TOOLS=new Set(['read_code_slice','read_workspace']);
 const convo=document.getElementById('convo');
+
+/* ── highlight references ("pins") ─────────────────────────────────────────
+ * A message can carry MANY highlights, pulled from three sources: the codebase,
+ * a test/editor file, or the conversation. They stage as removable chips in the
+ * composer tray, then render as small static chips beneath the sent message.
+ * Defined here (before the first render) so seeded asides can draw chips too. */
+const REF_ICON={
+  code:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6l-5 6 5 6M16 6l5 6-5 6"/></svg>',
+  test:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v6l-4.5 8.5A2 2 0 0 0 6 21h12a2 2 0 0 0 1.5-3.5L15 9V3"/><path d="M8 3h8"/></svg>',
+  convo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.5A8 8 0 1 1 21 12z"/></svg>',
+};
+let pendingRefs=[];
+const refTray=document.getElementById('refTray');
+/* one chip; removable=true adds the × used in the composer tray (omitted for static under-message chips) */
+function refChip(ref, removable){
+  const x=removable?`<span class="rc-x" title="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></span>`:'';
+  return `<span class="ref-chip" title="${esc(ref.snippet||ref.label)}"><span class="rc-ic">${REF_ICON[ref.kind]||REF_ICON.convo}</span><span class="rc-lb">${esc(ref.label)}</span>${x}</span>`;
+}
+function renderRefTray(){
+  refTray.innerHTML=pendingRefs.map(r=>refChip(r,true)).join('');
+  refTray.querySelectorAll('.rc-x').forEach((x,i)=>x.addEventListener('click',()=>{ pendingRefs.splice(i,1); renderRefTray(); }));
+  if(typeof syncSend==='function') syncSend();
+}
+function addRef(ref){ pendingRefs.push(ref); renderRefTray(); chatInput.focus(); }
+
 STREAM.forEach(item=>{
   if(item.t==='msg'){
     const d=document.createElement('div'); d.className='turn '+item.role; d.dataset.id=item.id;
@@ -791,7 +836,10 @@ function hl(line){
 function buildAside(item){
   const d=document.createElement('div'); d.className='aside'+(item.collapsed?' collapsed':''); if(item.id) d.dataset.id=item.id;
   const quote=item.quote?`<div class="aside-quote"><span class="qf">${esc(item.quote.fname||'code')}</span>${esc(item.quote.code)}</div>`:'';
-  const qa=(item.qa||[]).map(t=>`<div class="aside-qa ${t.role}"><span class="say">${t.text}</span></div>`).join('');
+  const qa=(item.qa||[]).map(t=>{
+    const chips=(t.refs&&t.refs.length)?`<div class="msg-refs">${t.refs.map(r=>refChip(r,false)).join('')}</div>`:'';
+    return `<div class="aside-qa ${t.role}"><span class="say">${t.text}</span>${chips}</div>`;
+  }).join('');
   d.innerHTML=`<div class="aside-eyebrow">aside</div>
     <div class="aside-cell">
       <button class="aside-head"><span class="ah-title">${esc(item.title||'Side question')}</span><span class="ah-caret" aria-hidden="true">${item.collapsed?'+':'−'}</span></button>
@@ -816,10 +864,11 @@ function buildAside(item){
   ta.addEventListener('input',()=>{ ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; });
   return d;
 }
-/* spin up a new aside in the conversation (optionally seeded with a Q+A / a code quote) */
-function createAside(title, quote, seedText){
-  const item={ title:title||'Side question', collapsed:false, quote:quote||null, qa:[] };
-  if(seedText) item.qa=[{role:'learner',text:esc(seedText)},{role:'tutor',text:'(demo) off-record answer.'}];
+/* spin up a new aside — seeded with the learner's question + any highlight refs (chips) */
+function createAside(title, refs, seedText){
+  const item={ title:title||'Side question', collapsed:false, qa:[] };
+  if(seedText || (refs&&refs.length))
+    item.qa=[{role:'learner',text:esc(seedText||''),refs:refs||[]},{role:'tutor',text:'(demo) off-record answer.'}];
   const el=buildAside(item); convo.appendChild(el);
   el.scrollIntoView({block:'end',behavior:'smooth'});
   const ta=el.querySelector('.aside-ask textarea'); if(ta && !seedText) ta.focus();
@@ -1116,7 +1165,7 @@ const chatSend=document.getElementById('chatSend');
 const modeSwitch=document.getElementById('modeSwitch');
 const PLACEHOLDER={ answer:'Answer…', aside:'Side question…' };
 function autosize(){ chatInput.style.height='auto'; chatInput.style.height=chatInput.scrollHeight+'px'; }
-function syncSend(){ chatSend.disabled = chatInput.value.trim()===''; }
+function syncSend(){ chatSend.disabled = chatInput.value.trim()==='' && pendingRefs.length===0; }
 chatInput.addEventListener('input',()=>{ autosize(); syncSend(); });
 autosize(); syncSend();
 
@@ -1129,36 +1178,51 @@ modeSwitch.addEventListener('click',e=>{
   chatInput.focus();
 });
 function send(){
-  const v=chatInput.value.trim(); if(!v) return;
-  if(composer.dataset.mode==='aside'){ createAside(v, null, v); }   // off-record thread
+  const v=chatInput.value.trim(); if(!v && !pendingRefs.length) return;
+  const refs=pendingRefs.slice();
+  if(composer.dataset.mode==='aside'){ createAside(v, refs, v); }   // off-record thread + its pins
   else {
     const d=document.createElement('div'); d.className='turn learner';
-    d.innerHTML=`<div class="say">${esc(v)}</div>`;
+    d.innerHTML=`<div class="say">${esc(v)}</div>`+
+      (refs.length?`<div class="msg-refs">${refs.map(r=>refChip(r,false)).join('')}</div>`:'');
     convo.appendChild(d); d.scrollIntoView({block:'end',behavior:'smooth'});
   }
-  chatInput.value=''; autosize(); syncSend();
+  chatInput.value=''; pendingRefs=[]; renderRefTray(); autosize(); syncSend();
 }
 chatSend.addEventListener('click',send);
 chatInput.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); send(); }});
 
-/* highlight code in the Codebase view → floating "Ask aside" → seeds an aside
- * quoting the selection, then jumps to the conversation so it can be answered */
+/* highlight anywhere → a floating "Attach" pins the selection to the composer as
+ * a chip. Three sources feed it: the codebase, a test/editor file, the conversation.
+ * The learner can stack several, then send them together with their message. */
 const codebaseEl=document.getElementById('codebase');
 let askBtn=null;
 function removeAskBtn(){ if(askBtn){ askBtn.remove(); askBtn=null; } }
-codebaseEl.addEventListener('mouseup',e=>{
-  const text=(window.getSelection().toString()||'').trim();
+function showAttachPop(x,y,ref){
   removeAskBtn();
-  if(!text) return;
-  const quote={ fname:currentFile||'code', code:text };
-  askBtn=document.createElement('button'); askBtn.className='ask-aside-pop'; askBtn.textContent='@ Ask aside';
-  askBtn.style.left=(e.clientX+8)+'px'; askBtn.style.top=(e.clientY-4)+'px';
+  askBtn=document.createElement('button'); askBtn.className='ask-aside-pop';
+  askBtn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Attach';
+  askBtn.style.left=(x+8)+'px'; askBtn.style.top=(y-4)+'px';
   document.body.appendChild(askBtn);
   askBtn.addEventListener('click',()=>{
-    const el=createAside('About this snippet', quote, null);
-    removeAskBtn(); window.getSelection().removeAllRanges();
-    showMid('conversation'); el.scrollIntoView({block:'center'});
+    addRef(ref); removeAskBtn(); window.getSelection().removeAllRanges();
+    showMid('conversation');
   });
+}
+/* source 1 — codebase view */
+codebaseEl.addEventListener('mouseup',e=>{
+  const text=(window.getSelection().toString()||'').trim(); removeAskBtn();
+  if(text) showAttachPop(e.clientX,e.clientY,{ kind:'code', label:currentFile||'code', snippet:text });
+});
+/* source 2 — a test / editor file (textarea → read its own selection) */
+editorArea.addEventListener('mouseup',e=>{
+  const s=editorArea.value.substring(editorArea.selectionStart,editorArea.selectionEnd).trim(); removeAskBtn();
+  if(s){ const name=EDITOR_FILES[activeFile]?EDITOR_FILES[activeFile].name:'test'; showAttachPop(e.clientX,e.clientY,{ kind:'test', label:name, snippet:s }); }
+});
+/* source 3 — the conversation itself */
+convo.addEventListener('mouseup',e=>{
+  const text=(window.getSelection().toString()||'').trim(); removeAskBtn();
+  if(text) showAttachPop(e.clientX,e.clientY,{ kind:'convo', label:'conversation', snippet:text });
 });
 document.addEventListener('mousedown',e=>{ if(askBtn && !askBtn.contains(e.target)) removeAskBtn(); });
 
