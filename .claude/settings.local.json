@@ -113,7 +113,15 @@
       "Read(//home/kingbilal/.claude/plugins/**)",
       "Read(//home/kingbilal/.claude/**)",
       "WebSearch",
-      "Bash(git -C /mnt/c/Users/dell/Desktop/Myprojects/dev_master status --short agentic_tutor)"
+      "Bash(git -C /mnt/c/Users/dell/Desktop/Myprojects/dev_master status --short agentic_tutor)",
+      "Bash(python3 -c \"import pytest; print\\('pytest OK', pytest.__version__\\)\")",
+      "Bash(python3 -m pip install -q pytest)",
+      "Bash(python3 -c \"import pytest; print\\('pytest now OK', pytest.__version__\\)\")",
+      "Bash(.venv/bin/python -m ensurepip)",
+      "Bash(.venv/bin/python -m pip install -q pytest)",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(.venv/bin/python -c \"import pytest; print\\('pytest', pytest.__version__\\)\")",
+      "Bash(../.venv/bin/python -m pytest tests_v2 -q)"
     ]
   }
 }

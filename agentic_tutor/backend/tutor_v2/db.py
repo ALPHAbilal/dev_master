@@ -9,7 +9,7 @@ from typing import Iterator
 
 from .errors import InvariantError
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 8
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 
 
@@ -80,7 +80,41 @@ class Database:
             # idempotently by schema.sql (executescript runs on every init), so no
             # transform is required here — fresh AND existing DBs both gain the table.
             return
+        if version == 7:
+            self._migrate_aside_layer()
+            return
+        if version == 8:
+            # Control-plane registry (codebases, sessions). The additive tables are created
+            # idempotently by schema.sql (executescript runs on every init), so no transform
+            # is needed here — fresh AND existing DBs both gain them.
+            return
         raise RuntimeError(f"no migration implementation for schema {version}")
+
+    def _migrate_aside_layer(self) -> None:
+        """Add the aside layer: refs + thread columns on messages, and the thread index.
+
+        The aside_threads/aside_turns tables (and their own indexes) are created
+        idempotently by schema.sql's ``executescript`` on every init, so only the new
+        ``conversation_messages`` columns need conditional ALTERs here. The index on
+        those columns must live in this migration — not schema.sql — because
+        ``executescript`` runs before this migration, when the columns may not yet exist
+        on an upgraded database.
+        """
+        columns = {row[1] for row in self._connection.execute(
+            "PRAGMA table_info(conversation_messages)")}
+        if "refs_json" not in columns:
+            self._connection.execute(
+                "ALTER TABLE conversation_messages ADD COLUMN refs_json TEXT NOT NULL DEFAULT '[]'")
+        if "thread_kind" not in columns:
+            self._connection.execute(
+                "ALTER TABLE conversation_messages ADD COLUMN thread_kind TEXT NOT NULL "
+                "DEFAULT 'main' CHECK (thread_kind IN ('main','aside'))")
+        if "thread_id" not in columns:
+            self._connection.execute(
+                "ALTER TABLE conversation_messages ADD COLUMN thread_id TEXT REFERENCES aside_threads(id)")
+        self._connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_messages_thread "
+            "ON conversation_messages(journey_id, thread_id, sequence)")
 
     def _migrate_events_to_monotonic_ids(self) -> None:
         """Rebuild the v1 events table so event IDs are never reused after archival."""

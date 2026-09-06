@@ -42,6 +42,9 @@ class ConversationRecorder:
         axis: str | None = None,
         status: str = "RECORDED",
         source_wakeup_step: str | None = None,
+        refs: list[dict[str, Any]] | None = None,
+        thread_kind: str = "main",
+        thread_id: str | None = None,
     ) -> int:
         if role not in self._ROLES:
             raise ValidationError(f"unsupported message role: {role}")
@@ -49,6 +52,12 @@ class ConversationRecorder:
             raise ValidationError(f"unsupported message status: {status}")
         if not message_kind.strip() or not turn_id.strip():
             raise ValidationError("message_kind and turn_id are required")
+        if thread_kind not in {"main", "aside"}:
+            raise ValidationError(f"unsupported thread_kind: {thread_kind}")
+        if thread_kind == "main" and thread_id is not None:
+            raise ValidationError("a main message must not belong to an aside thread")
+        if thread_kind == "aside" and thread_id is None:
+            raise ValidationError("an aside message requires a thread_id")
         with self.db.transaction():
             sequence = int(self.db.connection.execute(
                 "SELECT COALESCE(MAX(sequence), 0) + 1 FROM conversation_messages WHERE journey_id=?",
@@ -56,19 +65,21 @@ class ConversationRecorder:
             ).fetchone()[0])
             cursor = self.db.connection.execute(
                 "INSERT INTO conversation_messages(journey_id,unit_id,axis,role,message_kind,content,"
-                "turn_id,sequence,status,source_wakeup_step) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                "turn_id,sequence,status,source_wakeup_step,refs_json,thread_kind,thread_id) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (journey_id, unit_id, axis, role, message_kind, content, turn_id, sequence,
-                 status, source_wakeup_step),
+                 status, source_wakeup_step, _json(refs or []), thread_kind, thread_id),
             )
         return int(cursor.lastrowid)
 
-    def set_turn_status(self, *, journey_id: int, turn_id: str, status: str) -> None:
+    def set_turn_status(self, *, journey_id: int, turn_id: str, status: str,
+                        thread_kind: str = "main") -> None:
         if status not in self._STATUSES:
             raise ValidationError(f"unsupported message status: {status}")
         with self.db.transaction():
             self.db.connection.execute(
-                "UPDATE conversation_messages SET status=? WHERE journey_id=? AND turn_id=?",
-                (status, journey_id, turn_id),
+                "UPDATE conversation_messages SET status=? WHERE journey_id=? AND turn_id=? AND thread_kind=?",
+                (status, journey_id, turn_id, thread_kind),
             )
 
     def list_for_journey(self, journey_id: int) -> list[dict[str, Any]]:
@@ -78,9 +89,14 @@ class ConversationRecorder:
         )
 
     def find_learner_answer(self, *, journey_id: int, turn_id: str) -> dict[str, Any] | None:
-        """Return an already-recorded learner answer for this turn, if any (replay guard)."""
+        """Return an already-recorded GRADED learner answer for this turn (replay guard).
+
+        Scoped to a main-conversation answer so an off-record aside question sharing a
+        journey can never be mistaken for graded evidence.
+        """
         return self.db.one(
-            "SELECT * FROM conversation_messages WHERE journey_id=? AND turn_id=? AND role='learner'",
+            "SELECT * FROM conversation_messages WHERE journey_id=? AND turn_id=? "
+            "AND role='learner' AND message_kind='answer' AND thread_kind='main'",
             (journey_id, turn_id),
         )
 
@@ -271,3 +287,69 @@ class JourneyRecorder:
             if row["parent_id"] is None:
                 return current
             current = int(row["parent_id"])
+
+
+class AsideRecorder:
+    """The only writer of the aside thread/turn tables (off-record side questions).
+
+    Threads group a side-question's Q&A; turns track one learner question's durable
+    PENDING→COMPLETE state and the message ids it produced. Nothing here touches an
+    engine stone; every write is scoped to aside_threads / aside_turns and validated for
+    ownership so a caller cannot cross journeys. Composes as a savepoint inside the
+    orchestrator's outer transaction.
+    """
+
+    def __init__(self, db: Database, config: TutorConfig) -> None:
+        self.db = db
+        self.config = config
+
+    def create_thread(self, *, thread_id: str, journey_id: int, unit_id: int,
+                      origin_message_id: int | None, title: str, created_at: str) -> None:
+        if not thread_id.strip() or not title.strip() or not created_at.strip():
+            raise ValidationError("thread_id, title and created_at are required")
+        with self.db.transaction():
+            self.db.connection.execute(
+                "INSERT INTO aside_threads(id,journey_id,unit_id,origin_message_id,title,created_at) "
+                "VALUES(?,?,?,?,?,?)",
+                (thread_id, journey_id, unit_id, origin_message_id, title, created_at),
+            )
+
+    def get_thread(self, *, journey_id: int, thread_id: str) -> dict[str, Any] | None:
+        return self.db.one(
+            "SELECT * FROM aside_threads WHERE id=? AND journey_id=?", (thread_id, journey_id))
+
+    def get_turn(self, *, journey_id: int, request_id: str) -> dict[str, Any] | None:
+        return self.db.one(
+            "SELECT * FROM aside_turns WHERE id=? AND journey_id=?", (request_id, journey_id))
+
+    def start_turn(self, *, request_id: str, journey_id: int, thread_id: str,
+                   request: dict[str, Any], learner_message_id: int,
+                   anchor_event_id: int | None, created_at: str) -> None:
+        """Insert a PENDING turn. The (journey,thread) FK enforces thread ownership."""
+        with self.db.transaction():
+            self.db.connection.execute(
+                "INSERT INTO aside_turns(id,journey_id,thread_id,request_json,status,"
+                "learner_message_id,anchor_event_id,created_at) VALUES(?,?,?,?,'PENDING',?,?,?)",
+                (request_id, journey_id, thread_id, _json(request), learner_message_id,
+                 anchor_event_id, created_at),
+            )
+
+    def complete_turn(self, *, journey_id: int, request_id: str, reply_message_id: int,
+                      completed_at: str) -> None:
+        """Move a turn PENDING→COMPLETE, attaching its reply. Only a PENDING turn advances."""
+        with self.db.transaction():
+            cursor = self.db.connection.execute(
+                "UPDATE aside_turns SET status='COMPLETE',reply_message_id=?,completed_at=? "
+                "WHERE id=? AND journey_id=? AND status='PENDING'",
+                (reply_message_id, completed_at, request_id, journey_id),
+            )
+            if cursor.rowcount != 1:
+                raise InvariantError("aside turn is not PENDING or does not exist")
+
+    def thread_history(self, *, journey_id: int, thread_id: str) -> list[dict[str, Any]]:
+        """This thread's messages in display order (learner questions + tutor replies)."""
+        return self.db.query(
+            "SELECT id,role,content,refs_json FROM conversation_messages "
+            "WHERE journey_id=? AND thread_id=? AND thread_kind='aside' ORDER BY sequence",
+            (journey_id, thread_id),
+        )

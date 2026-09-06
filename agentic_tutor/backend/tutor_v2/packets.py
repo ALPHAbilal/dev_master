@@ -21,6 +21,9 @@ class CapabilityPolicy:
         "wakeup.test": ("read_code_slice", "read_axis_evidence", "read_probe_history", "read_workspace"),
         "wakeup.grade": ("read_code_slice", "read_axis_evidence", "read_probe_history", "read_transcript"),
         "wakeup.distill": ("read_turn_context", "read_probe_history", "read_workspace", "read_event_trace"),
+        # Off-record aside: the agent may read only the frozen pins for this thread. No
+        # workspace, repo search, axis/probe evidence, or write/route capability is granted.
+        "wakeup.aside": ("read_pin",),
     }
 
     def for_step(self, step: str) -> tuple[str, ...]:
@@ -61,6 +64,8 @@ class WakeupBuilder:
         """
         if step not in WAKEUP_AGENTS:
             raise ValidationError(f"unsupported wakeup step: {step}")
+        if step == "wakeup.aside":
+            raise ValidationError("wakeup.aside is built by build_aside, not build")
         meta = self._meta()
         if step == "wakeup.map":
             if unit_id is not None or axis is not None:
@@ -100,6 +105,57 @@ class WakeupBuilder:
             step=continuation["next_step"], unit_id=unit_id, axis=axis, transient=transient
         )
 
+    def build_aside(self, *, journey_id: int, request_id: str) -> dict[str, Any]:
+        """Assemble the closed packet for an off-record aside from persisted state.
+
+        The agent receives its unit (id/slug/title + the axes that fire), the current
+        question, a *pin manifest* (paths + descriptions, never the raw blobs), and this
+        thread's prior completed Q&A. No axis grade, probe history, workspace, stack, meta,
+        or profile is included, and the only capability granted is read_pin.
+        """
+        from .references import PinStore  # local import avoids a construction-time cycle
+        turn = self.db.one(
+            "SELECT * FROM aside_turns WHERE id=? AND journey_id=?", (request_id, journey_id))
+        if not turn:
+            raise ValidationError("aside turn does not belong to this journey")
+        request = json.loads(turn["request_json"])
+        unit_id = int(request["unit_id"])
+        unit = self.db.one(
+            "SELECT id,slug,title FROM units WHERE id=? AND session_id=?",
+            (unit_id, self.config.session_id))
+        if not unit:
+            raise ValidationError("aside unit does not belong to this session")
+        axes = [row["axis"] for row in self.db.query(
+            "SELECT axis FROM axes WHERE unit_id=? ORDER BY ordinal", (unit_id,))]
+        rows = self.db.query(
+            "SELECT id,role,content,refs_json FROM conversation_messages "
+            "WHERE journey_id=? AND thread_id=? AND thread_kind='aside' ORDER BY sequence",
+            (journey_id, turn["thread_id"]))
+        history = [{"message_id": row["id"], "role": row["role"], "content": row["content"],
+                    "refs": json.loads(row["refs_json"])}
+                   for row in rows if row["id"] != turn["learner_message_id"]]
+        history_truncated = len(history) > 20
+        manifest = PinStore(self.config).manifest(thread_id=turn["thread_id"])
+        context = {
+            "journey_id": journey_id,
+            "thread_id": turn["thread_id"],
+            "request_id": request_id,
+            "unit": {"id": unit["id"], "slug": unit["slug"], "title": unit["title"], "axes": axes},
+            "question": request["question"],
+            "pins": manifest,
+            "history": history[-20:],
+            "history_truncated": history_truncated,
+        }
+        packet = {
+            "step": "wakeup.aside",
+            "agent": WAKEUP_AGENTS["wakeup.aside"],
+            "session_id": self.config.session_id,
+            "context": context,
+            "capabilities": list(self.policy.for_step("wakeup.aside")),
+            "unit_id": unit_id,
+        }
+        return validate_wakeup(packet)
+
     def _unit_context(
         self, step: str, unit_id: int, axis: str, meta: dict[str, Any], transient: dict[str, Any]
     ) -> dict[str, Any]:
@@ -129,7 +185,7 @@ class WakeupBuilder:
         if step in {"wakeup.probe", "wakeup.teach", "wakeup.test", "wakeup.grade"}:
             context["recent_probes"] = self._recent_probes(unit_id, axis)
         if step == "wakeup.grade":
-            if set(transient) - {"learner_answer", "question_ref", "action_evidence"}:
+            if set(transient) - {"learner_answer", "question_ref", "action_evidence", "refs"}:
                 raise ValidationError("grade transient contains an unscoped field")
             if "learner_answer" not in transient and "action_evidence" not in transient:
                 raise ValidationError("wakeup.grade requires current answer or action evidence")

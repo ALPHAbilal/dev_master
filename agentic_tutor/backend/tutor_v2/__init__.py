@@ -1,8 +1,9 @@
 """Tutor v2 backend foundation: no frontend and no Claude SDK dependency."""
 from .config import TutorConfig
 from .contracts import (
-    AXES, EVENT_KINDS, GRADE_CATEGORIES, WAKEUP_AGENTS, validate_action_event,
-    validate_archive_manifest, validate_continuation, validate_return, validate_wakeup,
+    AXES, CONTINUATION_STEPS, EVENT_KINDS, GRADE_CATEGORIES, WAKEUP_AGENTS,
+    validate_action_event, validate_archive_manifest, validate_continuation,
+    validate_return, validate_wakeup,
 )
 from .db import Database
 from .domain import (AgentOutput, Axis, Event, Handoff, ReturnStamp, StackFrame, ToolCall,
@@ -17,12 +18,17 @@ from .errors import (
 from .routing import RouteDecision, Router
 from .packets import CapabilityPolicy, WakeupBuilder
 from .parsing import ReturnStampParser
-from .recorders import ConversationRecorder, JourneyRecorder, ProbeRecorder, ToolCallRecorder
+from .aside_instructions import AXIS_INSTRUCTIONS, BASE_ASIDE_INSTRUCTION, build_aside_instruction
+from .references import PinStore, ReferenceValidator
+from .recorders import (
+    AsideRecorder, ConversationRecorder, JourneyRecorder, ProbeRecorder, ToolCallRecorder,
+)
 from .graph_projection import GraphProjection
 from .learner_model import LearnerModelService
-from .orchestrator import TurnOrchestrator, TurnResult
+from .orchestrator import AsideResult, TurnOrchestrator, TurnResult
 from .driver import DriverState, TurnDriver
 from .factory import AppContext, build_session
+from .registry import ControlPlane, SessionRegistry
 from .api import ApiHandlers
 from .structure import StructuralEdge, StructuralNode, StructureExtraction, StructureExtractor, reconcile_range
 from .semantics import SemanticGraphService
@@ -44,17 +50,20 @@ __all__ = [
     "InvariantError", "CapabilityUnavailableError", "StaleWorkspaceRevisionError",
     "WorkspaceService", "WorkspaceWrite", "EventRecorder", "ArchiveService",
     "ArchiveReceipt", "HandoffService", "StateReader",
-    "AXES", "EVENT_KINDS", "GRADE_CATEGORIES", "WAKEUP_AGENTS", "validate_wakeup",
+    "AXES", "CONTINUATION_STEPS", "EVENT_KINDS", "GRADE_CATEGORIES", "WAKEUP_AGENTS", "validate_wakeup",
     "validate_return", "validate_action_event", "validate_continuation",
     "validate_archive_manifest",
     "Router", "RouteDecision",
     "CapabilityPolicy", "WakeupBuilder",
     "ReturnStampParser",
-    "ConversationRecorder", "JourneyRecorder", "ProbeRecorder",
+    "PinStore", "ReferenceValidator",
+    "AXIS_INSTRUCTIONS", "BASE_ASIDE_INSTRUCTION", "build_aside_instruction",
+    "AsideRecorder", "ConversationRecorder", "JourneyRecorder", "ProbeRecorder", "ToolCallRecorder",
     "LearnerModelService", "GraphProjection",
-    "TurnOrchestrator", "TurnResult",
+    "TurnOrchestrator", "TurnResult", "AsideResult",
     "TurnDriver", "DriverState",
     "AppContext", "build_session", "ApiHandlers",
+    "ControlPlane", "SessionRegistry",
     "StructuralEdge", "StructuralNode", "StructureExtraction", "StructureExtractor", "reconcile_range",
     "SemanticGraphService",
     "JourneyReader", "AXIS_WORDING", "SNAPSHOT_VERSION",

@@ -19,7 +19,15 @@ WAKEUP_AGENTS = {
     "wakeup.test": "TEACHER",
     "wakeup.grade": "JUDGE",
     "wakeup.distill": "DISTILLER",
+    # Off-record side questions. A distinct agent job (answer only; no verdict/route). It is
+    # deliberately NOT a member of CONTINUATION_STEPS, so it can never become an engine route.
+    "wakeup.aside": "TEACHER",
 }
+# The engine's legal next-steps for a parked continuation. Frozen to the six graded-loop
+# steps so adding an agent to WAKEUP_AGENTS (e.g. wakeup.aside) never expands routing.
+CONTINUATION_STEPS = frozenset({
+    "wakeup.map", "wakeup.probe", "wakeup.teach", "wakeup.test", "wakeup.grade", "wakeup.distill",
+})
 GRADE_CATEGORIES = frozenset({
     "correct-deep", "pattern-matched", "shaky", "misconception", "different-prereq",
     "sibling-hole", "confused-question", "different-axis", "off-topic", "gives-up",
@@ -86,6 +94,8 @@ def validate_wakeup(packet: dict[str, Any]) -> dict[str, Any]:
     _string_list(packet["capabilities"], "wakeup.capabilities")
     if "unit_id" in packet:
         _integer(packet["unit_id"], "wakeup.unit_id", minimum=1)
+    if step == "wakeup.aside" and "axis" in packet:
+        raise ValidationError("wakeup.aside is not axis-scoped")
     if "axis" in packet and packet["axis"] not in AXES:
         raise ValidationError("wakeup.axis is unsupported")
     return deepcopy(packet)
@@ -260,7 +270,7 @@ def validate_continuation(record: dict[str, Any]) -> dict[str, Any]:
     """Validate code-owned PARK state without turning it into an agent prompt."""
     record = _expect_object(record, "continuation")
     _expect_keys(record, required={"next_step", "awaiting", "outstanding_question_ref", "context_refs"}, optional=set(), label="continuation")
-    if record["next_step"] not in WAKEUP_AGENTS:
+    if record["next_step"] not in CONTINUATION_STEPS:
         raise ValidationError("continuation.next_step is unsupported")
     if record["awaiting"] not in {"learner_answer", "learner_reaction", "none"}:
         raise ValidationError("continuation.awaiting is unsupported")

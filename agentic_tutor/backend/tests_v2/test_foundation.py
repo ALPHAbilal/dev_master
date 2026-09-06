@@ -30,7 +30,7 @@ def test_fresh_database_has_authoritative_mutable_stones_and_version():
     assert {"schema_migrations", "units", "axes", "stack", "meta", "probes", "learner", "handoff", "events"} <= tables
     assert {"journeys", "conversation_messages", "journey_events",
             "semantic_nodes", "semantic_edges", "learner_notes"} <= tables
-    assert db.one("SELECT MAX(version) AS version FROM schema_migrations") == {"version": 6}
+    assert db.one("SELECT MAX(version) AS version FROM schema_migrations") == {"version": 8}
 
 
 def test_file_database_enables_wal_and_reopens_cleanly():
@@ -40,7 +40,7 @@ def test_file_database_enables_wal_and_reopens_cleanly():
         assert db.one("PRAGMA journal_mode")["journal_mode"] == "wal"
         db.close()
         reopened = Database(path)
-        assert reopened.one("SELECT MAX(version) AS version FROM schema_migrations") == {"version": 6}
+        assert reopened.one("SELECT MAX(version) AS version FROM schema_migrations") == {"version": 8}
         reopened.close()
 
 
@@ -74,7 +74,7 @@ def test_v1_events_migrate_to_monotonic_ids_without_losing_rows():
         legacy.connection.commit()
         legacy.close()
         db = Database(path)
-        assert db.one("SELECT MAX(version) AS version FROM schema_migrations") == {"version": 6}
+        assert db.one("SELECT MAX(version) AS version FROM schema_migrations") == {"version": 8}
         assert db.one("SELECT id FROM events") == {"id": 7}
         assert "AUTOINCREMENT" in db.one(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='events'"
@@ -208,3 +208,91 @@ def test_conversation_sequence_is_unique_per_journey():
         assert False, "sequence must be unique within a journey"
     except sqlite3.IntegrityError:
         pass
+
+
+def test_v7_aside_layer_schema_present_with_defaults():
+    db = Database()
+    tables = {row["name"] for row in db.query("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert {"aside_threads", "aside_turns"} <= tables
+    cols = {row["name"] for row in db.query("PRAGMA table_info(conversation_messages)")}
+    assert {"refs_json", "thread_kind", "thread_id"} <= cols
+    indexes = {row["name"] for row in db.query("SELECT name FROM sqlite_master WHERE type='index'")}
+    assert "idx_messages_thread" in indexes
+    # a recorded message defaults to a main, ref-less turn
+    unit_id = _unit(db)
+    with db.transaction():
+        journey_id = int(db.connection.execute(
+            "INSERT INTO journeys(session_id, root_unit_id) VALUES(?,?)", ("s1", unit_id)).lastrowid)
+        db.connection.execute(
+            "INSERT INTO conversation_messages(journey_id,unit_id,role,message_kind,content,turn_id,sequence) "
+            "VALUES(?,?,?,?,?,?,?)", (journey_id, unit_id, "tutor", "question", "q?", "turn-1", 1))
+    row = db.one("SELECT refs_json,thread_kind,thread_id FROM conversation_messages WHERE journey_id=?",
+                 (journey_id,))
+    assert row == {"refs_json": "[]", "thread_kind": "main", "thread_id": None}
+
+
+def test_v7_thread_kind_check_rejects_unknown_value():
+    db = Database()
+    unit_id = _unit(db)
+    with db.transaction():
+        journey_id = int(db.connection.execute(
+            "INSERT INTO journeys(session_id, root_unit_id) VALUES(?,?)", ("s1", unit_id)).lastrowid)
+    raised = False
+    try:
+        with db.transaction():
+            db.connection.execute(
+                "INSERT INTO conversation_messages(journey_id,unit_id,role,message_kind,content,"
+                "turn_id,sequence,thread_kind) VALUES(?,?,?,?,?,?,?,?)",
+                (journey_id, unit_id, "learner", "aside_question", "hi", "aside:x", 1, "bogus"))
+    except sqlite3.IntegrityError:
+        raised = True
+    assert raised, "CHECK must reject an unknown thread_kind"
+
+
+def test_v6_database_upgrades_to_v7_preserving_existing_messages():
+    """A pre-aside (v6) DB gains the new columns/tables and its rows become main/[]/null.
+
+    Built by taking a real v7 DB and *downgrading only* conversation_messages to its
+    pre-aside shape (every other table stays valid), then reopening to run migration 7.
+    """
+    with tempfile.TemporaryDirectory() as temp:
+        path = Path(temp) / "legacy.sqlite"
+        db = Database(path)
+        unit_id = _unit(db)
+        with db.transaction():
+            journey_id = int(db.connection.execute(
+                "INSERT INTO journeys(session_id, root_unit_id) VALUES(?,?)", ("s1", unit_id)).lastrowid)
+            db.connection.execute(
+                "INSERT INTO conversation_messages(journey_id,unit_id,role,message_kind,content,turn_id,sequence) "
+                "VALUES(?,?,?,?,?,?,?)", (journey_id, unit_id, "tutor", "question", "old q", "turn-1", 1))
+        # Simulate the pre-v7 world: rebuild conversation_messages without the aside columns
+        # and roll the recorded schema version back to 6.
+        db.connection.execute("PRAGMA foreign_keys = OFF")
+        db.connection.executescript("""
+            DROP INDEX IF EXISTS idx_messages_thread;
+            ALTER TABLE conversation_messages RENAME TO cm_v7;
+            CREATE TABLE conversation_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, journey_id INTEGER, unit_id INTEGER, axis TEXT,
+                role TEXT, message_kind TEXT, content TEXT, turn_id TEXT, sequence INTEGER,
+                status TEXT DEFAULT 'RECORDED', source_wakeup_step TEXT, archived_artifact_ref TEXT,
+                created_at TEXT, UNIQUE(journey_id, sequence));
+            INSERT INTO conversation_messages(id,journey_id,unit_id,axis,role,message_kind,content,
+                turn_id,sequence,status,source_wakeup_step,archived_artifact_ref,created_at)
+                SELECT id,journey_id,unit_id,axis,role,message_kind,content,turn_id,sequence,status,
+                       source_wakeup_step,archived_artifact_ref,created_at FROM cm_v7;
+            DROP TABLE cm_v7;
+            DELETE FROM schema_migrations WHERE version>=7;
+        """)
+        db.connection.commit()
+        db.close()
+
+        upgraded = Database(path)  # opening runs migration 7 again
+        assert upgraded.one("SELECT MAX(version) AS version FROM schema_migrations") == {"version": 8}
+        cols = {row["name"] for row in upgraded.query("PRAGMA table_info(conversation_messages)")}
+        assert {"refs_json", "thread_kind", "thread_id"} <= cols
+        indexes = {row["name"] for row in upgraded.query("SELECT name FROM sqlite_master WHERE type='index'")}
+        assert "idx_messages_thread" in indexes
+        # the pre-existing message survived and defaulted into the main conversation
+        row = upgraded.one("SELECT content,refs_json,thread_kind,thread_id FROM conversation_messages")
+        assert row == {"content": "old q", "refs_json": "[]", "thread_kind": "main", "thread_id": None}
+        upgraded.close()

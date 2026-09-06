@@ -18,7 +18,7 @@ from .config import TutorConfig
 from .db import Database
 from .errors import ValidationError
 
-SNAPSHOT_VERSION = 1
+SNAPSHOT_VERSION = 2
 
 # Backend axis names → learner-facing wording (UI copy layer, spec §4.4).
 AXIS_WORDING = {
@@ -76,8 +76,14 @@ class JourneyReader:
                 "SELECT * FROM semantic_edges WHERE journey_id=? ORDER BY id", (journey_id,)),
             "lifecycle": self.db.query(
                 "SELECT * FROM journey_events WHERE journey_id=? ORDER BY id", (journey_id,)),
-            "conversation": self.db.query(
-                "SELECT * FROM conversation_messages WHERE journey_id=? ORDER BY sequence", (journey_id,)),
+            "conversation": self._conversation(journey_id),
+            "aside_threads": self.db.query(
+                "SELECT id,journey_id,unit_id,origin_message_id,title,created_at "
+                "FROM aside_threads WHERE journey_id=? ORDER BY id", (journey_id,)),
+            "aside_turns": self.db.query(
+                "SELECT id,journey_id,thread_id,status,learner_message_id,reply_message_id,"
+                "anchor_event_id,created_at,completed_at FROM aside_turns WHERE journey_id=? "
+                "ORDER BY created_at,id", (journey_id,)),
             "evidence": {
                 "probes": self.db.query(
                     "SELECT * FROM probes WHERE session_id=? AND unit_id IN (%s) ORDER BY id"
@@ -98,6 +104,19 @@ class JourneyReader:
         }
 
     # -- internals ----------------------------------------------------------------
+
+    def _conversation(self, journey_id: int) -> list[dict[str, Any]]:
+        """Conversation rows in global order, each with its refs decoded from JSON.
+
+        thread_kind / thread_id ride along from SELECT * so a client can group aside
+        threads; refs is the decoded list a client renders as highlight chips.
+        """
+        rows = self.db.query(
+            "SELECT * FROM conversation_messages WHERE journey_id=? ORDER BY sequence",
+            (journey_id,))
+        for row in rows:
+            row["refs"] = json.loads(row.get("refs_json") or "[]")
+        return rows
 
     def _journey_unit_ids(self, root_unit_id: int) -> list[int]:
         """All units in this journey: the root plus every descendant child (BFS)."""

@@ -35,6 +35,17 @@ class AnswerBody(BaseModel):
     axis: str
     question: str
     answer: str
+    refs: list[dict[str, Any]] | None = None
+
+
+class AsideBody(BaseModel):
+    model_config = {"extra": "forbid"}  # strict: an unknown field is a 400, not silently dropped
+    request_id: str
+    unit_id: int
+    question: str = ""
+    refs: list[dict[str, Any]] | None = None
+    thread_id: str | None = None
+    origin_message_id: int | None = None
 
 
 class ParkBody(BaseModel):
@@ -85,6 +96,10 @@ def create_app(context: AppContext, *, allow_origins: list[str] | None = None) -
     @app.post("/journey/{journey_id}/answer")
     def answer(journey_id: int, body: AnswerBody) -> dict[str, Any]:
         return _guard(lambda: handlers.answer(journey_id, **body.model_dump()))
+
+    @app.post("/journey/{journey_id}/aside")
+    def aside(journey_id: int, body: AsideBody) -> dict[str, Any]:
+        return _guard(lambda: handlers.aside(journey_id, **body.model_dump()))
 
     @app.post("/journey/{journey_id}/park")
     def park(journey_id: int, body: ParkBody) -> dict[str, Any]:

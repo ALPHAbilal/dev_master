@@ -143,8 +143,46 @@ CREATE TABLE IF NOT EXISTS conversation_messages (
     source_wakeup_step    TEXT,
     archived_artifact_ref TEXT,
     created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    -- Aside layer (v7): a message may carry many highlight references (refs_json), and
+    -- belongs either to the graded main conversation or to an off-record aside thread.
+    refs_json      TEXT NOT NULL DEFAULT '[]',
+    thread_kind    TEXT NOT NULL DEFAULT 'main' CHECK (thread_kind IN ('main','aside')),
+    thread_id      TEXT REFERENCES aside_threads(id),
     UNIQUE(journey_id, sequence)
 );
+
+-- Aside layer (v7): off-record, ungraded side-question threads. Additive — no engine
+-- stone (units/axes/stack/probes/meta) is touched by an aside. A thread groups its Q&A
+-- messages (via conversation_messages.thread_id); each turn tracks the durable
+-- PENDING→COMPLETE state of one learner question + its agent reply.
+CREATE TABLE IF NOT EXISTS aside_threads (
+    id                TEXT PRIMARY KEY NOT NULL,
+    journey_id        INTEGER NOT NULL REFERENCES journeys(id) ON DELETE CASCADE,
+    unit_id           INTEGER NOT NULL REFERENCES units(id),
+    origin_message_id INTEGER REFERENCES conversation_messages(id),
+    title             TEXT NOT NULL,
+    created_at        TEXT NOT NULL,
+    UNIQUE (journey_id, id)
+);
+
+CREATE TABLE IF NOT EXISTS aside_turns (
+    id                 TEXT PRIMARY KEY NOT NULL,
+    journey_id         INTEGER NOT NULL REFERENCES journeys(id) ON DELETE CASCADE,
+    thread_id          TEXT NOT NULL,
+    request_json       TEXT NOT NULL,
+    status             TEXT NOT NULL CHECK (status IN ('PENDING','COMPLETE')),
+    learner_message_id INTEGER NOT NULL REFERENCES conversation_messages(id),
+    reply_message_id   INTEGER REFERENCES conversation_messages(id),
+    anchor_event_id    INTEGER REFERENCES journey_events(id),
+    created_at         TEXT NOT NULL,
+    completed_at       TEXT,
+    FOREIGN KEY (journey_id, thread_id) REFERENCES aside_threads(journey_id, id),
+    CHECK ((status = 'PENDING'  AND reply_message_id IS NULL     AND completed_at IS NULL)
+        OR (status = 'COMPLETE' AND reply_message_id IS NOT NULL AND completed_at IS NOT NULL))
+);
+
+CREATE INDEX IF NOT EXISTS idx_aside_threads_journey ON aside_threads(journey_id, id);
+CREATE INDEX IF NOT EXISTS idx_aside_turns_thread ON aside_turns(journey_id, thread_id, created_at, id);
 
 CREATE TABLE IF NOT EXISTS journey_events (
     id                     INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -233,3 +271,26 @@ CREATE INDEX IF NOT EXISTS idx_tool_calls_journey ON tool_calls(journey_id, id);
 CREATE INDEX IF NOT EXISTS idx_semantic_nodes_journey ON semantic_nodes(journey_id, id);
 CREATE INDEX IF NOT EXISTS idx_semantic_edges_journey ON semantic_edges(journey_id, id);
 CREATE INDEX IF NOT EXISTS idx_learner_notes_journey ON learner_notes(journey_id, id);
+
+-- Control plane (v8): the multi-tenant registry. A "codebase" is an imported repo owned by
+-- a user; a "session" is one (user, codebase) pairing whose id IS the engine session_id that
+-- scopes every stone above. These tables are ADDITIVE metadata — no engine stone references
+-- them, and the engine remains a single-session worker resolved per request.
+CREATE TABLE IF NOT EXISTS codebases (
+    id         TEXT PRIMARY KEY NOT NULL,
+    user_id    TEXT NOT NULL,
+    name       TEXT NOT NULL,
+    root_path  TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id          TEXT PRIMARY KEY NOT NULL,   -- this IS the engine session_id
+    user_id     TEXT NOT NULL,
+    codebase_id TEXT NOT NULL REFERENCES codebases(id) ON DELETE CASCADE,
+    created_at  TEXT NOT NULL,
+    UNIQUE (user_id, codebase_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_codebases_user ON codebases(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);

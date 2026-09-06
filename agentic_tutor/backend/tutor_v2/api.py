@@ -45,13 +45,27 @@ class ApiHandlers:
         return self._state_payload(state)
 
     def answer(self, journey_id: int, *, turn_id: str, unit_id: int, axis: str,
-               question: str, answer: str) -> dict[str, Any]:
-        """Grade one learner answer, then advance to the next learner question."""
+               question: str, answer: str, refs: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        """Grade one learner answer (with any attached highlight pins), then advance."""
         graded = self.ctx.session.run_grade(
             journey_id=journey_id, unit_id=unit_id, axis=axis, turn_id=turn_id,
-            question=question, answer=answer)
+            question=question, answer=answer, refs=refs)
         state = self.ctx.driver.advance(journey_id=journey_id, decision=graded.decision)
         return self._state_payload(state)
+
+    def aside(self, journey_id: int, *, request_id: str, unit_id: int, question: str,
+              refs: list[dict[str, Any]] | None = None, thread_id: str | None = None,
+              origin_message_id: int | None = None) -> dict[str, Any]:
+        """Answer one off-record side question. Returns an aside acknowledgment — NOT a
+        DriverState — so the client's live lesson state is left untouched."""
+        result = self.ctx.session.run_aside(
+            journey_id=journey_id, unit_id=unit_id, request_id=request_id, question=question,
+            refs=refs, thread_id=thread_id, origin_message_id=origin_message_id)
+        return {"operation": "aside", "journey_id": result.journey_id,
+                "thread_id": result.thread_id, "request_id": result.request_id,
+                "status": result.status.lower(), "learner_message_id": result.learner_message_id,
+                "reply_message_id": result.reply_message_id,
+                "projection_revision": result.projection_revision}
 
     def resume(self) -> dict[str, Any]:
         """Restore a parked journey, then advance to its resumed question."""

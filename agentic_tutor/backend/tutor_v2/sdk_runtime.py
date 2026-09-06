@@ -99,6 +99,13 @@ class TutorToolGateway:
             if set(arguments) != {"query"} or not isinstance(query, str) or not query.strip():
                 raise ValidationError("search_repository requires exactly one non-blank query")
             return {"matches": self._search_repository(query.strip())}
+        if capability == "read_pin":
+            from .references import PinStore
+            path = arguments.get("path")
+            if set(arguments) != {"path"} or not isinstance(path, str) or not path.strip():
+                raise ValidationError("read_pin requires exactly one non-blank path")
+            thread_id = str(self.wakeup["context"]["thread_id"])
+            return {"content": PinStore(self.config).read(thread_id=thread_id, rel_path=path)}
         raise CapabilityUnavailableError(f"{capability} has no SDK tool handler")
 
     def _require(self, capability: str) -> None:
@@ -233,7 +240,11 @@ class ClaudeAgentAdapter:
             raise AgentSdkUnavailableError("claude-agent-sdk is unavailable") from error
         tools: list[Any] = []
         for capability in gateway.wakeup["capabilities"]:
-            schema: dict[str, type] = {"query": str} if capability == "search_repository" else {}
+            schema: dict[str, type] = {}
+            if capability == "search_repository":
+                schema = {"query": str}
+            elif capability == "read_pin":
+                schema = {"path": str}
 
             @tool(capability, f"Tutor capability: {capability}. Use only for its stated scoped purpose.", schema)
             async def handler(arguments: dict[str, Any], _capability: str = capability) -> dict[str, Any]:

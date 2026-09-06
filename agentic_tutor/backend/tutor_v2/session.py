@@ -19,11 +19,12 @@ import asyncio
 import logging
 from typing import Any, Callable
 
+from .aside_instructions import build_aside_instruction
 from .config import TutorConfig
 from .contracts import WAKEUP_AGENTS
 from .domain import AgentOutput
 from .errors import ValidationError
-from .orchestrator import TurnOrchestrator, TurnResult
+from .orchestrator import AsideResult, TurnOrchestrator, TurnResult
 from .packets import WakeupBuilder
 from .routing import RouteDecision
 from .sdk_runtime import ClaudeAgentAdapter
@@ -115,16 +116,23 @@ class SessionRunner:
 
     def run_grade(
         self, *, journey_id: int, unit_id: int, axis: str, turn_id: str, question: str,
-        answer: str, step: str = "probe",
+        answer: str, step: str = "probe", refs: Any = None,
     ) -> TurnResult:
+        # A graded answer may carry highlight pins as additional evidence for the JUDGE.
+        # They are validated up front, ride in the grade packet's current_evidence, and are
+        # stored on the durable answer message — the verdict/route/probe schema is unchanged.
+        normalized = self.orchestrator.references.validate(refs, journey_id=journey_id)
+        transient: dict[str, Any] = {"learner_answer": answer}
+        if normalized:
+            transient["refs"] = normalized
         wakeup = self.wakeups.build(
-            step="wakeup.grade", unit_id=unit_id, axis=axis,
-            transient={"learner_answer": answer},
+            step="wakeup.grade", unit_id=unit_id, axis=axis, transient=transient,
         )
         output = self._invoke("wakeup.grade", wakeup)
         result = self.orchestrator.submit_answer(
             journey_id=journey_id, unit_id=unit_id, axis=axis, turn_id=turn_id,
             question=question, answer=answer, grade_blocks=output.blocks, step=step,
+            refs=normalized,
         )
         self._record_tools(journey_id, unit_id, turn_id, "wakeup.grade", output)
         return result
@@ -154,6 +162,31 @@ class SessionRunner:
             raise ValidationError("cannot distill a unit that has no axes")
         return str(row["axis"])
 
+    # -- aside (off-record side question; never grades or advances) ----------------
+
+    def run_aside(
+        self, *, journey_id: int, unit_id: int, request_id: str, question: str,
+        refs: Any = None, thread_id: str | None = None, origin_message_id: int | None = None,
+    ) -> AsideResult:
+        """Record the off-record question, run the ASIDE agent, and record its reply.
+
+        Idempotent by ``request_id``: a completed turn short-circuits with no agent call; a
+        durable PENDING turn (e.g. a prior invocation crashed) is safely re-run. The agent's
+        prose reply is recorded inertly — it is never parsed for a verdict or a route.
+        """
+        begin = self.orchestrator.begin_aside(
+            journey_id=journey_id, unit_id=unit_id, request_id=request_id, question=question,
+            refs=refs, thread_id=thread_id, origin_message_id=origin_message_id)
+        if begin.status == "COMPLETE":
+            return begin
+        packet = self.wakeups.build_aside(journey_id=journey_id, request_id=begin.request_id)
+        instruction = build_aside_instruction(list(packet["context"]["unit"]["axes"]))
+        output = self._invoke_with("wakeup.aside", packet, instruction)
+        result = self.orchestrator.commit_aside(
+            journey_id=journey_id, request_id=request_id, aside_blocks=output.blocks)
+        self._record_tools(journey_id, unit_id, f"aside:{request_id}", "wakeup.aside", output)
+        return result
+
     # -- lifecycle pass-throughs (no agent call) ----------------------------------
 
     def finish_child(self, *, child_unit_id: int) -> TurnResult:
@@ -171,7 +204,10 @@ class SessionRunner:
     # -- internals ----------------------------------------------------------------
 
     def _invoke(self, step: str, wakeup: dict[str, Any]) -> AgentOutput:
-        instruction = self.instructions.get(step, "")
+        return self._invoke_with(step, wakeup, self.instructions.get(step, ""))
+
+    def _invoke_with(self, step: str, wakeup: dict[str, Any], instruction: str) -> AgentOutput:
+        """Invoke the agent seam with an explicit instruction (aside assembles its own)."""
         if not instruction.strip():
             raise ValidationError(f"no agent instruction configured for {step}")
         result = self.agent_run(wakeup, instruction)

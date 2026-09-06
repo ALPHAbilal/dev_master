@@ -13,7 +13,9 @@ Claude SDK; a thin production layer runs ``ClaudeAgentAdapter.run`` and forwards
 from __future__ import annotations
 
 import json
+import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 from .config import TutorConfig
@@ -23,11 +25,19 @@ from .graph_projection import GraphProjection
 from .journey_archive import JourneyArchiveService
 from .learner_model import LearnerModelService
 from .parsing import ReturnStampParser
-from .recorders import ConversationRecorder, JourneyRecorder, ProbeRecorder, ToolCallRecorder
+from .recorders import (
+    AsideRecorder, ConversationRecorder, JourneyRecorder, ProbeRecorder, ToolCallRecorder,
+)
+from .references import PinStore, ReferenceValidator
 from .routing import RouteDecision, Router
 from .semantics import SemanticGraphService
 from .services import ArchiveService
 from .structure import StructureExtractor
+
+
+def _utc_now() -> str:
+    """Application-supplied UTC timestamp for the aside tables (fixed ISO-8601 form)."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,6 +46,20 @@ class TurnResult:
 
     journey_id: int
     decision: RouteDecision | None
+    projection_revision: int
+
+
+@dataclass(frozen=True, slots=True)
+class AsideResult:
+    """The outcome of an off-record aside step. It carries NO RouteDecision — an aside
+    never advances the lesson — so it cannot be mistaken for a graded turn."""
+
+    journey_id: int
+    thread_id: str
+    request_id: str
+    learner_message_id: int
+    reply_message_id: int | None
+    status: str
     projection_revision: int
 
 
@@ -58,6 +82,9 @@ class TurnOrchestrator:
         learner_model: LearnerModelService | None = None,
         graph_projection: GraphProjection | None = None,
         tool_calls_recorder: ToolCallRecorder | None = None,
+        asides: AsideRecorder | None = None,
+        references: ReferenceValidator | None = None,
+        pins: PinStore | None = None,
     ) -> None:
         self.db = db
         self.config = config
@@ -66,6 +93,11 @@ class TurnOrchestrator:
         self.conversation = conversation or ConversationRecorder(db, config)
         self.probes = probes or ProbeRecorder(db, config)
         self.journeys = journeys or JourneyRecorder(db, config)
+        # Aside layer (off-record side questions). Always available — asides are additive
+        # and side-effect-free on the ladder, so they need no optional wiring toggle.
+        self.asides = asides or AsideRecorder(db, config)
+        self.references = references or ReferenceValidator(db, config)
+        self.pins = pins or PinStore(config)
         # Optional additive wiring. When present, the orchestrator auto-attaches the
         # parser structure graph for newly pointed units and checkpoints/finalizes the
         # journey archive. When omitted, behavior is byte-for-byte the prior version.
@@ -177,6 +209,7 @@ class TurnOrchestrator:
         answer: str,
         grade_blocks: list[str],
         step: str = "probe",
+        refs: list[dict[str, Any]] | None = None,
     ) -> TurnResult:
         """Persist the learner answer, then commit route + probe + lifecycle atomically.
 
@@ -199,6 +232,7 @@ class TurnOrchestrator:
             self.conversation.record(
                 journey_id=journey_id, unit_id=unit_id, role="learner", message_kind="answer",
                 content=answer, turn_id=turn_id, axis=axis, status="AWAITING_EVALUATION",
+                refs=refs,
             )
         # 5-7: parse + validate the Judge stamp with no route claimed yet.
         stamp = self.parser.parse(grade_blocks, expected_kind="return.grade")
@@ -370,6 +404,118 @@ class TurnOrchestrator:
                                        event_type="journey_resumed", axis=decision.axis)
             revision = self.journeys.bump_revision(journey_id)
         return TurnResult(journey_id, decision, revision)
+
+    # -- Aside layer: off-record, ungraded side questions -------------------------
+
+    def begin_aside(
+        self, *, journey_id: int, unit_id: int, request_id: str, question: str,
+        refs: Any = None, thread_id: str | None = None, origin_message_id: int | None = None,
+    ) -> AsideResult:
+        """Record an off-record learner question (+ its pins) and open/continue a thread.
+
+        Writes ONLY the aside/journey layer: an ``aside_question`` message, an optional new
+        thread + one map anchor, and a PENDING ``aside_turn``. It records no probe, changes
+        no axis/unit/stack/meta, and never advances the driver. Idempotent by ``request_id``.
+        Pins are frozen to files after commit so the aside agent reads them through a tool.
+        """
+        self._require_uuid(request_id, "request_id")
+        existing = self.asides.get_turn(journey_id=journey_id, request_id=request_id)
+        if existing is not None:
+            return self._aside_result_from_turn(journey_id, existing)
+        self._require_aside_journey(journey_id, unit_id)
+        normalized = self.references.validate(refs, journey_id=journey_id)
+        if not question.strip() and not normalized:
+            raise ValidationError("an aside needs a question or at least one reference")
+        title = question.strip()[:120] or "Side question"
+        created_at = _utc_now()
+        is_new_thread = thread_id is None
+        with self.db.transaction():
+            if is_new_thread:
+                thread_id = str(uuid.uuid4())
+                self.asides.create_thread(
+                    thread_id=thread_id, journey_id=journey_id, unit_id=unit_id,
+                    origin_message_id=origin_message_id, title=title, created_at=created_at)
+            else:
+                if self.asides.get_thread(journey_id=journey_id, thread_id=thread_id) is None:
+                    raise ValidationError("aside thread does not belong to this journey")
+                if origin_message_id is not None:
+                    raise ValidationError("a follow-up must not set origin_message_id")
+            learner_message_id = self.conversation.record(
+                journey_id=journey_id, unit_id=unit_id, role="learner",
+                message_kind="aside_question", content=question, turn_id=f"aside:{request_id}",
+                refs=normalized, thread_kind="aside", thread_id=thread_id)
+            anchor_event_id = None
+            if is_new_thread:
+                anchor_event_id = self.journeys.record_event(
+                    journey_id=journey_id, unit_id=unit_id, event_type="aside",
+                    payload={"thread_id": thread_id, "title": title,
+                             "origin_message_id": origin_message_id},
+                    message_refs=[learner_message_id],
+                    source_ref=(normalized[0]["source"] if normalized else None))
+            self.asides.start_turn(
+                request_id=request_id, journey_id=journey_id, thread_id=thread_id,
+                request={"question": question, "refs": normalized, "unit_id": unit_id,
+                         "origin_message_id": origin_message_id},
+                learner_message_id=learner_message_id, anchor_event_id=anchor_event_id,
+                created_at=created_at)
+            revision = self.journeys.bump_revision(journey_id)
+        # Post-commit: freeze the pins to files (no DB lock held during file IO).
+        self.pins.materialize(thread_id=thread_id, refs=normalized)
+        return AsideResult(journey_id, thread_id, request_id, learner_message_id, None,
+                           "PENDING", revision)
+
+    def commit_aside(self, *, journey_id: int, request_id: str,
+                     aside_blocks: list[str]) -> AsideResult:
+        """Record the aside agent's reply and complete the turn. No route, no advance.
+
+        Idempotent: a second commit for a COMPLETE turn returns the winning reply and does
+        not re-record. Failure inside the boundary rolls reply + completion + revision back
+        together, leaving the durable PENDING question for a same-request retry.
+        """
+        turn = self.asides.get_turn(journey_id=journey_id, request_id=request_id)
+        if turn is None:
+            raise ValidationError("no aside turn exists for this request")
+        if turn["status"] == "COMPLETE":
+            return self._aside_result_from_turn(journey_id, turn)
+        reply = "\n\n".join(block.strip() for block in aside_blocks if block.strip())
+        if not reply:
+            raise ValidationError("aside agent produced no reply text")
+        unit_id = int(json.loads(turn["request_json"])["unit_id"])
+        completed_at = _utc_now()
+        with self.db.transaction():
+            current = self.asides.get_turn(journey_id=journey_id, request_id=request_id)
+            if current["status"] == "COMPLETE":
+                return self._aside_result_from_turn(journey_id, current)
+            reply_message_id = self.conversation.record(
+                journey_id=journey_id, unit_id=unit_id, role="tutor",
+                message_kind="aside_reply", content=reply, turn_id=f"aside:{request_id}",
+                source_wakeup_step="wakeup.aside", thread_kind="aside",
+                thread_id=current["thread_id"])
+            self.asides.complete_turn(journey_id=journey_id, request_id=request_id,
+                reply_message_id=reply_message_id, completed_at=completed_at)
+            revision = self.journeys.bump_revision(journey_id)
+        return AsideResult(journey_id, current["thread_id"], request_id,
+                           current["learner_message_id"], reply_message_id, "COMPLETE", revision)
+
+    def _require_aside_journey(self, journey_id: int, unit_id: int) -> None:
+        journey = self.journeys.get(journey_id)
+        if journey["state"] == "OWNED":
+            raise ValidationError("cannot open an aside on a completed (OWNED) journey")
+        if self.journeys.journey_for_unit(unit_id) != journey_id:
+            raise ValidationError("unit does not belong to this journey")
+
+    def _aside_result_from_turn(self, journey_id: int, turn: dict[str, Any]) -> AsideResult:
+        revision = int(self.journeys.get(journey_id)["projection_revision"])
+        return AsideResult(journey_id, turn["thread_id"], turn["id"],
+                           turn["learner_message_id"], turn["reply_message_id"],
+                           turn["status"], revision)
+
+    @staticmethod
+    def _require_uuid(value: Any, label: str) -> None:
+        try:
+            uuid.UUID(str(value))
+        except (ValueError, TypeError, AttributeError):
+            raise ValidationError(f"{label} must be a UUID")
 
     # -- internals ----------------------------------------------------------------
 
