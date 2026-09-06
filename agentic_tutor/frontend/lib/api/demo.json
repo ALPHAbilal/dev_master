@@ -1,0 +1,643 @@
+{
+  "CODEBASES": [
+    {
+      "name": "run_prompts.py",
+      "open": true,
+      "units": [
+        {
+          "slug": "load_prompts",
+          "state": "OWNED"
+        },
+        {
+          "slug": "normalize_row",
+          "state": "OWNED"
+        },
+        {
+          "slug": "_pinned_qa_group",
+          "state": "ACTIVE",
+          "current": true
+        },
+        {
+          "slug": "_dedupe_by_id",
+          "state": "QUEUED"
+        },
+        {
+          "slug": "build_prompt_batch",
+          "state": "QUEUED"
+        },
+        {
+          "slug": "run_prompts",
+          "state": "QUEUED"
+        }
+      ]
+    },
+    {
+      "name": "schema_loader.py",
+      "open": false,
+      "units": [
+        {
+          "slug": "read_schema",
+          "state": "PARKED"
+        },
+        {
+          "slug": "validate_row",
+          "state": "QUEUED"
+        }
+      ]
+    }
+  ],
+  "STREAM": [
+    {
+      "t": "msg",
+      "id": 1,
+      "role": "system",
+      "text": "Unit opened — <code>_pinned_qa_group</code> (L42–46), phase ASSEMBLE."
+    },
+    {
+      "t": "run",
+      "id": "r2",
+      "agent": "TEACHER",
+      "step": "wakeup.probe",
+      "tools": [
+        [
+          "read_code_slice",
+          "L42–46"
+        ],
+        [
+          "read_axis_evidence",
+          "What it does"
+        ],
+        [
+          "read_probe_history",
+          "no prior probes"
+        ]
+      ]
+    },
+    {
+      "t": "msg",
+      "id": 2,
+      "role": "tutor",
+      "text": "Before you write it — what does the caller expect back? Shape and order."
+    },
+    {
+      "t": "msg",
+      "id": 3,
+      "role": "learner",
+      "text": "A list of question dicts, pinned first, preserving the passed order."
+    },
+    {
+      "t": "run",
+      "id": "r2g",
+      "agent": "JUDGE",
+      "step": "wakeup.grade",
+      "tools": [
+        [
+          "read_code_slice",
+          "L42–46"
+        ],
+        [
+          "read_axis_evidence",
+          "What it does"
+        ],
+        [
+          "read_probe_history",
+          "1 probe"
+        ],
+        [
+          "read_transcript",
+          "your answer"
+        ]
+      ],
+      "stamp": {
+        "kind": "return.grade",
+        "verdict": "SOLID",
+        "category": "correct-deep"
+      }
+    },
+    {
+      "t": "fb",
+      "id": "f2",
+      "for": [
+        2,
+        3
+      ],
+      "verdict": "SOLID",
+      "category": "correct-deep",
+      "agent": "JUDGE",
+      "text": "Order within the pinned group is right — COMPREHEND proved."
+    },
+    {
+      "t": "run",
+      "id": "r5",
+      "agent": "TEACHER",
+      "step": "wakeup.probe",
+      "tools": [
+        [
+          "read_code_slice",
+          "L42–46"
+        ],
+        [
+          "read_axis_evidence",
+          "What can break"
+        ],
+        [
+          "read_probe_history",
+          "1 probe"
+        ]
+      ]
+    },
+    {
+      "t": "msg",
+      "id": 5,
+      "role": "tutor",
+      "text": "Now trace one input where a pinned <code>id</code> also appears unpinned. What comes out?"
+    },
+    {
+      "t": "msg",
+      "id": 6,
+      "role": "learner",
+      "text": "…it would appear twice. I didn’t dedupe across the two groups."
+    },
+    {
+      "t": "run",
+      "id": "r6g",
+      "agent": "JUDGE",
+      "step": "wakeup.grade",
+      "tools": [
+        [
+          "read_code_slice",
+          "L42–46"
+        ],
+        [
+          "read_axis_evidence",
+          "What can break"
+        ],
+        [
+          "read_probe_history",
+          "2 probes"
+        ],
+        [
+          "read_transcript",
+          "your answer"
+        ]
+      ],
+      "stamp": {
+        "kind": "return.grade",
+        "verdict": "MISSING",
+        "category": "sibling-hole"
+      }
+    },
+    {
+      "t": "fb",
+      "id": "f6",
+      "for": [
+        5,
+        6
+      ],
+      "verdict": "MISSING",
+      "category": "sibling-hole",
+      "agent": "JUDGE",
+      "text": "Gap: no de-duplication across groups. Prerequisite uncovered — dict identity vs value."
+    },
+    {
+      "t": "msg",
+      "id": 7,
+      "role": "tutor",
+      "text": "Here’s the shape once you dedupe by the value you care about — collapse it if it’s in the way."
+    },
+    {
+      "t": "code",
+      "id": "c7",
+      "agent": "Tutor",
+      "lang": "py",
+      "fname": "_pinned_qa_group.py",
+      "code": "def _pinned_qa_group(questions):\n    pinned = [q for q in questions if q[\"pin\"]]\n    rest   = [q for q in questions if not q[\"pin\"]]\n    seen, out = set(), []\n    for q in pinned + rest:          # pinned first, order preserved\n        if q[\"id\"] not in seen:      # dedupe by value, not object identity\n            seen.add(q[\"id\"])\n            out.append(q)\n    return out\n"
+    },
+    {
+      "t": "aside",
+      "id": "a1",
+      "title": "How does list.append differ from +?",
+      "collapsed": true,
+      "qa": [
+        {
+          "role": "learner",
+          "text": "Quick one — why <code>out.append(q)</code> and not <code>out = out + [q]</code>?",
+          "refs": [
+            {
+              "kind": "code",
+              "label": "_pinned_qa_group.py",
+              "snippet": "out.append(q)"
+            },
+            {
+              "kind": "test",
+              "label": "test_pinned_qa.py",
+              "snippet": "return pinned + rest"
+            }
+          ]
+        },
+        {
+          "role": "tutor",
+          "text": "<code>append</code> mutates the same list in place (O(1)); <code>+</code> builds a new list each time (O(n)). In a loop, append is the one you want."
+        }
+      ]
+    }
+  ],
+  "UNITS": {
+    "load_prompts": {
+      "story": [
+        [
+          "learned",
+          0,
+          "the file is loaded and turned into rows"
+        ],
+        [
+          "proved",
+          0,
+          "you can trace where the rows come from",
+          "COMPREHEND"
+        ],
+        [
+          "sealed",
+          0,
+          "Read the prompt file"
+        ]
+      ]
+    },
+    "normalize_row": {
+      "story": [
+        [
+          "learned",
+          0,
+          "each row gets a real pin flag, even when it's missing"
+        ],
+        [
+          "proved",
+          0,
+          "you handled the row with no pin key",
+          "ROBUSTNESS"
+        ],
+        [
+          "sealed",
+          0,
+          "Coerce each row's shape"
+        ]
+      ]
+    },
+    "_pinned_qa_group": {
+      "story": [
+        [
+          "learned",
+          0,
+          "pinned items stay in the order they were given"
+        ],
+        [
+          "proved",
+          0,
+          "you can read pinned-first ordering",
+          "COMPREHEND"
+        ],
+        [
+          "proved",
+          0,
+          "the order survives because the two groups are joined",
+          "MECHANISM"
+        ],
+        [
+          "note",
+          0,
+          "de-dupe across groups — worth doing, but it doesn't block you"
+        ],
+        [
+          "aside",
+          0,
+          "How does list.append differ from +?",
+          "a1"
+        ],
+        [
+          "gap",
+          0,
+          "the same id can appear in both groups — nothing removes the duplicate",
+          "ROBUSTNESS"
+        ],
+        [
+          "dive",
+          0,
+          "Dict identity vs value",
+          "you needed this first"
+        ],
+        [
+          "learned",
+          1,
+          "`is` checks identity, `==` checks value"
+        ],
+        [
+          "mechanism",
+          1,
+          "you first explained equality by identity, not by value",
+          "MECHANISM"
+        ],
+        [
+          "gap",
+          1,
+          "to be sure, you needed how dict keys are matched"
+        ],
+        [
+          "dive",
+          1,
+          "Why keys must hash",
+          "needed before that could click"
+        ],
+        [
+          "learned",
+          2,
+          "membership checks the hash, then equality"
+        ],
+        [
+          "proved",
+          2,
+          "you named a key Python can't hash",
+          "MECHANISM"
+        ],
+        [
+          "sealed",
+          2,
+          "Why keys must hash"
+        ],
+        [
+          "return",
+          1,
+          "Dict identity vs value",
+          null,
+          "which do two equal dicts share — identity or value?"
+        ],
+        [
+          "proved",
+          1,
+          "two equal-looking dicts are still different objects",
+          "MECHANISM"
+        ],
+        [
+          "resolved",
+          1,
+          "equality is by identity, not value",
+          "MECHANISM"
+        ],
+        [
+          "sealed",
+          1,
+          "Dict identity vs value"
+        ],
+        [
+          "return",
+          0,
+          "Group pinned questions first",
+          "ROBUSTNESS",
+          "trace an input where a pinned id also appears unpinned"
+        ],
+        [
+          "dive",
+          0,
+          "What 'collision' means for ids",
+          "the gap came back once identity was solid"
+        ],
+        [
+          "learned",
+          1,
+          "two equal ids mean one real question, not two"
+        ],
+        [
+          "shaky",
+          1,
+          "still fuzzy on what the output length should be",
+          "COMPREHEND"
+        ],
+        [
+          "here",
+          1,
+          "answer what the output length should be",
+          "MECHANISM"
+        ]
+      ]
+    },
+    "dict_identity": {
+      "story": [
+        [
+          "why",
+          0,
+          "You opened this because ids collided in Group pinned questions first"
+        ],
+        [
+          "learned",
+          0,
+          "`is` checks identity, `==` checks value"
+        ],
+        [
+          "proved",
+          0,
+          "two equal-looking dicts are still different objects",
+          "MECHANISM"
+        ],
+        [
+          "sealed",
+          0,
+          "Dict identity vs value"
+        ],
+        [
+          "return",
+          0,
+          "Group pinned questions first",
+          "ROBUSTNESS",
+          "trace an input where a pinned id also appears unpinned"
+        ]
+      ]
+    },
+    "hashing_keys": {
+      "story": [
+        [
+          "why",
+          0,
+          "You opened this because identity needed how keys are matched"
+        ],
+        [
+          "learned",
+          0,
+          "membership checks the hash, then equality"
+        ],
+        [
+          "proved",
+          0,
+          "you named a key Python can't hash",
+          "MECHANISM"
+        ],
+        [
+          "sealed",
+          0,
+          "Why keys must hash"
+        ],
+        [
+          "return",
+          0,
+          "Dict identity vs value",
+          "MECHANISM",
+          "which do two equal dicts share — identity or value?"
+        ]
+      ]
+    },
+    "collision_semantics": {
+      "story": [
+        [
+          "why",
+          0,
+          "You opened this because the collision gap came back"
+        ],
+        [
+          "learned",
+          0,
+          "two equal ids mean one real question, not two"
+        ],
+        [
+          "shaky",
+          0,
+          "still fuzzy on what the output length should be",
+          "COMPREHEND"
+        ],
+        [
+          "here",
+          0,
+          "answer what the output length should be",
+          "MECHANISM"
+        ]
+      ]
+    },
+    "_dedupe_by_id": {
+      "story": [
+        [
+          "locked",
+          0,
+          "Not started yet — it's next on the ladder."
+        ]
+      ]
+    },
+    "build_prompt_batch": {
+      "story": [
+        [
+          "locked",
+          0,
+          "Locked until the earlier units are owned."
+        ]
+      ]
+    },
+    "run_prompts": {
+      "story": [
+        [
+          "locked",
+          0,
+          "Locked until the earlier units are owned."
+        ]
+      ]
+    },
+    "read_schema": {
+      "story": [
+        [
+          "locked",
+          0,
+          "Parked — resume from the sidebar to continue."
+        ]
+      ]
+    },
+    "validate_row": {
+      "story": [
+        [
+          "locked",
+          0,
+          "Locked until the earlier units are owned."
+        ]
+      ]
+    }
+  },
+  "FILES": {
+    "run_prompts.py": {
+      "code": [
+        "# assemble-pinned-qa",
+        "",
+        "def load_prompts(path):",
+        "    return json.load(open(path))",
+        "",
+        "def normalize_row(r):",
+        "    return {**r, \"pin\": bool(r.get(\"pin\"))}",
+        "",
+        "def _pinned_qa_group(questions):",
+        "    pinned = [q for q in questions if q[\"pin\"]]",
+        "    rest   = [q for q in questions if not q[\"pin\"]]",
+        "    # TODO: id collisions across groups?",
+        "    return pinned + rest",
+        "",
+        "def build_prompt_batch(rows):",
+        "    grouped = _pinned_qa_group(rows)",
+        "    return [render(r) for r in grouped]"
+      ],
+      "units": [
+        {
+          "slug": "load_prompts",
+          "lo": 3,
+          "hi": 4,
+          "state": "OWNED"
+        },
+        {
+          "slug": "normalize_row",
+          "lo": 6,
+          "hi": 7,
+          "state": "OWNED"
+        },
+        {
+          "slug": "_pinned_qa_group",
+          "lo": 9,
+          "hi": 13,
+          "state": "ACTIVE"
+        },
+        {
+          "slug": "build_prompt_batch",
+          "lo": 15,
+          "hi": 17,
+          "state": "QUEUED"
+        }
+      ]
+    },
+    "schema_loader.py": {
+      "code": [
+        "# schema_loader.py",
+        "import json",
+        "",
+        "def read_schema(path):",
+        "    with open(path) as fh:",
+        "        return json.load(fh)",
+        "",
+        "def validate_row(row, schema):",
+        "    for key in schema[\"required\"]:",
+        "        if key not in row:",
+        "            raise KeyError(key)",
+        "    return True"
+      ],
+      "units": [
+        {
+          "slug": "read_schema",
+          "lo": 4,
+          "hi": 6,
+          "state": "PARKED"
+        },
+        {
+          "slug": "validate_row",
+          "lo": 8,
+          "hi": 12,
+          "state": "QUEUED"
+        }
+      ]
+    }
+  },
+  "EDITOR_FILES": [
+    {
+      "name": "test_pinned_qa.py",
+      "content": "def _pinned_qa_group(questions):\n    pinned = [q for q in questions if q[\"pin\"]]\n    rest   = [q for q in questions if not q[\"pin\"]]\n    # TODO: id collisions across groups?\n    return pinned + rest\n"
+    }
+  ]
+}

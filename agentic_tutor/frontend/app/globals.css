@@ -1,0 +1,7 @@
+html,body { margin:0; height:100%; }
+.tutor-screen,.scan-screen { height:100vh; overflow:hidden; }
+:where(.tutor-screen,.scan-screen) :where(.unit,.cb-row) { width:100%; text-align:left; border:0; background:none; font:inherit; }
+.tutor-screen .say { white-space:pre-wrap; }
+.tutor-screen .utag { user-select:none; }
+.tutor-screen .settings { margin:auto; border:1px solid var(--bg-elevated); border-radius:12px; padding:24px; background:var(--bg-app); color:var(--text-primary); }
+.tutor-screen .settings::backdrop { background:rgba(0,0,0,.15); }
