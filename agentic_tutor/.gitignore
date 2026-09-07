@@ -1,6 +1,26 @@
+# Python
 __pycache__/
 *.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# Local engine state (SQLite + workspace/archive/aside files live under STATE_ROOT)
 *.db
 *.db-wal
 *.db-shm
-.pytest_cache/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+state/
+backend/state/
+
+# Node / Next (frontend also has its own .gitignore)
+node_modules/
+.next/
+*.tsbuildinfo
+
+# Env
+.env
+.env.*
+!.env.example
