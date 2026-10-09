@@ -221,6 +221,16 @@ export function createStubApi(): Api {
       });
       return { codebase_id: id, name: body.name };
     },
+    importRepo: async (body) => {
+      const id = `codebase-${++counter}`;
+      codebases.push({
+        id,
+        name: body.name,
+        session_id: `${id}-session`,
+        unit_count: units.length,
+      });
+      return { codebase_id: id, name: body.name };
+    },
     open: async (id) => {
       const cb = codebases.find((c) => c.id === id);
       if (!cb) throw new Error("Codebase not found");

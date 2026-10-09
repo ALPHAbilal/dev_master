@@ -27,6 +27,7 @@ from .errors import (
     CapabilityUnavailableError, InvariantError, StaleWorkspaceRevisionError, ValidationError,
 )
 from .factory import AppContext
+from .importer import clone_repository
 from .registry import ControlPlane
 from .auth import AuthenticationError, IdentityVerifier, verifier_from_env
 from .streaming import SSE_HEADERS, ScanLog, journey_events, scan_events
@@ -73,6 +74,12 @@ class CodebaseBody(BaseModel):
     source: str
 
 
+class ImportBody(BaseModel):
+    model_config = {"extra": "forbid"}
+    name: str
+    git_url: str
+
+
 @dataclass
 class SessionSurface:
     context: AppContext
@@ -110,6 +117,9 @@ def create_app(control_plane: ControlPlane, *, verifier: IdentityVerifier | None
         CORSMiddleware,
         allow_origins=allow_origins if allow_origins is not None else [
             value.strip() for value in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",") if value.strip()],
+        # Optional: a regex to additionally allow ephemeral origins (e.g. Vercel preview URLs).
+        # Unset -> None -> behaves exactly as before.
+        allow_origin_regex=os.getenv("ALLOWED_ORIGIN_REGEX") or None,
         allow_methods=["*"], allow_headers=["*"],
     )
 
@@ -191,6 +201,24 @@ def create_app(control_plane: ControlPlane, *, verifier: IdentityVerifier | None
                     await task
                 finally:
                     raise
+
+    @app.get("/health")
+    async def health() -> dict[str, str]:
+        """Unauthenticated liveness probe for the host's health checks."""
+        return {"status": "ok"}
+
+    @app.post("/codebases/import")
+    async def import_codebase(body: ImportBody, user_id: str = Depends(identity)) -> dict[str, Any]:
+        """Clone a public https git repo into CODEBASE_ROOT, then register it like any host dir."""
+        if source_root is None:
+            raise HTTPException(400, "import is disabled: CODEBASE_ROOT is not configured")
+        # Clone outside the lock (it writes to a unique dir, so no contention) — it can be slow.
+        target = await run_in_threadpool(lambda: _guard(lambda: clone_repository(
+            git_url=body.git_url, name=body.name, dest_root=source_root)))
+        async with resolver_lock:
+            cid = await run_in_threadpool(lambda: _guard(lambda: control_plane.create_codebase(
+                user_id=user_id, name=body.name, root_path=str(target))))
+        return {"codebase_id": cid, "name": body.name}
 
     @app.post("/codebases")
     async def create_codebase(body: CodebaseBody, user_id: str = Depends(identity)) -> dict[str, Any]:

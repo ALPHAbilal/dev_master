@@ -1,5 +1,6 @@
 // Current Python storage uses integer IDs; the target control plane uses strings.
 // Preserve the wire value, especially for strict reference validation.
+import type { StationSource } from '../scanner';
 export type Id = string | number;
 export type Ref = { label: string; snippet: string } & (
   | { kind: "code"; source: { file: string; lo: number; hi: number } }
@@ -25,13 +26,10 @@ export interface Codebase {
   session_id: string | null;
   unit_count: number;
 }
-export interface Unit {
+export interface Unit extends StationSource {
   id: Id;
   slug: string;
   title: string;
-  file: string;
-  lo: number;
-  hi: number;
   ordinal: number;
   depth: number;
   parent_id: Id | null;
@@ -157,7 +155,7 @@ export interface StreamEvents {
 }
 export interface ScanEvents {
   thinking: { text: string };
-  unit: { slug: string; file: string; lo: number; hi: number };
+  unit: StationSource & { slug: string };
   done: { journey_id: Id };
 }
 export type Handlers<T> = { [K in keyof T]?: (event: T[K]) => void } & {
@@ -172,6 +170,10 @@ export interface Api {
   register(body: {
     name: string;
     source: string;
+  }): Promise<{ codebase_id: Id; name: string }>;
+  importRepo(body: {
+    name: string;
+    git_url: string;
   }): Promise<{ codebase_id: Id; name: string }>;
   open(id: Id): Promise<{ session_id: string }>;
   init(body: Init): Promise<{

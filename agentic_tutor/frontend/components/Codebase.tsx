@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useTutor } from "@/lib/session";
 import type { Ref, Unit } from "@/lib/api/types";
 import Icon from "./Icon";
+import { stationHighlights } from '@/lib/scanner';
 type TreeNode = {
   name: string;
   path: string;
@@ -91,7 +92,7 @@ function ExplorerRow({
         </span>
         {node.file && (
           <span className="ex-count">
-            {snapshot?.units.filter((u) => u.file === node.path).length || ""}
+            {snapshot?.units.filter((u) => stationHighlights(u).some(h => h.file === node.path)).length || ""}
           </span>
         )}
       </div>
@@ -125,10 +126,10 @@ export default function Codebase({
   const paths = [
     ...new Set([
       ...Object.keys(files),
-      ...(snapshot?.units.map((u) => u.file) || []),
+      ...(snapshot?.units.flatMap((u) => stationHighlights(u).map(h => h.file)) || []),
     ]),
   ];
-  const path = selected || unit?.file || paths[0] || "",
+  const path = selected || (unit && stationHighlights(unit)[0]?.file) || paths[0] || "",
     source = files[path],
     lines = source?.split("\n") || [];
   function select(e: React.MouseEvent) {
@@ -200,7 +201,7 @@ export default function Codebase({
             id="focusToggle"
             role="switch"
             aria-checked={focus}
-            title="Show only the current unit's highlight"
+            title="Show only the current unit's highlights"
             onClick={() => setFocus(!focus)}
           >
             <span className="ftoggle-track">
@@ -217,9 +218,10 @@ export default function Codebase({
               </span>
             ) : (
               lines.map((line, i) => {
-                const range = snapshot?.units.find(
-                    (u) => u.file === path && i + 1 >= u.lo && i + 1 <= u.hi,
-                  ),
+                const matches = snapshot?.units.filter(
+                    (u) => stationHighlights(u).some(h => h.file === path && i + 1 >= h.lo && i + 1 <= h.hi),
+                  ) || [],
+                  range = matches.find(u => u.id === unit?.id) || matches[0],
                   current = range?.id === unit?.id,
                   lit = range && (!focus || current);
                 return (
@@ -232,7 +234,7 @@ export default function Codebase({
                   >
                     <span className="ln">{i + 1}</span>
                     <span className="code">{line || " "}</span>
-                    {lit && i + 1 === range.lo && (
+                    {lit && stationHighlights(range).some(h => h.file === path && i + 1 === h.lo) && (
                       <span className="utag">{range.slug}</span>
                     )}
                   </div>

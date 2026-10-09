@@ -1,0 +1,729 @@
+<title>T3 Graph Variations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
+<style>
+/* Layout: a sticky step bar, then three panels side by side (stacked when narrow). Each panel draws the same 11 steps of T3 a different way. Light-only, matching the T3 Tutor Loop page. */
+:root{
+  color-scheme:light;
+  --bg:#F6F8FB;
+  --surface:#FFFFFF;
+  --surface-2:#EEF2F7;
+  --ink:#1B2430;
+  --ink-2:#4C5869;
+  --ink-3:#7A8597;
+  --line:#DDE3EB;
+  --line-strong:#B8C2CF;
+  --accent:#2F5FD0;
+  --accent-soft:#E6EDFC;
+  --focus-ring:rgba(47,95,208,.16);
+  --orch:#7350CC;
+  --ok:#2E8443;
+  --ok-soft:#E5F5E9;
+  --warn:#AA6400;
+  --warn-soft:#FCF1DE;
+  --warn-hatch:rgba(170,100,0,.38);
+  --bad:#BC375F;
+  --bad-soft:#FCE8EE;
+  --on-strong:#FFFFFF;
+  --shadow:0 1px 2px rgba(27,36,48,.05),0 6px 18px rgba(27,36,48,.06);
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-cond:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.page{max-width:1500px;margin:0 auto;padding-inline:clamp(16px,3vw,36px);padding-block:28px 56px;display:grid;gap:18px}
+code{font-family:var(--font-mono);font-size:.87em;background:var(--surface-2);padding:1px 5px;border-radius:4px}
+.lbl{font:600 11px/1.6 var(--font-cond);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.defs{position:absolute;width:0;height:0;overflow:hidden}
+
+/* ---------- header ---------- */
+.top{display:grid;gap:10px}
+.eyebrow{margin:0;font:600 12px/1.3 var(--font-cond);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+h1{margin:0;font:700 clamp(26px,3.6vw,38px)/1.1 var(--font-body);letter-spacing:-.02em;text-wrap:balance}
+.lede{margin:0;max-width:80ch;color:var(--ink-2)}
+
+/* ---------- step bar ---------- */
+.stepbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:12px 14px;display:grid;gap:10px}
+.sb-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.btn{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;min-width:36px;height:32px;padding:0 10px;font:600 14px var(--font-mono);cursor:pointer}
+.btn:hover{border-color:var(--line-strong)}
+.btn:disabled{opacity:.4;cursor:default}
+.dots{display:flex;gap:4px;flex-wrap:wrap}
+.dot{appearance:none;width:28px;height:28px;border-radius:14px;border:1.5px solid var(--line-strong);background:var(--surface);font:600 12px var(--font-mono);color:var(--ink-2);cursor:pointer;padding:0}
+.dot.past{border-color:var(--accent);color:var(--accent)}
+.dot.on{background:var(--accent);border-color:var(--accent);color:var(--on-strong)}
+.btn:focus-visible,.dot:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sb-info{display:grid;gap:4px;min-width:0}
+.sb-title{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sb-title .n{font:600 13px var(--font-mono);color:var(--ink-3)}
+.sb-title b{font-size:16px;font-weight:600}
+.pill{display:inline-flex;align-items:center;border-radius:999px;padding:0 9px;font:600 11px/1.85 var(--font-mono);letter-spacing:.02em;border:1px solid}
+.pill.neutral{color:var(--ink-2);border-color:var(--line-strong);background:var(--surface)}
+.pill.ok{color:var(--ok);border-color:var(--ok);background:var(--ok-soft)}
+.pill.warn{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
+.pill.bad{color:var(--bad);border-color:var(--bad);background:var(--bad-soft)}
+.pill.accent{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+.decision{font:600 12px var(--font-mono);color:var(--orch)}
+.said{margin:0;font-size:13.5px;color:var(--ink-2);overflow-wrap:anywhere}
+.said .lbl{margin-right:6px}
+
+/* ---------- panels ---------- */
+.variants{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr));gap:18px;align-items:start}
+.variant{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:12px;min-width:0}
+.vhead{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;align-items:center}
+.vtag{grid-row:span 2;width:30px;height:30px;border-radius:8px;background:var(--ink);color:var(--on-strong);display:grid;place-items:center;font:600 14px var(--font-mono)}
+.vhead h2{margin:0;font:600 18px/1.25 var(--font-body)}
+.vhead p{margin:0;font-size:13px;color:var(--ink-2)}
+.figure{overflow-x:auto}
+.figure svg{display:block;width:100%;height:auto;min-width:320px}
+.vnote{display:grid;gap:4px;font-size:13px;color:var(--ink-2);background:var(--surface-2);border-radius:8px;padding:9px 12px;overflow-wrap:anywhere}
+.vnote b{color:var(--ink);font-weight:600}
+.key{list-style:none;margin:0;padding:10px 0 0;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink-2)}
+.key li{display:flex;align-items:center;gap:6px}
+.sw{flex:none;display:inline-block;width:20px;height:11px;border-radius:3px;border:1.5px solid var(--line-strong);background:var(--surface)}
+.sw.active{background:var(--accent-soft);border-color:var(--accent)}
+.sw.paused{border-color:var(--warn);background:repeating-linear-gradient(45deg,var(--warn-soft) 0 3px,var(--warn-hatch) 3px 4px)}
+.sw.resolved,.sw.known{background:var(--ok-soft);border-color:var(--ok)}
+.sw.saved{border-style:dashed;border-color:var(--ink-3)}
+.sw.needed{border-style:dashed}
+.sw.uncertain{background:var(--warn-soft);border-color:var(--warn)}
+.sw.missing{background:var(--bad-soft);border-color:var(--bad)}
+.sw.line{height:0;border:0;border-top:3px solid var(--accent);border-radius:0}
+.sw.tick{width:12px;height:3px;border:0;border-radius:1px;background:var(--ink)}
+.sw.dash{height:0;border:0;border-top:1.5px dashed var(--ink-3);border-radius:0}
+.foot{margin:0;font-size:12.5px;color:var(--ink-3)}
+
+/* ---------- SVG shared ---------- */
+.hatch-bg{fill:var(--warn-soft)}
+.hatch-ln{stroke:var(--warn);stroke-width:1.4;opacity:.45}
+.arrowhead{fill:var(--ink-3)}
+.fut{opacity:.16}
+.svg-num{font:600 10px var(--font-mono);fill:var(--ink-3);text-anchor:middle}
+.svg-num.cur{fill:var(--accent)}
+.svg-num.fut{opacity:.45}
+.sec{font:600 8.5px var(--font-cond);letter-spacing:.1em;fill:var(--ink-3)}
+.divider{stroke:var(--line-strong);stroke-width:1;stroke-dasharray:2 3}
+.guide{stroke:var(--line);stroke-width:1}
+.cs-needed{fill:var(--surface);stroke:var(--line-strong);stroke-dasharray:2 2}
+.cs-uncertain{fill:var(--warn-soft);stroke:var(--warn)}
+.cs-missing{fill:var(--bad-soft);stroke:var(--bad)}
+.cs-known{fill:var(--ok-soft);stroke:var(--ok)}
+.chg{animation:chg 1.2s ease-out 1}
+@keyframes chg{0%{stroke:var(--ink);stroke-width:3.5}100%{}}
+
+/* ---------- A: dive and return ---------- */
+.a-band{fill:var(--accent-soft);opacity:.65}
+.lane-id{font:600 11px var(--font-mono);fill:var(--ink)}
+.lane-sub{font:600 8px var(--font-cond);letter-spacing:.08em;fill:var(--ink-3)}
+.a-cell{stroke-width:1.2}
+.a-ACTIVE{fill:var(--accent-soft);stroke:var(--accent)}
+.a-SUSPENDED{fill:url(#hatch);stroke:var(--warn)}
+.a-OPEN{fill:var(--surface);stroke:var(--ink-3);stroke-dasharray:3 2}
+.a-RES{fill:var(--ok-soft);stroke:var(--ok)}
+.a-hist{fill:var(--ok);opacity:.35}
+.a-hist.fut{opacity:.06}
+.a-check{font:700 10px var(--font-body);fill:var(--ok);text-anchor:middle}
+.a-ev{fill:var(--ink)}
+.a-evdot{fill:var(--ink)}
+.a-path{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.a-path.ghost{stroke:var(--line-strong);stroke-width:1.4;stroke-dasharray:3 3}
+.a-dot{fill:var(--accent)}
+.a-dot.cur{stroke:var(--surface);stroke-width:2}
+.a-halo{fill:none;stroke:var(--accent);stroke-width:1.5;opacity:.35}
+.a-ccell{stroke-width:1}
+.c-row-id{font:600 9.5px var(--font-mono);fill:var(--ink)}
+.c-row-name{font:400 8.5px var(--font-body);fill:var(--ink-2)}
+
+/* ---------- B: nested detours ---------- */
+.nest{display:grid;gap:10px;min-width:0}
+.frame{border:1.5px solid var(--line-strong);border-radius:10px;padding:10px 12px;display:grid;gap:7px;background:var(--surface);min-width:0}
+.frame.st-ACTIVE{border-color:var(--accent)}
+.frame.focus{background:var(--accent-soft);box-shadow:0 0 0 3px var(--focus-ring)}
+.frame.st-SUSPENDED{border-style:dashed;border-color:var(--warn)}
+.frame.st-RESOLVED{border-color:var(--ok);background:var(--ok-soft)}
+.frame.st-OPEN{border-style:dashed;border-color:var(--ink-3)}
+.frame.chg{animation:chgh 1.2s ease-out 1}
+@keyframes chgh{0%{box-shadow:0 0 0 3px var(--ink-3)}100%{box-shadow:0 0 0 0 var(--focus-ring)}}
+.fhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fid{font:600 13px var(--font-mono)}
+.fcat{font:600 10.5px var(--font-cond);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.fst{margin-left:auto;border-radius:999px;padding:0 8px;font:600 10.5px/1.8 var(--font-cond);letter-spacing:.08em;text-transform:uppercase;color:var(--on-strong);background:var(--ink-3)}
+.st-ACTIVE>.fhead .fst{background:var(--accent)}
+.st-SUSPENDED>.fhead .fst{background:var(--warn)}
+.st-RESOLVED>.fhead .fst{background:var(--ok)}
+.ftitle{margin:0;font-weight:600;font-size:14px;line-height:1.35}
+.fline{display:grid;grid-template-columns:92px minmax(0,1fr);gap:8px;align-items:baseline;font-size:12.5px;color:var(--ink-2)}
+.fline.exit .val{color:var(--accent);font-weight:500}
+.fline.ret .val{color:var(--warn);font-weight:500}
+.fev{margin:0;padding:0;list-style:none;display:grid;gap:1px;font:12px/1.5 var(--font-mono);color:var(--ink-2)}
+.fev li::before{content:"+ ";color:var(--ink-3)}
+.fev li.new{color:var(--ok);font-weight:600}
+.fev .s{color:var(--ink-3);font-weight:400}
+.fdone{margin:0;font:12px/1.5 var(--font-mono);color:var(--ok);background:var(--surface);border:1px solid var(--ok);border-radius:8px;padding:5px 9px}
+.fdone.chg{animation:chgh 1.2s ease-out 1}
+.fclosed,.fnote{margin:0;font-size:12.5px;color:var(--ink-2)}
+.chips{display:flex;flex-wrap:wrap;gap:5px;min-width:0}
+.chip{display:inline-flex;align-items:center;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:6px;padding:0 7px;font:500 12px/1.75 var(--font-mono);white-space:nowrap}
+.chip.cs-needed{border-style:dashed;border-color:var(--line-strong);background:var(--surface);color:var(--ink-2)}
+.chip.cs-uncertain{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+.chip.cs-missing{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.chip.cs-known{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
+.tray{border:1.5px dashed var(--line-strong);border-radius:10px;padding:10px 12px;display:grid;gap:8px}
+.tray .empty{margin:0;font-size:12.5px;color:var(--ink-3)}
+.reused{margin:0;font-size:12.5px;color:var(--ink-2)}
+.reused .lbl{margin-right:6px}
+
+/* ---------- C: knowledge map ---------- */
+.c-edge{fill:none;stroke:var(--line-strong);stroke-width:1.4}
+.c-edge.done{stroke:var(--ok);opacity:.55}
+.c-edge.hot{stroke:var(--accent);stroke-width:2.2}
+.c-edge.dash{stroke:var(--ink-3);stroke-dasharray:4 3}
+.c-task{fill:var(--surface);stroke:var(--line-strong);stroke-width:1.4}
+.c-task.done,.c-task.RESOLVED{fill:var(--ok-soft);stroke:var(--ok)}
+.c-task.ACTIVE{fill:var(--accent-soft);stroke:var(--accent);stroke-width:2}
+.c-task.SUSPENDED{fill:url(#hatch);stroke:var(--warn)}
+.c-task.next{stroke:var(--ink-3);stroke-dasharray:4 3}
+.c-task.next.up{stroke:var(--accent);stroke-width:2}
+.c-card{stroke-width:1.4}
+.c-card.linked{stroke:var(--accent);stroke-width:2.6}
+.c-id{font:600 11px var(--font-mono);fill:var(--ink)}
+.c-name{font:400 9.5px var(--font-body);fill:var(--ink)}
+.c-sub{font:400 9px var(--font-body);fill:var(--ink-2)}
+.c-sub.ok{fill:var(--ok);font-weight:600}
+.c-ev{font:400 8.8px var(--font-body);fill:var(--ink-2)}
+.c-ev.none{fill:var(--ink-3);font-style:italic}
+.c-tag.tg-needed{fill:var(--ink-3)}
+.c-tag.tg-uncertain{fill:var(--warn)}
+.c-tag.tg-missing{fill:var(--bad)}
+.c-tag.tg-known{fill:var(--ok)}
+.c-tag-t{font:600 7.5px var(--font-cond);letter-spacing:.06em;fill:var(--on-strong);text-anchor:middle}
+.c-badge{stroke-width:1.3}
+.c-btext{font:600 8.5px var(--font-mono);fill:var(--ink);text-anchor:middle}
+.c-lbl{font:600 7.5px var(--font-cond);letter-spacing:.08em;fill:var(--ink-3)}
+
+@media (max-width:520px){
+  .fline{grid-template-columns:minmax(0,1fr);gap:0}
+}
+@media (prefers-reduced-motion:reduce){
+  .chg,.frame.chg,.fdone.chg{animation:none}
+}
+</style>
+
+<svg class="defs" width="0" height="0" aria-hidden="true" focusable="false">
+  <defs>
+    <pattern id="hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+      <rect width="6" height="6" class="hatch-bg"></rect>
+      <line x1="0" y1="0" x2="0" y2="6" class="hatch-ln"></line>
+    </pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="arrowhead"></path>
+    </marker>
+  </defs>
+</svg>
+
+<div class="page">
+  <header class="top">
+    <p class="eyebrow">T3 tutor loop · graph only</p>
+    <h1>Three ways to draw the T3 graph</h1>
+    <p class="lede">Same task and the same 11 steps as the T3 Tutor Loop page. Each panel draws the graph a different way, so you can see which one shows what matters. Use the step bar, or the ← and → keys.</p>
+  </header>
+
+  <div class="stepbar" role="group" aria-label="Step controls">
+    <div class="sb-row">
+      <button class="btn" id="prevBtn" type="button" aria-label="Previous step">←</button>
+      <div class="dots" id="dots"></div>
+      <button class="btn" id="nextBtn" type="button" aria-label="Next step">→</button>
+    </div>
+    <div class="sb-info" aria-live="polite">
+      <div class="sb-title"><span class="n" id="sbNo">0</span><b id="sbTitle"></b><span id="sbAssess" class="sb-title"></span></div>
+      <p class="said" id="sbSaid"></p>
+    </div>
+  </div>
+
+  <div class="variants">
+    <section class="variant" aria-labelledby="hA">
+      <div class="vhead">
+        <span class="vtag">A</span>
+        <h2 id="hA">Dive and return</h2>
+        <p>Time runs left to right and detour depth runs down. Shows where the focus went and how it came back.</p>
+      </div>
+      <div class="figure"><svg id="svgA" viewBox="0 0 480 308" role="img" aria-label="Focus trajectory by step"></svg></div>
+      <div class="vnote" id="noteA"></div>
+      <ul class="key">
+        <li><span class="sw line"></span>Focus path</li>
+        <li><span class="sw active"></span>Active</li>
+        <li><span class="sw paused"></span>Paused</li>
+        <li><span class="sw resolved"></span>Resolved</li>
+        <li><span class="sw saved"></span>Saved for later</li>
+        <li><span class="sw tick"></span>New evidence</li>
+        <li><span class="sw needed"></span>No evidence</li>
+        <li><span class="sw uncertain"></span>Uncertain</li>
+        <li><span class="sw missing"></span>Missing</li>
+        <li><span class="sw known"></span>Known</li>
+      </ul>
+    </section>
+
+    <section class="variant" aria-labelledby="hB">
+      <div class="vhead">
+        <span class="vtag">B</span>
+        <h2 id="hB">Nested detours</h2>
+        <p>Each detour sits inside the goal it interrupted. Shows what is open now, what closes it, and what it returns to.</p>
+      </div>
+      <div class="nest" id="nestB"></div>
+      <ul class="key">
+        <li><span class="sw active"></span>The focus</li>
+        <li><span class="sw paused"></span>Paused, will resume</li>
+        <li><span class="sw resolved"></span>Resolved, kept as one line</li>
+        <li><span class="sw saved"></span>Saved for later</li>
+      </ul>
+    </section>
+
+    <section class="variant" aria-labelledby="hC">
+      <div class="vhead">
+        <span class="vtag">C</span>
+        <h2 id="hC">Knowledge map</h2>
+        <p>Concepts are the main nodes, across tasks. Shows what the learner knows, the proof for it, and what carries over.</p>
+      </div>
+      <div class="figure"><svg id="svgC" viewBox="0 0 480 332" role="img" aria-label="Concepts and tasks"></svg></div>
+      <div class="vnote" id="noteC"></div>
+      <ul class="key">
+        <li><span class="sw resolved"></span>Task done</li>
+        <li><span class="sw active"></span>Current task or detour</li>
+        <li><span class="sw saved"></span>Next task or saved issue</li>
+        <li><span class="sw dash"></span>Prerequisite (right) · carried (left)</li>
+        <li><span class="sw needed"></span>No evidence</li>
+        <li><span class="sw uncertain"></span>Uncertain</li>
+        <li><span class="sw missing"></span>Missing</li>
+        <li><span class="sw known"></span>Known</li>
+      </ul>
+    </section>
+  </div>
+
+  <p class="foot">Data: the 11 steps of <code>t3-tutor-loop.html</code>. The prerequisite C15 → C04 comes from the concept file in Spec v0.2. Only the drawing differs between panels; the scenario is unchanged.</p>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ================= the scenario (from t3-tutor-loop.html) ================= */
+  var STEPS = [
+    { t: "Loop opens", a: [["LOOP OPENS", "neutral"]], d: "start T3", m: null,
+      set: { T3: "ACTIVE", C15: "needed", C17: "needed", C13: "needed", C04: "known", C05: "known" }, stack: ["T3"], open: [] },
+    { t: "Reproduce", a: [["ON_TRACK", "neutral"]], d: "CONTINUE",
+      m: "Reproduced it. Same message every time as a guest. Where does this message even come from?" },
+    { t: "Find the message", a: [["ON_TRACK", "neutral"]], d: "CONTINUE",
+      m: "Line 824. It's inside `except Exception as e:` on line 821. So something crashes and this except swallows it?",
+      set: { C17: "uncertain" } },
+    { t: "The real error", a: [["GAP_DISCOVERED · knowledge", "bad"]], d: "REDIRECT → I1",
+      m: "UnboundLocalError on `label`! But label is right there in the loop on line 684?! How can it not exist?",
+      set: { I1: "ACTIVE", T3: "SUSPENDED", C15: "missing", C17: "known" }, stack: ["T3", "I1"] },
+    { t: "Predict", a: [["ON_TRACK · inside the detour", "neutral"]], d: "CONTINUE",
+      m: "None? In JS it would be undefined." },
+    { t: "Run it, then a new question", a: [["DEPENDENCY_MISSING · codebase", "warn"]], d: "REDIRECT → I2",
+      m: "Same error! So `x` only exists if the loop ran at least once. OK... but why would the loop on line 684 run zero times for a guest?",
+      set: { I2: "ACTIVE", I1: "SUSPENDED" }, stack: ["T3", "I1", "I2"] },
+    { t: "Trace the guest path", a: [["GAP_RESOLVED · I2", "ok"]], d: "RESUME → I1",
+      m: "Lines 469–470: `if not base or not user_id: return []`. A guest has no user_id, so it returns an empty list.",
+      set: { I2: "RESOLVED", I1: "ACTIVE" }, stack: ["T3", "I1"] },
+    { t: "Connect it back", a: [["GAP_RESOLVED · I1", "ok"]], d: "RESUME → T3",
+      m: "Nothing. It never gets assigned, exactly like x in last([]). Then line 722 reads label and crashes, and the except on line 821 hides it.",
+      set: { I1: "RESOLVED", C15: "known", T3: "ACTIVE" }, stack: ["T3"] },
+    { t: "Find the right variable", a: [["ON_TRACK", "neutral"]], d: "CONTINUE",
+      m: "`question_label`! Line 610 unpacks it from `user_query_operations`. So line 722 should check question_label." },
+    { t: "Fix, check, side question", a: [["GOAL MET → VERIFY", "accent"], ["SIDE GAP · not blocking", "neutral"]], d: "VERIFY · probe C13",
+      m: "2 passed! Wait, how does that test even talk to the chatbot without an OpenAI key?",
+      set: { I3: "OPEN", C13: "uncertain" }, open: ["I3"] },
+    { t: "Probe and close", a: [["TASK_COMPLETED", "ok"]], d: "COMPLETE",
+      m: "Whether the model gets the pricing tool. `tools` is the list of functions OpenAI is allowed to call, and candidates don't get the pricing one.",
+      set: { C13: "known", T3: "RESOLVED" }, stack: [] }
+  ];
+
+  var NODES = {
+    T3: { cat: "task · fix", title: "Guests always get \"Une erreur s'est produite\"", depth: 0 },
+    I1: { cat: "knowledge", title: "A loop variable only exists if the loop ran", about: "C15", depth: 1, parent: "T3" },
+    I2: { cat: "codebase", title: "Why the loop on line 684 runs 0 times for a guest", depth: 2, parent: "I1" },
+    I3: { cat: "testing", title: "How the test fakes OpenAI", side: true, parent: "T3" }
+  };
+  var CONCEPTS = {
+    C15: { name: "loop variables outlive the loop", mid: "loop vars outlive the loop", tiny: "loop scope" },
+    C17: { name: "broad except hides failures", mid: "broad except hides failures", tiny: "broad except" },
+    C13: { name: "OpenAI tool calling", mid: "OpenAI tool calling", tiny: "tool calling" },
+    C04: { name: "tuple unpacking", mid: "tuple unpacking", tiny: "unpacking", from: "T1" },
+    C05: { name: "dict.get", mid: "dict.get", tiny: "dict.get", from: "T2" }
+  };
+  var EVIDENCE = [
+    { s: 1, n: "T3", x: "reproduced the bug as a guest" },
+    { s: 2, n: "T3", x: "found the broad except at line 821" },
+    { s: 3, n: "C17", x: "made the hidden error visible" },
+    { s: 4, n: "I1", x: "predicted None (the JS habit)" },
+    { s: 5, n: "I1", x: "explained x after the loop" },
+    { s: 6, n: "I2", x: "read lines 469–470" },
+    { s: 7, n: "I1", x: "explained why label is unbound for a guest" },
+    { s: 7, n: "C15", x: "explained it on the real code" },
+    { s: 8, n: "T3", x: "found question_label (line 610)" },
+    { s: 9, n: "T3", x: "check/test_t3.py: 2 passed" },
+    { s: 10, n: "C13", x: "explained what the if on line 722 decides", sx: "explained the if on line 722" }
+  ];
+  var RETURN = {
+    T3: { s: 3, x: "has the traceback; line 722 reads label" },
+    I1: { s: 5, x: "gets last([]); must connect it to label" }
+  };
+  var EXIT = {
+    T3: "check/test_t3.py passes, and C15, C17, C13 are known",
+    I1: "they explain why label is unbound for a guest",
+    I2: null
+  };
+  var WORD = {
+    ACTIVE: "active", SUSPENDED: "paused", RESOLVED: "resolved", OPEN: "saved",
+    needed: "no evidence", uncertain: "uncertain", missing: "missing", known: "known"
+  };
+  var N = STEPS.length;
+
+  /* ================= cumulative snapshots ================= */
+  var SNAP = [];
+  (function () {
+    var cur = {}, stack = [], open = [];
+    STEPS.forEach(function (s) {
+      var before = Object.assign({}, cur), set = s.set || {};
+      Object.keys(set).forEach(function (k) { cur[k] = set[k]; });
+      if (s.stack) stack = s.stack;
+      if (s.open) open = s.open;
+      SNAP.push({
+        status: Object.assign({}, cur),
+        changed: Object.keys(set).filter(function (k) { return before[k] !== cur[k]; }),
+        stack: stack.slice(), open: open.slice()
+      });
+    });
+  })();
+
+  /* ================= helpers ================= */
+  var SVGNS = "http://www.w3.org/2000/svg";
+  function mk(tag, attrs, parent, text) {
+    var e = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function fmt(s) { return esc(s).replace(/`([^`]+)`/g, "<code>$1</code>"); }
+  function topOf(i) { var st = SNAP[i].stack; return st.length ? st[st.length - 1] : null; }
+  function focusOf(i) { return topOf(i) || "T3"; }
+  function evFor(id, i) { return EVIDENCE.filter(function (e) { return e.n === id && e.s <= i; }); }
+  function evAt(i) { return EVIDENCE.filter(function (e) { return e.s === i; }); }
+  function evHas(id, j) { return EVIDENCE.some(function (e) { return e.n === id && e.s === j; }); }
+  function changed(i, id) { return SNAP[i].changed.indexOf(id) !== -1; }
+
+  /* ================= A · dive and return ================= */
+  var A = {
+    X0: 96, CW: 34, H: 308,
+    lanes: [
+      { id: "T3", y: 42, sub: "TASK · FIX" },
+      { id: "I1", y: 80, sub: "KNOWLEDGE" },
+      { id: "I2", y: 118, sub: "CODEBASE" },
+      { id: "I3", y: 170, sub: "TESTING" }
+    ],
+    conceptY: { C15: 222, C17: 240, C13: 258, C04: 276, C05: 294 }
+  };
+
+  function renderA(i) {
+    var svg = document.getElementById("svgA");
+    clear(svg);
+    var X0 = A.X0, CW = A.CW, right = X0 + CW * N;
+    function cx(j) { return X0 + CW * j + CW / 2; }
+    var laneY = {};
+    A.lanes.forEach(function (l) { laneY[l.id] = l.y; });
+
+    mk("rect", { x: X0 + CW * i, y: 20, width: CW, height: A.H - 22, rx: 6, "class": "a-band" }, svg);
+    for (var j = 0; j < N; j++) {
+      mk("text", { x: cx(j), y: 13, "class": "svg-num" + (j === i ? " cur" : "") + (j > i ? " fut" : "") }, svg, String(j));
+    }
+    mk("line", { x1: 8, y1: 142, x2: right, y2: 142, "class": "divider" }, svg);
+    mk("text", { x: 8, y: 156, "class": "sec" }, svg, "SAVED FOR LATER");
+    mk("line", { x1: 8, y1: 192, x2: right, y2: 192, "class": "divider" }, svg);
+    mk("text", { x: 8, y: 207, "class": "sec" }, svg, "CONCEPTS");
+
+    A.lanes.forEach(function (l) {
+      mk("line", { x1: X0, y1: l.y, x2: right, y2: l.y, "class": "guide" }, svg);
+      mk("text", { x: 8, y: l.y + 1, "class": "lane-id" }, svg, l.id);
+      mk("text", { x: 8, y: l.y + 12, "class": "lane-sub" }, svg, l.sub);
+      for (var j = 0; j < N; j++) {
+        var st = SNAP[j].status[l.id];
+        if (!st) continue;
+        var prev = j > 0 ? SNAP[j - 1].status[l.id] : undefined;
+        var fut = j > i ? " fut" : "", chg = (j === i && changed(i, l.id)) ? " chg" : "";
+        var x = X0 + CW * j + 2;
+        if (st === "RESOLVED" && prev === "RESOLVED") {
+          mk("rect", { x: x, y: l.y - 2, width: CW - 4, height: 4, rx: 2, "class": "a-hist" + fut }, svg);
+          continue;
+        }
+        if (st === "RESOLVED") {
+          mk("rect", { x: x, y: l.y - 9, width: CW - 4, height: 18, rx: 4, "class": "a-cell a-RES" + fut + chg }, svg);
+          mk("text", { x: cx(j), y: l.y + 4, "class": "a-check" + fut }, svg, "✓");
+          continue;
+        }
+        mk("rect", { x: x, y: l.y - 9, width: CW - 4, height: 18, rx: 4, "class": "a-cell a-" + st + fut + chg }, svg);
+        if (evHas(l.id, j)) mk("rect", { x: cx(j) - 6, y: l.y + 5, width: 12, height: 2.5, rx: 1, "class": "a-ev" + fut }, svg);
+      }
+    });
+
+    function fy(j) { return laneY[focusOf(j)]; }
+    var solid = "M" + cx(0) + "," + fy(0), ghost = solid;
+    for (var k = 1; k < N; k++) {
+      var seg = " H" + (X0 + CW * k) + " V" + fy(k) + " H" + cx(k);
+      ghost += seg;
+      if (k <= i) solid += seg;
+    }
+    mk("path", { d: ghost, "class": "a-path ghost" }, svg);
+    mk("path", { d: solid, "class": "a-path" }, svg);
+    for (var m = 0; m <= i; m++) {
+      mk("circle", { cx: cx(m), cy: fy(m), r: m === i ? 4.5 : 2.6, "class": "a-dot" + (m === i ? " cur" : "") }, svg);
+    }
+    mk("circle", { cx: cx(i), cy: fy(i), r: 8.5, "class": "a-halo" }, svg);
+
+    Object.keys(A.conceptY).forEach(function (c) {
+      var y = A.conceptY[c];
+      mk("text", { x: 8, y: y + 3.5, "class": "c-row-id" }, svg, c);
+      mk("text", { x: 34, y: y + 3.5, "class": "c-row-name" }, svg, CONCEPTS[c].tiny);
+      for (var j = 0; j < N; j++) {
+        var st = SNAP[j].status[c];
+        if (!st) continue;
+        var fut = j > i ? " fut" : "", chg = (j === i && changed(i, c)) ? " chg" : "";
+        mk("rect", { x: X0 + CW * j + 2, y: y - 6, width: CW - 4, height: 12, rx: 3, "class": "a-ccell cs-" + st + fut + chg }, svg);
+        if (evHas(c, j)) mk("circle", { cx: cx(j), cy: y, r: 2.2, "class": "a-evdot" + fut }, svg);
+      }
+    });
+    svg.setAttribute("aria-label", "Step " + i + ": focus on " + (topOf(i) || "nothing, T3 closed"));
+  }
+
+  function noteA(i) {
+    var top = topOf(i), out = [];
+    if (top) {
+      var depth = SNAP[i].stack.length - 1;
+      out.push("<span><b>Focus:</b> " + top + " · " + (depth === 0 ? "the task itself" : "detour depth " + depth) + "</span>");
+    } else {
+      out.push("<span><b>Focus:</b> none. T3 is closed and T4 opens next in a fresh loop.</span>");
+    }
+    SNAP[i].stack.slice(0, -1).reverse().forEach(function (id) {
+      if (RETURN[id]) out.push("<span><b>Paused " + id + "</b>, resumes with: “" + esc(RETURN[id].x) + "”</span>");
+    });
+    var ev = evAt(i);
+    if (ev.length) out.push("<span><b>New evidence:</b> " + ev.map(function (e) { return e.n + " · " + esc(e.x); }).join("; ") + "</span>");
+    return out.join("");
+  }
+
+  /* ================= B · nested detours ================= */
+  function renderB(i) {
+    var snap = SNAP[i], top = topOf(i);
+    function chip(c) {
+      var st = snap.status[c];
+      return '<span class="chip cs-' + st + '" title="' + esc(CONCEPTS[c].name) + '">' + c + " · " + WORD[st] + "</span>";
+    }
+    function kidsOf(id) {
+      return Object.keys(NODES).filter(function (k) { return NODES[k].parent === id && !NODES[k].side && snap.status[k]; });
+    }
+    function frame(id) {
+      var n = NODES[id], st = snap.status[id];
+      var cls = "frame st-" + st + (id === top ? " focus" : "") + (changed(i, id) ? " chg" : "");
+      var h = '<div class="' + cls + '">';
+      h += '<div class="fhead"><span class="fid">' + id + '</span><span class="fcat">' + n.cat + '</span><span class="fst">' + WORD[st] + "</span></div>";
+      h += '<p class="ftitle">' + esc(n.title) + "</p>";
+      if (id === "T3") h += '<div class="fline"><span class="lbl">Needs</span><span class="chips">' + ["C15", "C17", "C13"].map(chip).join("") + "</span></div>";
+      if (n.about) h += '<div class="fline"><span class="lbl">About</span><span class="chips">' + chip(n.about) + "</span></div>";
+      if (id === top) {
+        h += '<div class="fline exit"><span class="lbl">Closes when</span><span class="val">' +
+          (EXIT[id] ? esc(EXIT[id]) : "<i>not set in the scenario</i>") + "</span></div>";
+      }
+      if (st === "SUSPENDED" && RETURN[id]) {
+        h += '<div class="fline ret"><span class="lbl">Resumes with</span><span class="val">“' + esc(RETURN[id].x) + "”</span></div>";
+      }
+      var ev = evFor(id, i);
+      if (ev.length) {
+        h += '<ul class="fev">' + ev.slice(-3).map(function (e) {
+          return "<li" + (e.s === i ? ' class="new"' : "") + ">" + esc(e.x) + ' <span class="s">· step ' + e.s + "</span></li>";
+        }).join("") + "</ul>";
+      }
+      if (id === "T3" && st === "RESOLVED") h += '<p class="fclosed">Closed. The journey entry is written and T4 opens next in a fresh loop.</p>';
+      kidsOf(id).forEach(function (k) {
+        if (snap.status[k] === "RESOLVED") {
+          var last = evFor(k, i).slice(-1)[0], inner = kidsOf(k);
+          h += '<p class="fdone' + (changed(i, k) ? " chg" : "") + '">✓ ' + k + " resolved" + (last ? ": " + esc(last.x) : "") +
+            (inner.length ? " (with " + inner.join(", ") + " inside)" : "") + "</p>";
+        } else {
+          h += frame(k);
+        }
+      });
+      return h + "</div>";
+    }
+
+    var tray = '<div class="tray"><span class="lbl">Saved for later</span>';
+    if (snap.open.length) {
+      tray += snap.open.map(function (k) {
+        var n = NODES[k];
+        return '<div class="frame st-OPEN' + (changed(i, k) ? " chg" : "") + '"><div class="fhead"><span class="fid">' + k +
+          '</span><span class="fcat">' + n.cat + '</span><span class="fst">saved</span></div><p class="ftitle">' + esc(n.title) +
+          '</p><p class="fnote">Not blocking T3. ' + (i === N - 1 ? "Carried to a later task." : "Recorded, not chased now.") + "</p></div>";
+      }).join("");
+    } else {
+      tray += '<p class="empty">Nothing yet.</p>';
+    }
+    tray += "</div>";
+    var reused = '<p class="reused"><span class="lbl">Reused, not retaught</span>C04 tuple unpacking (proved in T1) · C05 dict.get (proved in T2)</p>';
+    document.getElementById("nestB").innerHTML = frame("T3") + tray + reused;
+  }
+
+  /* ================= C · knowledge map ================= */
+  var C = {
+    tasks: { T1: { x: 12, y: 14, w: 120, h: 42 }, T2: { x: 12, y: 74, w: 120, h: 42 }, T3: { x: 12, y: 146, w: 120, h: 80 }, T4: { x: 12, y: 282, w: 120, h: 42 } },
+    cards: { C04: 11, C05: 71, C17: 135, C15: 195, C13: 255 },
+    x: 292, w: 168, h: 48
+  };
+
+  function renderC(i) {
+    var svg = document.getElementById("svgC");
+    clear(svg);
+    var snap = SNAP[i], top = topOf(i), hot = (top === "I1" || top === "I2");
+    function edge(d, cls) { return mk("path", { d: d, "class": "c-edge" + (cls ? " " + cls : "") }, svg); }
+
+    edge("M132,35 L292,35", "done");
+    edge("M132,95 L292,95", "done");
+    edge("M132,166 C212,166 212,159 292,159", changed(i, "C17") ? "chg" : "");
+    if (snap.status.I1) {
+      edge("M132,186 C176,186 176,219 218,219", hot ? "hot" : "");
+      edge("M282,219 L292,219", hot ? "hot" : "");
+    } else {
+      edge("M132,186 C212,186 212,219 292,219", changed(i, "C15") ? "chg" : "");
+    }
+    edge("M132,206 C212,206 212,279 292,279", changed(i, "C13") ? "chg" : "");
+    var pre = edge("M460,213 C479,213 479,41 460,41", "dash");
+    pre.setAttribute("marker-end", "url(#arrow)");
+
+    function task(id, cls, lines) {
+      var t = C.tasks[id];
+      mk("rect", { x: t.x, y: t.y, width: t.w, height: t.h, rx: 8, "class": "c-task " + cls + (changed(i, id) ? " chg" : "") }, svg);
+      lines.forEach(function (L, k) { mk("text", { x: t.x + 10, y: t.y + 16 + k * 13, "class": L[1] }, svg, L[0]); });
+    }
+    task("T1", "done", [["T1 · done", "c-id"], ["proved C04", "c-sub"]]);
+    task("T2", "done", [["T2 · done", "c-id"], ["proved C05", "c-sub"]]);
+    var t3 = snap.status.T3;
+    task("T3", t3, [["T3 · " + WORD[t3], "c-id"], ["Guests always get", "c-name"], ["the generic error", "c-name"],
+      [i >= 9 ? "check: 2 passed" : "check: not run yet", "c-sub" + (i >= 9 ? " ok" : "")]]);
+    task("T4", "next" + (i === N - 1 ? " up" : ""), [["T4", "c-id"], [i === N - 1 ? "opens next, fresh loop" : "next task", "c-sub"]]);
+
+    if (snap.status.I3) {
+      mk("path", { d: "M72,226 L72,242", "class": "c-edge dash" }, svg);
+      mk("rect", { x: 22, y: 243, width: 100, height: 20, rx: 10, "class": "c-badge a-OPEN" + (changed(i, "I3") ? " chg" : "") }, svg);
+      mk("text", { x: 72, y: 256.5, "class": "c-btext" }, svg, "I3 · testing");
+      var carry = mk("path", { d: "M72,263 L72,281", "class": "c-edge dash" }, svg);
+      carry.setAttribute("marker-end", "url(#arrow)");
+      mk("text", { x: 80, y: 276, "class": "c-lbl" }, svg, "CARRIED TO A LATER TASK");
+    }
+    if (snap.status.I1) {
+      var s1 = snap.status.I1;
+      mk("rect", { x: 218, y: 210, width: 64, height: 18, rx: 9, "class": "c-badge a-" + (s1 === "RESOLVED" ? "RES" : s1) + (changed(i, "I1") ? " chg" : "") }, svg);
+      mk("text", { x: 250, y: 222, "class": "c-btext" }, svg, "I1 · detour");
+    }
+    if (snap.status.I2) {
+      var s2 = snap.status.I2;
+      mk("line", { x1: 250, y1: 228, x2: 250, y2: 234, "class": "c-edge" + (top === "I2" ? " hot" : "") }, svg);
+      mk("rect", { x: 222, y: 234, width: 56, height: 16, rx: 8, "class": "c-badge a-" + (s2 === "RESOLVED" ? "RES" : s2) + (changed(i, "I2") ? " chg" : "") }, svg);
+      mk("text", { x: 250, y: 245, "class": "c-btext" }, svg, "I2 · code");
+    }
+
+    Object.keys(C.cards).forEach(function (c) {
+      var y = C.cards[c], st = snap.status[c], linked = hot && c === "C15";
+      mk("rect", { x: C.x, y: y, width: C.w, height: C.h, rx: 8, "class": "c-card cs-" + st + (linked ? " linked" : "") + (changed(i, c) ? " chg" : "") }, svg);
+      mk("text", { x: C.x + 10, y: y + 16, "class": "c-id" }, svg, c);
+      var word = WORD[st].toUpperCase(), tw = word.length * 4.6 + 12;
+      mk("rect", { x: C.x + C.w - 8 - tw, y: y + 6, width: tw, height: 14, rx: 7, "class": "c-tag tg-" + st }, svg);
+      mk("text", { x: C.x + C.w - 8 - tw / 2, y: y + 15.6, "class": "c-tag-t" }, svg, word);
+      mk("text", { x: C.x + 10, y: y + 29, "class": "c-name" }, svg, CONCEPTS[c].mid);
+      var ev = evFor(c, i).slice(-1)[0];
+      var text = ev ? "✓ " + (ev.sx || ev.x) : (CONCEPTS[c].from ? "proved in " + CONCEPTS[c].from + ", reused" : "no evidence yet");
+      mk("text", { x: C.x + 10, y: y + 41, "class": "c-ev" + (ev || CONCEPTS[c].from ? "" : " none") }, svg, text);
+    });
+    svg.setAttribute("aria-label", "Step " + i + ": concept states for T3");
+  }
+
+  function noteC(i) {
+    var out = [], prev = i > 0 ? SNAP[i - 1].status : {}, now = SNAP[i].status;
+    if (i === 0) {
+      out.push("<span><b>Start:</b> T3 needs C15, C17 and C13. None has evidence yet.</span>");
+    } else {
+      var moved = Object.keys(CONCEPTS).filter(function (c) { return prev[c] !== now[c]; });
+      out.push("<span><b>Changed:</b> " + (moved.length ? moved.map(function (c) {
+        var e = EVIDENCE.filter(function (x) { return x.s === i && x.n === c; })[0];
+        return c + " " + WORD[prev[c]] + " → " + WORD[now[c]] + (e ? " (" + esc(e.x) + ")" : "");
+      }).join("; ") : "no concept moved at this step.") + "</span>");
+    }
+    if (now.I2) out.push("<span><b>I2</b> is about this codebase, not a concept in the bank, so it has no card.</span>");
+    if (now.I3) out.push("<span><b>I3</b> has no concept either. It travels to a later task as an open issue.</span>");
+    out.push("<span><b>Reused:</b> C04 and C05 were proved in T1 and T2, so T3 never teaches them.</span>");
+    return out.join("");
+  }
+
+  /* ================= step bar + navigation ================= */
+  var active = -1;
+  var dotsEl = document.getElementById("dots"), dots = [];
+  var prevBtn = document.getElementById("prevBtn"), nextBtn = document.getElementById("nextBtn");
+  for (var d = 0; d < N; d++) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "dot";
+    b.textContent = String(d);
+    b.setAttribute("aria-label", "Step " + d + ": " + STEPS[d].t);
+    b.addEventListener("click", (function (k) { return function () { go(k); }; })(d));
+    dotsEl.appendChild(b);
+    dots.push(b);
+  }
+
+  function renderBar(i) {
+    dots.forEach(function (el, k) {
+      el.className = "dot" + (k === i ? " on" : k < i ? " past" : "");
+      if (k === i) el.setAttribute("aria-current", "step"); else el.removeAttribute("aria-current");
+    });
+    var s = STEPS[i];
+    document.getElementById("sbNo").textContent = "Step " + i;
+    document.getElementById("sbTitle").textContent = s.t;
+    document.getElementById("sbAssess").innerHTML = s.a.map(function (a) {
+      return '<span class="pill ' + a[1] + '">' + esc(a[0]) + "</span>";
+    }).join("") + '<span class="decision">→ ' + esc(s.d) + "</span>";
+    document.getElementById("sbSaid").innerHTML = s.m
+      ? '<span class="lbl">Learner</span>' + fmt(s.m)
+      : '<span class="lbl">Engine</span>Takes T3 from <code>ladder.md</code> and opens a fresh loop. C04 and C05 are already known from T1 and T2.';
+    prevBtn.disabled = i === 0;
+    nextBtn.disabled = i === N - 1;
+  }
+
+  function go(i) {
+    i = Math.max(0, Math.min(N - 1, i));
+    if (i === active) return;
+    active = i;
+    renderBar(i);
+    renderA(i);
+    document.getElementById("noteA").innerHTML = noteA(i);
+    renderB(i);
+    renderC(i);
+    document.getElementById("noteC").innerHTML = noteC(i);
+  }
+
+  prevBtn.addEventListener("click", function () { go(active - 1); });
+  nextBtn.addEventListener("click", function () { go(active + 1); });
+  document.addEventListener("keydown", function (e) {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.key === "ArrowRight") { e.preventDefault(); go(active + 1); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); go(active - 1); }
+  });
+
+  var start = 5;
+  var m = /^#step-(\d+)$/.exec(location.hash || "");
+  if (m) start = parseInt(m[1], 10);
+  go(start);
+})();
+</script>

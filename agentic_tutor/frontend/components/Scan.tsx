@@ -12,6 +12,11 @@ import type { ScanEvents, Unit } from "@/lib/api/types";
 import Sidebar from "./Sidebar";
 import Icon from "./Icon";
 import ErrorBanner from "./ErrorBanner";
+import BatchPlanner from './BatchPlanner';
+import StationDetails from './StationDetails';
+import { useAuth } from '@/lib/auth';
+import { defaultBatchSettings, stationHighlights } from '@/lib/scanner';
+import scannerDemo from '@/lib/scanner-demo.json';
 const dy = [0, 4, -3, 5, -2, 3, -4, 2],
   rot = [-3.5, 2.5, -1.5, 3, -2.5, 1.5, -3, 2],
   gw = [64, 82, 52, 74, 90, 58, 78, 66];
@@ -79,7 +84,7 @@ function Pill({
       tabIndex={0}
       onClick={open}
       onKeyDown={(e) => {
-        if (e.key === "Enter") open();
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
       }}
     >
       <span className={"g " + state} />
@@ -91,6 +96,9 @@ function Pill({
 export default function Scan() {
   const tutor = useTutor(),
     router = useRouter();
+  const identity = useAuth();
+  const [batchSettings, setBatchSettings] = useState(defaultBatchSettings);
+  const [preview, setPreview] = useState(false);
   const [left, setLeft] = useState(true),
     [source, setSource] = useState(""),
     [imported, setImported] = useState(false),
@@ -100,8 +108,7 @@ export default function Scan() {
     [thinking, setThinking] = useState(""),
     [logs, setLogs] = useState<string[]>([]),
     [units, setUnits] = useState<ScanEvents["unit"][]>([]),
-    [want, setWant] = useState(8),
-    [limit, setLimit] = useState(8),
+    [limit, setLimit] = useState(3),
     [detail, setDetail] = useState<ScanEvents["unit"] | null>(null),
     [fade, setFade] = useState(false);
   const picker = useRef<HTMLInputElement>(null),
@@ -151,7 +158,14 @@ export default function Scan() {
     setImporting(true);
     tutor.setError("");
     try {
-      const cb = await tutor.api.register({ name, source: source.trim() });
+      const value = source.trim();
+      // An https:// value is a git repo to clone; anything else is a host path to register.
+      const cb = /^https:\/\/\S+$/.test(value)
+        ? await tutor.api.importRepo({
+            name: name.replace(/\.git$/, ""),
+            git_url: value,
+          })
+        : await tutor.api.register({ name, source: value });
       await tutor.api.open(cb.codebase_id);
       tutor.setCodebaseId(cb.codebase_id);
       await tutor.refreshCodebases();
@@ -165,13 +179,17 @@ export default function Scan() {
   }
   async function generate() {
     if (mapping.current) return;
-    if (complete) {
-      setLimit((old) => old + want);
+    if (complete) return;
+    if (tutor.isStub || preview) {
+      setUnits(scannerDemo.slice(0, batchSettings.initial).map(station => ({ ...station, highlights: station.contract.highlights })));
+      setLimit(batchSettings.initial);
+      setComplete(true);
+      setLogs(['Preview · sample stations from soufiane_prompts. No scan or background job was run.']);
       return;
     }
     mapping.current = true;
     setScanning(true);
-    setLimit(want);
+    setLimit(batchSettings.initial);
     tutor.setError("");
     stop.current?.();
     stop.current = tutor.api.scan({
@@ -202,7 +220,7 @@ export default function Scan() {
       await tutor.adopt(state);
       const update = await tutor.api.snapshot(state.journey_id);
       if (!active.current) return;
-      if (update.snapshot) setUnits(update.snapshot.units);
+      if (update.snapshot) { setUnits(update.snapshot.units); setLimit(update.snapshot.units.length); }
       setComplete(true);
     } catch (error) {
       tutor.report(error);
@@ -219,6 +237,7 @@ export default function Scan() {
   function reset() {
     if (mapping.current || importLock.current) return;
     setImported(false);
+    setPreview(false);
     setComplete(false);
     setUnits([]);
     setLogs([]);
@@ -226,8 +245,8 @@ export default function Scan() {
   }
   const visible = units.slice(0, limit),
     pending = complete
-      ? Math.min(want, Math.max(0, units.length - limit))
-      : Math.max(0, (scanning ? limit : want) - visible.length);
+      ? 0
+      : Math.max(0, (scanning ? limit : batchSettings.initial) - visible.length);
   const stateOf = (u: ScanEvents["unit"]) => {
     const found = tutor.snapshot?.units.find(
       (v) => v.slug === u.slug && v.file === u.file,
@@ -258,9 +277,11 @@ export default function Scan() {
             <div
               className={"import-view" + (imported ? " gone" : "")}
               id="importView"
+              inert={imported}
             >
               <div className="import-card">
                 <div className="import-eyebrow">Import codebase</div>
+                <p className="scanner-intro">Start with 1–3 stations. Your learning profile and future batches stay with this codebase.</p>
                 <div className="import-field">
                   <input
                     id="importInput"
@@ -310,9 +331,10 @@ export default function Scan() {
                     void browse(e.target.files).catch(tutor.report);
                   }}
                 />
+                <button className="browse-example" onClick={() => { setSource('soufiane_prompts'); setPreview(true); setImported(true); }}>Preview example stations</button>
               </div>
             </div>
-            <div id="scanView" className={imported ? "on" : ""}>
+            <div id="scanView" className={imported ? "on" : ""} inert={!imported || !!detail}>
               <div className="title-row">
                 <span className="fn" id="scanFn">
                   {name}
@@ -321,6 +343,8 @@ export default function Scan() {
                   {source}
                 </span>
               </div>
+              <BatchPlanner key={`${identity.user_id}:${preview ? 'example' : tutor.codebaseId}`} user={identity.user_id} codebase={preview ? 'example:soufiane_prompts' : String(tutor.codebaseId ?? source)} name={name} onSettings={setBatchSettings} demo={tutor.isStub || preview} />
+              {tutor.isStub || preview ? <p className="scanner-intro">Frontend preview · sample stations from soufiane_prompts</p> : <p className="scanner-intro">Batch preferences are saved locally. The current scan service controls how many stations it returns.</p>}
               <div className="boxes">
                 <div className="box" id="logBox">
                   <div className="box-label">Agent log</div>
@@ -357,7 +381,7 @@ export default function Scan() {
                   </div>
                 </div>
                 <div className="box bag-box">
-                  <div className="box-label">Bag of units</div>
+                  <div className="box-label">Learning stations</div>
                   <div
                     className={
                       "bag-caps" +
@@ -429,43 +453,14 @@ export default function Scan() {
                 ) : complete && limit >= units.length ? (
                   <span className="gen-complete">
                     <Icon name="arrow" />
-                    ladder complete
+                    {units.length} {units.length === 1 ? 'station' : 'stations'} ready · your path continues in batches
                   </span>
                 ) : (
                   <div className="req">
-                    <div className="stepper">
-                      <button
-                        aria-label="Fewer"
-                        disabled={want <= 1}
-                        onClick={() => setWant(Math.max(1, want - 1))}
-                      >
-                        −
-                      </button>
-                      <input
-                        className="st-in"
-                        type="number"
-                        min={1}
-                        value={want}
-                        onChange={(e) =>
-                          setWant(
-                            Math.max(
-                              1,
-                              Math.min(100000, Number(e.target.value) || 1),
-                            ),
-                          )
-                        }
-                      />
-                      <button
-                        aria-label="More"
-                        onClick={() => setWant(want + 1)}
-                      >
-                        +
-                      </button>
-                    </div>
-                    <span className="req-unit">units</span>
+                    <span className="req-unit">{batchSettings.initial} initial stations</span>
                     <button className="req-go" onClick={() => void generate()}>
                       <Icon name="arrow" />
-                      Generate
+                      {tutor.isStub || preview ? 'Preview stations' : 'Generate'}
                     </button>
                   </div>
                 )}
@@ -502,6 +497,8 @@ export default function Scan() {
                     <div className="detail-sub">
                       {detail.file} · L{detail.lo}–{detail.hi}
                     </div>
+                    {(detail.contract || detailUnit?.contract) && <StationDetails key={detail.slug} contract={{ ...(detail.contract || detailUnit?.contract)!, highlights: stationHighlights(detailUnit || detail) }} files={tutor.files} />}
+                    {!detail.contract && !detailUnit?.contract && <>
                     <div className="meta-grid">
                       <span className="k">State</span>
                       <span className="v">{detailUnit?.state || "LOCKED"}</span>
@@ -516,7 +513,7 @@ export default function Scan() {
                       </span>
                     </div>
                     <div className="sec-l">
-                      Axes that fire · {axes.length}/7
+                      Assessment axes · {axes.length}
                     </div>
                     <div className="axes">
                       {axes.map((a) => (
@@ -543,6 +540,8 @@ export default function Scan() {
                         </div>
                       </>
                     )}
+                    <p className="scanner-intro">This station has a source anchor. Its learning contract has not been provided yet.</p>
+                    </>}
                   </>
                 )}
               </div>

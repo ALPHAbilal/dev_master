@@ -166,6 +166,47 @@ def test_entrypoint_and_cors(tmp_path, monkeypatch):
         assert client.get("/codebases", headers={"X-User-Id": "alice"}).json() == []
 
 
+def test_health_is_public(setup):
+    _, _, app = setup
+    with TestClient(app) as client:
+        response = client.get("/health")
+        assert response.status_code == 200 and response.json() == {"status": "ok"}
+
+
+def test_import_disabled_without_codebase_root(setup):
+    _, _, app = setup  # built with source_root=None
+    with TestClient(app) as client:
+        response = client.post("/codebases/import", headers={"X-User-Id": "alice"},
+                               json={"name": "x", "git_url": "https://github.com/a/b"})
+        assert response.status_code == 400
+
+
+def test_import_clones_then_registers(tmp_path, monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "dev")
+    plane = ControlPlane(tmp_path / "state", agent)
+    app = create_app(plane, stream_interval=0.02, source_root=tmp_path / "codebases")
+
+    def fake_clone(*, git_url, name, dest_root, timeout=120.0, cloner=None):
+        assert git_url == "https://github.com/octocat/Hello-World.git"
+        target = dest_root.resolve() / "hello-abcd1234"
+        target.mkdir(parents=True)
+        (target / "run.py").write_text(_SAMPLE)
+        return target
+    monkeypatch.setattr("tutor_v2.app.clone_repository", fake_clone)
+
+    with TestClient(app) as client:
+        response = client.post("/codebases/import", headers={"X-User-Id": "alice"},
+            json={"name": "Hello", "git_url": "https://github.com/octocat/Hello-World.git"})
+        assert response.status_code == 200, response.text
+        cid = response.json()["codebase_id"]
+        listed = client.get("/codebases", headers={"X-User-Id": "alice"}).json()
+        assert [c["id"] for c in listed] == [cid]
+        # strict body: an unexpected field is a 422, not silently accepted.
+        bad = client.post("/codebases/import", headers={"X-User-Id": "alice"},
+            json={"name": "x", "git_url": "https://github.com/a/b", "evil": 1})
+        assert bad.status_code == 422
+
+
 @contextmanager
 def serve(app):
     sock = socket.socket()

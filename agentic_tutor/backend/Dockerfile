@@ -5,7 +5,7 @@ WORKDIR /app
 # (@anthropic-ai/claude-code), a Node.js program. Install Node 20 + the CLI as root so
 # every agent turn (MAPPER/TEACHER/JUDGE/DISTILLER) has the binary on PATH at runtime.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && apt-get install -y --no-install-recommends curl ca-certificates git \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && npm install -g @anthropic-ai/claude-code \

@@ -1,0 +1,1080 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>T3 Tutor Loop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
+<style>
+/* Layout: two panes. Left = the learning graph, sticky like a map. Right = the conversation exactly as the learner sees it, with a dashed "backstage" strip between each learner turn and the tutor's reply. */
+:root{
+  /* Light-only, by request. */
+  color-scheme:light;
+  --bg:#F6F8FB;
+  --surface:#FFFFFF;
+  --surface-2:#EEF2F7;
+  --ink:#1B2430;
+  --ink-2:#4C5869;
+  --ink-3:#7A8597;
+  --line:#DDE3EB;
+  --line-strong:#B8C2CF;
+  --accent:#2F5FD0;
+  --accent-soft:#E6EDFC;
+  --orch:#7350CC;
+  --orch-soft:#F1ECFC;
+  --engine:#46536A;
+  --engine-soft:#EBEFF4;
+  --ok:#2E8443;
+  --ok-soft:#E5F5E9;
+  --warn:#AA6400;
+  --warn-soft:#FCF1DE;
+  --bad:#BC375F;
+  --bad-soft:#FCE8EE;
+  --on-strong:#FFFFFF;
+  --learner-bg:#E4ECF9;
+  --learner-line:#CBD8F0;
+  --learner-fg:#1B2430;
+  --learner-code:#D2DEF3;
+  --shadow:0 1px 2px rgba(27,36,48,.05),0 6px 18px rgba(27,36,48,.06);
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-cond:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.page{max-width:1360px;margin:0 auto;padding-inline:clamp(16px,3vw,36px);padding-block:28px 64px}
+code{font-family:var(--font-mono);font-size:.87em}
+.lbl{font:600 11px/1.6 var(--font-cond);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+
+/* ---------- header ---------- */
+.top{display:grid;gap:12px;margin-bottom:28px}
+.eyebrow{margin:0;font:600 12px/1.3 var(--font-cond);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+h1{margin:0;font:700 clamp(28px,4vw,42px)/1.08 var(--font-body);letter-spacing:-.02em;text-wrap:balance}
+.lede{margin:0;max-width:72ch;color:var(--ink-2)}
+.flow{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:22px}
+.flow li{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:4px;align-content:start}
+.flow li+li::before{content:"→";position:absolute;left:-11px;top:50%;transform:translate(-50%,-50%);color:var(--ink-3);font:600 15px var(--font-mono)}
+.role{font:600 12px/1.2 var(--font-cond);letter-spacing:.1em;text-transform:uppercase}
+.role small{font:500 11px var(--font-body);letter-spacing:0;text-transform:none;color:var(--ink-3);margin-left:6px}
+.role.learner{color:var(--ink)}.role.orch{color:var(--orch)}.role.engine{color:var(--engine)}.role.tutor{color:var(--accent)}
+.flow p{margin:0;font-size:13.5px;color:var(--ink-2)}
+.footnote{margin:0;font-size:12.5px;color:var(--ink-3)}
+
+/* ---------- layout ---------- */
+.layout{display:grid;grid-template-columns:minmax(330px,420px) minmax(0,1fr);gap:clamp(20px,3vw,40px);align-items:start}
+.map{position:sticky;top:calc(env(safe-area-inset-top,0px) + 14px);max-height:calc(100vh - 28px);max-height:calc(100dvh - 28px);overflow:auto;overscroll-behavior:contain;
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px;display:grid;gap:14px}
+.map-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.map-step{display:flex;align-items:center;gap:10px;min-width:0}
+.step-no{flex:none;min-width:30px;height:30px;padding:0 6px;border-radius:15px;display:grid;place-items:center;background:var(--accent);color:var(--on-strong);font:600 13px var(--font-mono)}
+.map-txt{min-width:0}
+.map-title{font-weight:600;line-height:1.25}
+.map-assess{font:500 12px/1.35 var(--font-mono);color:var(--ink-2);overflow-wrap:anywhere}
+.nav{display:flex;gap:6px;flex:none}
+.btn{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;min-width:36px;height:34px;padding:0 10px;font:600 14px var(--font-mono);cursor:pointer}
+.btn:hover{border-color:var(--line-strong)}
+.btn:focus-visible,.step-label:focus-visible,summary:focus-visible,.toggle input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn:disabled{opacity:.4;cursor:default}
+.sheet-close{display:none}
+
+/* ---------- graph ---------- */
+#graph{width:100%;height:auto;display:block}
+.g-node,.g-concept{transition:opacity .35s ease}
+.box{fill:var(--surface);stroke:var(--line-strong);stroke-width:1.5;transition:fill .3s ease,stroke .3s ease}
+.kind{font:600 9px var(--font-cond);letter-spacing:.06em;fill:var(--ink-3)}
+.title{font:500 12px var(--font-body);fill:var(--ink)}
+.cid{font:600 12px var(--font-mono);fill:var(--ink)}
+.cname{font:400 10.5px var(--font-body);fill:var(--ink-2)}
+.tag rect{fill:var(--ink-3);transition:fill .3s ease}
+.tag text{font:600 8.5px var(--font-cond);letter-spacing:.06em;fill:var(--on-strong)}
+.st-ACTIVE .box{fill:var(--accent-soft);stroke:var(--accent);stroke-width:2}
+.st-ACTIVE .tag rect{fill:var(--accent)}
+.st-SUSPENDED .box{stroke:var(--warn);stroke-dasharray:5 4}
+.st-SUSPENDED .tag rect{fill:var(--warn)}
+.st-RESOLVED .box{fill:var(--ok-soft);stroke:var(--ok)}
+.st-RESOLVED .tag rect{fill:var(--ok)}
+.st-OPEN .box{stroke:var(--ink-3);stroke-dasharray:3 3}
+.st-OPEN .tag rect{fill:var(--ink-3)}
+.st-hidden{opacity:0}
+.cs-needed .box{stroke-dasharray:3 3}
+.cs-missing .box{fill:var(--bad-soft);stroke:var(--bad)}
+.cs-missing .tag rect{fill:var(--bad)}
+.cs-uncertain .box{fill:var(--warn-soft);stroke:var(--warn)}
+.cs-uncertain .tag rect{fill:var(--warn)}
+.cs-known .box{fill:var(--ok-soft);stroke:var(--ok)}
+.cs-known .tag rect{fill:var(--ok)}
+.ring{fill:none;stroke:var(--accent);stroke-width:2;opacity:0}
+.is-focus .ring{animation:pulse 1.8s ease-in-out infinite}
+.linked .ring{opacity:.7;stroke-dasharray:4 3}
+.flash{fill:none;stroke:var(--ink);stroke-width:2.5;opacity:0}
+.changed .flash{animation:flash 1.1s ease-out 1}
+@keyframes pulse{0%,100%{opacity:.2}50%{opacity:.75}}
+@keyframes flash{0%{opacity:.85}100%{opacity:0}}
+.edge{fill:none;stroke:var(--line-strong);stroke-width:1.5;transition:opacity .35s ease}
+.edge.side{stroke-dasharray:4 4}
+.elabel{font:600 8.5px var(--font-cond);letter-spacing:.08em;fill:var(--ink-3);transition:opacity .35s ease}
+.off{opacity:0}
+.arrowhead{fill:var(--line-strong)}
+
+/* ---------- map details ---------- */
+.row{display:grid;grid-template-columns:92px minmax(0,1fr);gap:10px;align-items:start}
+.stack{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:24px}
+.stack .sep{color:var(--ink-3);font-family:var(--font-mono)}
+.stack .none{font-size:13px;color:var(--ink-3)}
+.chips{display:flex;flex-wrap:wrap;gap:5px;min-width:0}
+.chip{display:inline-flex;align-items:center;gap:3px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:6px;padding:0 7px;font:500 12px/1.75 var(--font-mono);white-space:nowrap}
+.chip.top{background:var(--accent);border-color:var(--accent);color:var(--on-strong)}
+.chip.add{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
+.chip.add::before{content:"+";font-weight:600}
+.chip.del{background:transparent;border-style:dashed;color:var(--ink-3);text-decoration:line-through}
+.chip.del::before{content:"−";display:inline-block;text-decoration:none}
+.chip.st{background:var(--orch-soft);border-color:transparent;color:var(--orch)}
+.chip.st.add{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
+.chip.st.del{background:transparent;border-color:var(--line);color:var(--ink-3)}
+.kit{display:grid;gap:9px;border-top:1px solid var(--line);padding-top:12px}
+.kit h3{margin:0;font:600 13.5px var(--font-body)}
+.kit .hint{margin:0;font-size:12px;color:var(--ink-3)}
+.legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;border-top:1px solid var(--line);padding-top:12px;font-size:12px;color:var(--ink-2)}
+.legend span{display:flex;align-items:center;gap:7px;min-width:0}
+.sw{flex:none;display:inline-block;width:22px;height:12px;border-radius:3px;border:1.5px solid var(--line-strong);background:var(--surface)}
+.sw-active{background:var(--accent-soft);border-color:var(--accent)}
+.sw-susp{border-color:var(--warn);border-style:dashed}
+.sw-res{background:var(--ok-soft);border-color:var(--ok)}
+.sw-open{border-color:var(--ink-3);border-style:dashed}
+.sw-miss{background:var(--bad-soft);border-color:var(--bad)}
+.sw-unc{background:var(--warn-soft);border-color:var(--warn)}
+.sw-known{background:var(--ok-soft);border-color:var(--ok)}
+.sw-need{border-style:dashed}
+
+/* ---------- conversation ---------- */
+.stage{min-width:0;display:grid;gap:18px}
+.taskcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;display:grid;gap:10px}
+.taskcard h2{margin:0;font:600 clamp(19px,2.2vw,23px)/1.3 var(--font-body);text-wrap:balance}
+.meta{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13.5px;color:var(--ink-2)}
+.meta b{font-weight:600;color:var(--ink)}
+.needs{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.crafted{margin:0;font-size:13px;color:var(--ink-3)}
+details.library{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 16px}
+details.library>summary{cursor:pointer;font-weight:600}
+details.library>summary span{font-weight:400;color:var(--ink-3);margin-left:6px;font-size:13.5px}
+.lib-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;padding-top:12px}
+.lib-grid h3{margin:0 0 6px;font:600 12px var(--font-cond);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
+.lib-grid dl{margin:0;display:grid;gap:7px}
+.lib-grid dt{font:500 12.5px var(--font-mono);color:var(--ink)}
+.lib-grid dd{margin:0;font-size:12.5px;color:var(--ink-2)}
+.convo-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:6px}
+.convo-head h2{margin:0;font:600 18px var(--font-body)}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink-2);cursor:pointer}
+.toggle input{width:16px;height:16px;accent-color:var(--accent);margin:0}
+.steps{display:grid}
+.step{scroll-margin-top:16px;display:grid;gap:12px;padding-block:22px;border-top:1px solid var(--line)}
+.step-label{display:flex;flex-wrap:wrap;align-items:center;gap:8px;cursor:pointer;background:none;border:0;padding:0;color:inherit;font:inherit;text-align:left;justify-self:start}
+.step-label .n{flex:none;min-width:24px;height:24px;padding:0 5px;border-radius:12px;display:grid;place-items:center;border:1.5px solid var(--line-strong);font:600 11.5px var(--font-mono);color:var(--ink-2);transition:background .2s,border-color .2s,color .2s}
+.step.is-active .step-label .n{background:var(--accent);border-color:var(--accent);color:var(--on-strong)}
+.step-label .t{font-weight:600}
+.pill{display:inline-flex;align-items:center;border-radius:999px;padding:0 9px;font:600 11px/1.85 var(--font-mono);letter-spacing:.02em;border:1px solid}
+.pill.neutral{color:var(--ink-2);border-color:var(--line-strong);background:var(--surface)}
+.pill.ok{color:var(--ok);border-color:var(--ok);background:var(--ok-soft)}
+.pill.warn{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
+.pill.bad{color:var(--bad);border-color:var(--bad);background:var(--bad-soft)}
+.pill.accent{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+.system,.after{font:12.5px/1.55 var(--font-mono);color:var(--ink-2);background:var(--surface-2);border-radius:8px;padding:8px 12px;overflow-wrap:anywhere}
+.system b,.after b{font-family:var(--font-cond);font-size:11px;letter-spacing:.1em;color:var(--engine);margin-right:6px}
+.events{display:grid;justify-items:end;gap:5px}
+.event{max-width:min(600px,94%);font:12.5px/1.5 var(--font-mono);color:var(--ink-2);background:var(--surface-2);border-radius:8px;padding:5px 10px;overflow-wrap:anywhere}
+.event b{font:600 10.5px var(--font-cond);letter-spacing:.1em;color:var(--ink);margin-right:8px}
+.msg{max-width:min(640px,90%);border-radius:14px;padding:10px 14px 12px;overflow-wrap:anywhere;min-width:0}
+.msg p{margin:0}
+.msg>*+*{margin-top:8px}
+.msg .who+*{margin-top:0}
+.who{font:600 10.5px/1 var(--font-cond);letter-spacing:.12em;text-transform:uppercase;margin-bottom:7px}
+.msg.learner{justify-self:end;background:var(--learner-bg);color:var(--learner-fg);border:1px solid var(--learner-line);border-bottom-right-radius:4px}
+.msg.learner .who{color:var(--ink-2)}
+.msg.learner code{background:var(--learner-code);padding:1px 5px;border-radius:4px}
+.msg.tutor{justify-self:start;background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:4px;box-shadow:var(--shadow)}
+.msg.tutor .who{color:var(--accent)}
+.msg.tutor code{background:var(--surface-2);padding:1px 5px;border-radius:4px}
+.msg pre{margin:8px 0 0;background:var(--surface-2);border-radius:8px;padding:10px 12px;overflow-x:auto;font:13px/1.5 var(--font-mono)}
+.msg pre code{background:none;padding:0;font-size:inherit}
+.msg blockquote{margin:8px 0 0;border-left:3px solid var(--line-strong);padding:2px 0 2px 10px;color:var(--ink-2);font-style:italic}
+
+/* ---------- backstage ---------- */
+.backstage{border:1.5px dashed var(--line-strong);border-radius:12px;padding:12px 14px;display:grid;gap:12px;min-width:0}
+.bs-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.bs-label{font:600 11px var(--font-cond);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2)}
+.bs-note{font-size:12px;color:var(--ink-3)}
+.lane{display:grid;grid-template-columns:112px minmax(0,1fr);gap:12px}
+.lane+.lane{border-top:1px solid var(--line);padding-top:12px}
+.lane-name{font:600 12px/1.3 var(--font-cond);letter-spacing:.08em;text-transform:uppercase}
+.lane-sub{display:block;font:400 11.5px/1.35 var(--font-body);letter-spacing:0;text-transform:none;color:var(--ink-3);margin-top:3px}
+.lane.orch .lane-name{color:var(--orch)}
+.lane.engine .lane-name{color:var(--engine)}
+.lane-body{min-width:0;display:grid;gap:8px;font-size:13.5px}
+.verdict{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.decision{font:600 12px var(--font-mono);color:var(--orch)}
+.reads{font-size:12.5px;color:var(--ink-2)}
+.reads .lbl{margin-right:6px}
+.updates{margin:0;padding:0;list-style:none;display:grid;gap:2px;font:12.5px/1.5 var(--font-mono);color:var(--ink)}
+.why{margin:0;color:var(--ink-2);font-size:13px}
+.allows{display:grid;gap:6px;padding-top:2px}
+.allows-title{font-size:12.5px;color:var(--ink-2)}
+.allow-row{display:grid;grid-template-columns:78px minmax(0,1fr);gap:8px;align-items:start}
+.eng-sum{margin:0;color:var(--ink-2)}
+details.prompt-d>summary{cursor:pointer;font-weight:600;font-size:13px;color:var(--engine)}
+.prompt{display:grid;gap:7px;margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.prompt-h{font:600 10.5px var(--font-cond);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.pline{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;font:12.5px/1.5 var(--font-mono);color:var(--ink)}
+.pline .ptag{color:var(--engine);font-weight:600;overflow-wrap:anywhere}
+.pline.state .ptag{color:var(--orch)}
+.pline.base{color:var(--ink-3)}
+.pline.base .ptag{color:var(--ink-3)}
+.pline.new .ptag::after{content:" new";color:var(--ok);font-weight:600}
+.ptools{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;font:12.5px/1.5 var(--font-mono);color:var(--ink-2);border-top:1px dashed var(--line);padding-top:7px}
+.ptools .ptag{color:var(--engine);font-weight:600}
+.hide-bs .backstage{display:none}
+.endspace{height:45vh}
+
+/* ---------- dock (phones) ---------- */
+.dock{display:none}
+
+@media (max-width:1100px){
+  .flow{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .flow li::before{display:none}
+}
+@media (max-width:900px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  .map{position:fixed;left:0;right:0;bottom:0;top:auto;max-height:86vh;max-height:86dvh;border-radius:16px 16px 0 0;z-index:30;
+    padding:16px 16px calc(84px + env(safe-area-inset-bottom,0px));transform:translateY(105%);visibility:hidden;
+    transition:transform .28s ease,visibility 0s linear .28s}
+  .map.open{transform:none;visibility:visible;transition:transform .28s ease}
+  .map .graph-wrap{max-width:440px;width:100%;justify-self:center}
+  .sheet-close{display:inline-block}
+  .dock{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:40;gap:8px;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--line);box-shadow:var(--shadow)}
+  .dock .grow{flex:1;font-family:var(--font-body);font-size:14px}
+  .page{padding-bottom:96px}
+  .lib-grid{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:640px){
+  .flow{grid-template-columns:minmax(0,1fr)}
+  .lane{grid-template-columns:minmax(0,1fr);gap:6px}
+  .pline,.ptools{grid-template-columns:minmax(0,1fr);gap:0}
+  .allow-row{grid-template-columns:minmax(0,1fr);gap:3px}
+  .msg{max-width:94%}
+  .row{grid-template-columns:minmax(0,1fr);gap:4px}
+}
+@media (prefers-reduced-motion:reduce){
+  .is-focus .ring{animation:none;opacity:.6}
+  .changed .flash{animation:none}
+  .map,.map.open,.box,.edge,.elabel,.g-node,.g-concept{transition:none}
+}
+</style>
+<style>body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <p class="eyebrow">Task-driven tutor · scenario on chatbot_final_version/app.py</p>
+    <h1>T3 Tutor Loop</h1>
+    <p class="lede">One real task, every turn shown. The graph on the left follows the conversation on the right as you scroll. Between each learner message and the tutor's reply, the dashed backstage strip shows the silent part: the orchestrator decides what the tutor is allowed, and the engine builds the tutor's prompt and tools from that decision.</p>
+    <ol class="flow" aria-label="Who does what">
+      <li><span class="role learner">Learner</span><p>Works in the code. Talks only to the tutor.</p></li>
+      <li><span class="role orch">Orchestrator<small>silent</small></span><p>Reads the graph, assesses each turn, updates the graph, and picks which templates, tools and state the tutor gets.</p></li>
+      <li><span class="role engine">Engine<small>code</small></span><p>Turns that pick into the tutor's system prompt (templates filled with state) and its tool list.</p></li>
+      <li><span class="role tutor">Tutor<small>the only voice</small></span><p>Teaches with exactly the kit it was given, nothing more.</p></li>
+    </ol>
+    <p class="footnote">Graph updates come from the orchestrator here. They could also pass through the engine; nothing else in the scenario would change. Phase 1 runs no code on the server: lines marked “pasted” are what the learner pastes from VS Code.</p>
+  </header>
+
+  <div class="layout">
+    <aside class="map" id="map" aria-label="Learning graph at the selected step">
+      <div class="map-head">
+        <div class="map-step">
+          <span class="step-no" id="mStepNo">0</span>
+          <div class="map-txt">
+            <div class="map-title" id="mTitle">Loop opens</div>
+            <div class="map-assess" id="mAssess"></div>
+          </div>
+        </div>
+        <div class="nav">
+          <button class="btn" id="prevBtn" type="button" aria-label="Previous step">←</button>
+          <button class="btn" id="nextBtn" type="button" aria-label="Next step">→</button>
+          <button class="btn sheet-close" id="sheetClose" type="button" aria-label="Close the graph">✕</button>
+        </div>
+      </div>
+      <div class="graph-wrap">
+        <svg id="graph" viewBox="0 0 360 440" role="img" aria-labelledby="gTitle"><title id="gTitle">Learning graph for task T3</title></svg>
+      </div>
+      <div class="row"><span class="lbl">Focus stack</span><div class="stack" id="mStack"></div></div>
+      <div class="row"><span class="lbl">Saved for later</span><div class="stack" id="mOpen"></div></div>
+      <section class="kit" aria-label="The tutor's kit at this step">
+        <h3>The tutor's kit at this step</h3>
+        <div class="row"><span class="lbl">Templates</span><div class="chips" id="kT"></div></div>
+        <div class="row"><span class="lbl">Tools</span><div class="chips" id="kTools"></div></div>
+        <div class="row"><span class="lbl">State</span><div class="chips" id="kS"></div></div>
+        <p class="hint">Green = switched on at this step. Struck through = switched off.</p>
+      </section>
+      <div class="legend" aria-label="Legend">
+        <span><span class="sw sw-active"></span>Active, the focus</span>
+        <span><span class="sw sw-susp"></span>Suspended, will resume</span>
+        <span><span class="sw sw-res"></span>Resolved</span>
+        <span><span class="sw sw-open"></span>Open, saved for later</span>
+        <span><span class="sw sw-need"></span>Concept needed, no evidence</span>
+        <span><span class="sw sw-miss"></span>Concept missing</span>
+        <span><span class="sw sw-unc"></span>Concept uncertain</span>
+        <span><span class="sw sw-known"></span>Concept known</span>
+      </div>
+    </aside>
+
+    <main class="stage">
+      <section class="taskcard" aria-label="The task">
+        <p class="eyebrow">Task T3 · fix · ladder tier: debug</p>
+        <h2>Guests always get "Une erreur s'est produite"</h2>
+        <div class="meta">
+          <span>File <b>app.py</b></span>
+          <span>Done when <b>check/test_t3.py</b> passes</span>
+          <span>Answer key <b>reference.patch</b> (locked)</span>
+        </div>
+        <div class="needs"><span class="lbl">Needs</span><span class="chip">C15 loop variables outlive the loop</span><span class="chip">C17 broad except hides failures</span><span class="chip">C13 OpenAI tool calling</span></div>
+        <p class="crafted">Made before any learner showed up, by the crafters: concepts/ → tasks/T3_guest_error/ → ladder.md. T1 and T2 are done, so C04 and C05 are already known.</p>
+      </section>
+
+      <details class="library" id="library">
+        <summary>The library<span id="libCount"></span></summary>
+        <div class="lib-grid" id="libGrid"></div>
+      </details>
+
+      <div class="convo-head">
+        <h2>Conversation</h2>
+        <label class="toggle" for="bsToggle"><input type="checkbox" id="bsToggle" checked>Show backstage</label>
+      </div>
+      <div class="steps" id="steps"></div>
+      <div class="endspace" aria-hidden="true"></div>
+    </main>
+  </div>
+</div>
+
+<nav class="dock" aria-label="Step controls">
+  <button class="btn" id="dPrev" type="button" aria-label="Previous step">←</button>
+  <button class="btn grow" id="dGraph" type="button" aria-expanded="false" aria-controls="map">Graph · step <span id="dStep">0</span> / 10</button>
+  <button class="btn" id="dNext" type="button" aria-label="Next step">→</button>
+</nav>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ================= the library ================= */
+  var BASE = "You are the tutor, the only voice the learner hears. Never type their fix. Never reveal the answer key.";
+
+  var TEMPLATES = {
+    base: "Who the tutor is. Always on. Never types the fix, never shows the answer key.",
+    task_intro: "Presents the task: the report, the goal, the done-check.",
+    task_frame: "Keeps the task goal in view while they work.",
+    guide_debugging: "Reproduce, locate, then make the real error visible.",
+    detour_concept: "Pauses the task to teach one missing idea.",
+    experiment_first: "A tiny runnable example before any explanation.",
+    guided_trace: "Walks through code the learner is reading.",
+    resume_bridge: "Reconnects to a paused goal using its saved context.",
+    guide_fix: "Guides toward the fix without typing it.",
+    park_side_question: "Acknowledges a non-blocking question and saves it.",
+    probe: "One short question to confirm understanding. No hints.",
+    close: "Wraps up the task and writes the journey entry."
+  };
+  var TOOLS = {
+    read_file: "Read files in the learner's repo.",
+    search: "Search the repo.",
+    scratch_pad: "Shared pad for tiny examples. The learner runs them in VS Code (phase 1).",
+    read_concept: "Read a concept file such as C15.",
+    write_journey: "Write the journey entry. Closing only."
+  };
+  var STATE_KEYS = {
+    task: "The task's goal, file and done-check.",
+    known: "Concepts the learner already has.",
+    focus: "The current node and where it stands.",
+    return_to: "Where to go back after a detour.",
+    watch_for: "A misconception seen in this session.",
+    evidence_wanted: "What the learner must show to close the focus.",
+    probe_target: "The concept to check.",
+    open_issues: "Recorded issues not being worked on now.",
+    journey: "The path the learner took through the task."
+  };
+
+  /* ================= the graph layout (viewBox 360 x 440) ================= */
+  var NODES = {
+    T3:  { type: "task",  x: 60,  y: 14,  w: 240, h: 62, kind: "TASK · FIX · ROOT", lines: ["T3 · Guests always get", "\"Une erreur s'est produite\""] },
+    I1:  { type: "issue", x: 4,   y: 118, w: 170, h: 64, kind: "ISSUE · KNOWLEDGE · C15", lines: ["I1 · loop variable only", "exists if the loop ran"], about: "C15" },
+    I3:  { type: "issue", x: 186, y: 118, w: 170, h: 64, kind: "ISSUE · TESTING", lines: ["I3 · how the test", "fakes OpenAI"] },
+    I2:  { type: "issue", x: 4,   y: 222, w: 170, h: 64, kind: "ISSUE · CODEBASE", lines: ["I2 · why the loop runs", "0 times for a guest"] },
+    C15: { type: "concept", x: 4,   y: 330, w: 110, h: 44, name: "loop var scope" },
+    C17: { type: "concept", x: 125, y: 330, w: 110, h: 44, name: "broad except" },
+    C13: { type: "concept", x: 246, y: 330, w: 110, h: 44, name: "tool calling" },
+    C04: { type: "concept", x: 4,   y: 392, w: 110, h: 40, name: "tuple unpacking", from: "T1" },
+    C05: { type: "concept", x: 246, y: 392, w: 110, h: 40, name: "dict.get", from: "T2" }
+  };
+  var EDGES = [
+    { d: "M110,76 C110,98 89,96 89,118", needs: "I1", label: [92, 101, "DETOUR", "end"] },
+    { d: "M250,76 C250,98 271,96 271,118", needs: "I3", cls: "side", label: [268, 101, "SIDE", "start"] },
+    { d: "M89,182 L89,222", needs: "I2", label: [96, 206, "NESTED", "start"] },
+    { d: "M180,76 L180,318", noArrow: true, label: [186, 309, "T3 REQUIRES", "start"] },
+    { d: "M26,318 L268,318", noArrow: true },
+    { d: "M26,318 L26,329" },
+    { d: "M147,318 L147,329" },
+    { d: "M268,318 L268,329" },
+    { d: "M26,374 L26,391" },
+    { d: "M268,374 L268,391" }
+  ];
+
+  /* ================= the scenario ================= */
+  var STEPS = [
+    {
+      title: "Loop opens",
+      assess: [["LOOP OPENS", "neutral"]],
+      decision: "start T3 with a small kit",
+      system: "ENGINE takes the next task from `ladder.md`, which is T3, and opens a fresh loop.",
+      orch: {
+        reads: "`ladder.md` · `learner/graph/knowledge.md`",
+        graph: ["+ T3 · ACTIVE (root)", "T3 requires C15 · C17 · C13", "C04 · C05 already known → reuse, never re-teach"],
+        why: "A new task always starts a fresh loop with a small kit."
+      },
+      allow: { t: ["base", "task_intro"], tools: ["read_file", "search"], s: ["task", "known"] },
+      prompt: [
+        ["base", BASE],
+        ["task_intro", "Present the task: the bug report, the goal, and how it is checked. Then ask where they would start."],
+        ["state · task", "T3 · fix · Guests always get \"Une erreur s'est produite\" · file app.py · done when check/test_t3.py passes"],
+        ["state · known", "C04 tuple unpacking (T1) · C05 dict.get (T2). Do not re-teach them."]
+      ],
+      tutor: [
+        { p: "New task: **T3**. A bug report came in from production:" },
+        { quote: "Guests always get: \"Une erreur s'est produite. Veuillez contacter le support.\"" },
+        { p: "Your goal: guests get a real answer again. You're done when `check/test_t3.py` passes. Where would you start?" }
+      ],
+      set: { T3: "ACTIVE", C15: "needed", C17: "needed", C13: "needed", C04: "known", C05: "known" },
+      stack: ["T3"], open: []
+    },
+    {
+      title: "Reproduce",
+      learner: {
+        events: [["RUN · pasted", "sent a message as a guest → \"Une erreur s'est produite. Veuillez contacter le support.\""]],
+        msg: "Reproduced it. Same message every time as a guest. Where does this message even come from?"
+      },
+      assess: [["ON_TRACK", "neutral"]],
+      decision: "CONTINUE",
+      orch: {
+        reads: "the message · `session/focus.md` · node T3",
+        graph: ["T3 · + evidence: reproduced the bug"],
+        why: "Finding where the message comes from is the task itself. A question is evidence, not proof of a gap."
+      },
+      allow: { t: ["base", "task_frame", "guide_debugging"], tools: ["read_file", "search"], s: ["task", "known", "focus"] },
+      prompt: [
+        ["base", BASE],
+        ["task_frame", "Keep the goal in view: guests must get a real answer."],
+        ["guide_debugging", "Help them reproduce, locate, then make the real error visible. One step at a time. Ask, don't tell."],
+        ["state · task", "T3 · guests get the generic error · app.py"],
+        ["state · known", "C04 · C05"],
+        ["state · focus", "T3 · bug reproduced as a guest"]
+      ],
+      tutor: [{ p: "Good, reproducing first is the right move. That sentence is a string literal somewhere in `app.py`. Search for it. What kind of block is it sitting in?" }]
+    },
+    {
+      title: "Find the message",
+      learner: {
+        events: [["SEARCH · pasted", "\"Une erreur s'est produite\" → app.py:824"]],
+        msg: "Line 824. It's inside `except Exception as e:` on line 821. So something crashes and this except swallows it?"
+      },
+      assess: [["ON_TRACK", "neutral"]],
+      decision: "CONTINUE",
+      orch: {
+        reads: "the message · the search result · node T3",
+        graph: ["T3 · + evidence: found the broad except (line 821)", "C17 · ? → uncertain"],
+        why: "They spotted the except but haven't used that yet, so C17 is only uncertain. Nothing to switch."
+      },
+      allow: { t: ["base", "task_frame", "guide_debugging"], tools: ["read_file", "search"], s: ["task", "known", "focus"] },
+      prompt: [
+        ["base", BASE],
+        ["task_frame", "Keep the goal in view: guests must get a real answer."],
+        ["guide_debugging", "Help them reproduce, locate, then make the real error visible. One step at a time. Ask, don't tell."],
+        ["state · task", "T3 · guests get the generic error · app.py"],
+        ["state · known", "C04 · C05"],
+        ["state · focus", "T3 · found the broad except at line 821"]
+      ],
+      tutor: [{ p: "Exactly. That `except` catches every error and swaps it for a polite message, so the real error is hiding in `e`. How could you see it?" }],
+      set: { C17: "uncertain" }
+    },
+    {
+      title: "The real error",
+      learner: {
+        events: [
+          ["EDIT · pasted", "app.py:821 · print(repr(e)) inside the except"],
+          ["RUN · pasted", "guest message → UnboundLocalError: cannot access local variable 'label' where it is not associated with a value"]
+        ],
+        msg: "UnboundLocalError on `label`! But label is right there in the loop on line 684?! How can it not exist?"
+      },
+      assess: [["GAP_DISCOVERED · knowledge", "bad"]],
+      decision: "REDIRECT → I1",
+      orch: {
+        reads: "the message · the pasted run output · node T3 · `concepts/C15`",
+        graph: [
+          "+ I1 · ACTIVE · discovered · bank link: C15",
+          "T3 → SUSPENDED · saves: has the traceback, line 722 reads label",
+          "C15 · ? → missing",
+          "C17 · uncertain → known (made the hidden error visible)"
+        ],
+        why: "They expect `label` to exist because it is written in the loop. That is a gap in how loop variables live, which matches bank concept C15, so the tutor can use C15's examples. `for label, link` also uses unpacking, but C04 is known, so no detour there."
+      },
+      allow: { t: ["base", "detour_concept", "experiment_first"], tools: ["scratch_pad", "read_concept"], s: ["focus", "return_to", "watch_for", "evidence_wanted"] },
+      prompt: [
+        ["base", BASE],
+        ["detour_concept", "Pause the task. Teach one idea only: a loop variable only exists if the loop ran. Use concept file C15."],
+        ["experiment_first", "Start with a tiny runnable example in the scratch pad. Ask for a prediction before they run it."],
+        ["state · focus", "I1 · a loop variable only exists if the loop ran"],
+        ["state · return_to", "T3 · has the traceback; line 722 reads label. Don't solve T3 here."],
+        ["state · watch_for", "expects a variable written in a loop to exist after it, even if the loop never ran (their words)"],
+        ["state · evidence_wanted", "They explain why label is unbound for a guest."]
+      ],
+      tutor: [
+        { p: "Good catch. This one surprises a lot of people. Let's step out of `app.py` for a minute. In the scratch pad:" },
+        { code: "def last(items):\n    for x in items:\n        pass\n    return x" },
+        { p: "`last([1, 2, 3])` returns `3`. What do you predict for `last([])`?" }
+      ],
+      set: { I1: "ACTIVE", T3: "SUSPENDED", C15: "missing", C17: "known" },
+      stack: ["T3", "I1"]
+    },
+    {
+      title: "Predict",
+      learner: { msg: "None? In JS it would be undefined." },
+      assess: [["ON_TRACK · inside the detour", "neutral"]],
+      decision: "CONTINUE",
+      orch: {
+        reads: "the message · node I1",
+        graph: ["I1 · + evidence: predicted None (JS habit, in their own words)", "I1 · watch for: JS habit (said by the learner, not assumed)"],
+        why: "An expected miss. Let the run teach it instead of an explanation."
+      },
+      allow: { t: ["base", "detour_concept", "experiment_first"], tools: ["scratch_pad", "read_concept"], s: ["focus", "return_to", "watch_for", "evidence_wanted"] },
+      prompt: [
+        ["base", BASE],
+        ["detour_concept", "Pause the task. Teach one idea only: a loop variable only exists if the loop ran. Use concept file C15."],
+        ["experiment_first", "Start with a tiny runnable example in the scratch pad. Ask for a prediction before they run it."],
+        ["state · focus", "I1 · predicted None (JS habit confirmed)"],
+        ["state · return_to", "T3 · has the traceback; line 722 reads label. Don't solve T3 here."],
+        ["state · watch_for", "JS habit, said by the learner: expects None or undefined after an empty loop"],
+        ["state · evidence_wanted", "They explain why label is unbound for a guest."]
+      ],
+      tutor: [{ p: "Run it and see." }]
+    },
+    {
+      title: "Run it, then a new question",
+      learner: {
+        events: [["RUN · pasted", "scratch pad · last([]) → UnboundLocalError: cannot access local variable 'x' where it is not associated with a value"]],
+        msg: "Same error! So `x` only exists if the loop ran at least once. And `last(['a', 'b'])` gives `'b'` because x keeps its last value after the loop. OK... but why would the loop on line 684 run zero times for a guest?"
+      },
+      assess: [["DEPENDENCY_MISSING · codebase", "warn"]],
+      decision: "REDIRECT → I2",
+      orch: {
+        reads: "the message · the pasted run output · node I1",
+        graph: [
+          "I1 · + evidence: explained x after the loop",
+          "+ I2 · ACTIVE · nested under I1",
+          "I1 → SUSPENDED · saves: gets last([]), must connect it to label"
+        ],
+        why: "The idea is clear in the toy. Using it on app.py needs one more fact: what the loop iterates over for a guest."
+      },
+      allow: { t: ["base", "guided_trace"], tools: ["read_file", "search"], s: ["focus", "return_to"] },
+      prompt: [
+        ["base", BASE],
+        ["guided_trace", "Walk through the code they are reading. Point to exact lines and ask what they see. Keep it short."],
+        ["state · focus", "I2 · why the loop on line 684 runs 0 times for a guest"],
+        ["state · return_to", "I1 · they get last([]); next, connect it to label."]
+      ],
+      tutor: [{ p: "Great question. Let's trace it. Line 684 loops over `self._record_process_links(...)`. Open that method on line 459. What does it return when the request has no `user_id`?" }],
+      set: { I2: "ACTIVE", I1: "SUSPENDED" },
+      stack: ["T3", "I1", "I2"]
+    },
+    {
+      title: "Trace the guest path",
+      learner: { msg: "Lines 469–470: `if not base or not user_id: return []`. A guest has no user_id, so it returns an empty list." },
+      assess: [["GAP_RESOLVED · I2", "ok"]],
+      decision: "RESUME → I1",
+      orch: {
+        reads: "the message · node I2 · I1's saved context",
+        graph: ["I2 → RESOLVED (read lines 469–470)", "I1 → ACTIVE (closest paused goal, nothing blocks it)"],
+        why: "Resume the nearest suspended goal and hand the tutor the context I1 saved when it was paused."
+      },
+      allow: { t: ["base", "resume_bridge", "detour_concept"], tools: ["read_file", "scratch_pad"], s: ["focus", "return_to", "evidence_wanted"] },
+      prompt: [
+        ["base", BASE],
+        ["resume_bridge", "Reconnect to the paused goal with one bridging sentence, then one question."],
+        ["detour_concept", "Teach one idea only: a loop variable only exists if the loop ran."],
+        ["state · focus", "I1 (resumed) · they get last([]); now connect it to label on line 684"],
+        ["state · return_to", "T3 · has the traceback; line 722 reads label"],
+        ["state · evidence_wanted", "They explain why label is unbound for a guest."]
+      ],
+      tutor: [{ p: "Right. Now put that next to your scratch pad. For a guest, the loop on line 684 gets `[]`. So what is `label` after that loop?" }],
+      set: { I2: "RESOLVED", I1: "ACTIVE" },
+      stack: ["T3", "I1"]
+    },
+    {
+      title: "Connect it back",
+      learner: { msg: "Nothing. It never gets assigned, exactly like x in last([]). Then line 722 reads label and crashes, and the except on line 821 hides it." },
+      assess: [["GAP_RESOLVED · I1", "ok"]],
+      decision: "RESUME → T3",
+      orch: {
+        reads: "the message · node I1 · T3's saved context",
+        graph: ["I1 → RESOLVED", "C15 · missing → known (explained it on the real code)", "T3 → ACTIVE"],
+        why: "The evidence I1 asked for is there: they explained why label is unbound for a guest."
+      },
+      allow: { t: ["base", "task_frame", "resume_bridge", "guide_fix"], tools: ["read_file", "search"], s: ["task", "known", "focus"] },
+      prompt: [
+        ["base", BASE],
+        ["task_frame", "Keep the goal in view: guests must get a real answer."],
+        ["resume_bridge", "Reconnect to the paused goal with one bridging sentence, then one question."],
+        ["guide_fix", "Guide them to the fix. Never type it for them. They run the check themselves."],
+        ["state · task", "T3 · guests get the generic error · app.py"],
+        ["state · known", "C04 · C05 · C15 (new)"],
+        ["state · focus", "T3 (resumed) · root cause found: label is unbound for guests"]
+      ],
+      tutor: [{ p: "That's the whole bug. Back to T3. Look at line 722 again: `label != 'candidate'`. A link label is never \"candidate\". Which variable in `chat()` can actually be `'candidate'`?" }],
+      set: { I1: "RESOLVED", C15: "known", T3: "ACTIVE" },
+      stack: ["T3"]
+    },
+    {
+      title: "Find the right variable",
+      learner: { msg: "`question_label`! Line 610 unpacks it from `user_query_operations`, and `QUESTION_LABELS` is `{'recruiter', 'candidate', 'both'}`. So line 722 should check question_label." },
+      assess: [["ON_TRACK", "neutral"]],
+      decision: "CONTINUE",
+      orch: {
+        reads: "the message · node T3",
+        graph: ["T3 · + evidence: found question_label (line 610)"],
+        why: "Right variable, right reason. The bridge is done, so resume_bridge is switched off."
+      },
+      allow: { t: ["base", "task_frame", "guide_fix"], tools: ["read_file", "search"], s: ["task", "known", "focus"] },
+      prompt: [
+        ["base", BASE],
+        ["task_frame", "Keep the goal in view: guests must get a real answer."],
+        ["guide_fix", "Guide them to the fix. Never type it for them. They run the check themselves."],
+        ["state · task", "T3 · guests get the generic error · app.py"],
+        ["state · known", "C04 · C05 · C15"],
+        ["state · focus", "T3 · knows the fix: question_label"]
+      ],
+      tutor: [{ p: "Yes. Make the change, then run the check." }]
+    },
+    {
+      title: "Fix, check, side question",
+      learner: {
+        events: [
+          ["EDIT · pasted", "app.py:722 · label → question_label"],
+          ["EDIT · pasted", "app.py:821 · removed the debug print"],
+          ["RUN · pasted", "check/test_t3.py → 2 passed"]
+        ],
+        msg: "2 passed! Wait, how does that test even talk to the chatbot without an OpenAI key?"
+      },
+      assess: [["GOAL MET → VERIFY", "accent"], ["SIDE GAP · not blocking", "neutral"]],
+      decision: "VERIFY · probe C13",
+      orch: {
+        reads: "the message · the pasted check result · node T3",
+        graph: [
+          "T3 · + evidence: check/test_t3.py 2 passed",
+          "+ I3 · OPEN · how the test fakes OpenAI (not blocking)",
+          "C13 · ? → uncertain (never came up)"
+        ],
+        why: "The code works. Learning evidence is thin on C13, so one probe. I3 is saved, not chased now."
+      },
+      allow: { t: ["base", "park_side_question", "probe"], tools: ["read_file"], s: ["focus", "probe_target", "open_issues"] },
+      prompt: [
+        ["base", BASE],
+        ["park_side_question", "Acknowledge the side question in one sentence, give at most a one-line answer, and say it's saved for later."],
+        ["probe", "Ask ONE short question that checks the target concept. No hints."],
+        ["state · focus", "T3 · check passed (2/2) · verifying learning"],
+        ["state · probe_target", "C13 · what the if on line 722 decides"],
+        ["state · open_issues", "I3 · how the test fakes OpenAI (saved)"]
+      ],
+      tutor: [{ p: "Both pass. Good question about the test. Short version: it swaps in a fake OpenAI client. It's saved for a later task. One last question before we close: what does the `if` on line 722 actually decide?" }],
+      set: { I3: "OPEN", C13: "uncertain" },
+      open: ["I3"]
+    },
+    {
+      title: "Probe and close",
+      learner: { msg: "Whether the model gets the pricing tool. `tools` is the list of functions OpenAI is allowed to call, and candidates don't get the pricing one." },
+      assess: [["TASK_COMPLETED", "ok"]],
+      decision: "COMPLETE",
+      orch: {
+        reads: "the message · node T3 · open issues",
+        graph: ["C13 · uncertain → known", "T3 → RESOLVED", "I3 stays OPEN → carried to a later task"],
+        why: "Task success (the check) and learning success (C15, C17, C13) are both there."
+      },
+      allow: { t: ["base", "close"], tools: ["write_journey"], s: ["task", "journey", "open_issues"] },
+      prompt: [
+        ["base", BASE],
+        ["close", "Wrap up in two sentences: what they fixed and what they learned. Then write the journey entry."],
+        ["state · task", "T3 · guests get the generic error · app.py"],
+        ["state · journey", "reproduced → found except 821 → I1 loop scope (I2 nested) → fixed line 722 → probe C13"],
+        ["state · open_issues", "I3 · carried to a later task"]
+      ],
+      tutor: [{ p: "T3 done. You found a real production bug: a loop variable read after a loop that never ran, hidden by a broad `except`. It's saved in your journey. Next up is T4." }],
+      after: "ENGINE · the tutor wrote `learner/journey/T3.md` · INDEX.md gets one line · discoveries go into the bank, labeled: C15 gets a misconception (step 4) and a new way to say it (step 7), and D1 (how the test fakes OpenAI) is added, linked to I3 · `session/` cleared · next from `ladder.md`: T4, with a fresh tutor and a fresh orchestrator. The learner's conversation simply continues.",
+      set: { C13: "known", T3: "RESOLVED" },
+      stack: []
+    }
+  ];
+
+  /* ================= helpers ================= */
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function fmt(s) {
+    return esc(s)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  }
+  function h(tag, attrs, html) {
+    var e = document.createElement(tag);
+    if (attrs) for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (html != null) e.innerHTML = html;
+    return e;
+  }
+  var SVGNS = "http://www.w3.org/2000/svg";
+  function mk(tag, attrs, parent) {
+    var e = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function same(a, b) {
+    if (a.length !== b.length) return false;
+    for (var i = 0; i < a.length; i++) if (b.indexOf(a[i]) === -1) return false;
+    return true;
+  }
+  function chipsHTML(cur, prev, dict, extra) {
+    var out = "";
+    cur.forEach(function (x) {
+      var cls = "chip" + (extra ? " " + extra : "") + (prev.indexOf(x) === -1 ? " add" : "");
+      out += '<span class="' + cls + '" title="' + esc(dict[x] || "") + '">' + esc(x) + "</span>";
+    });
+    prev.forEach(function (x) {
+      if (cur.indexOf(x) === -1) out += '<span class="chip' + (extra ? " " + extra : "") + ' del" title="' + esc(dict[x] || "") + '">' + esc(x) + "</span>";
+    });
+    return out;
+  }
+  var EMPTY = { t: [], tools: [], s: [] };
+  function prevAllow(i) { return i > 0 ? STEPS[i - 1].allow : EMPTY; }
+
+  /* ================= snapshots of the graph per step ================= */
+  var SNAP = [];
+  (function () {
+    var cur = {}, stack = [], open = [];
+    STEPS.forEach(function (s) {
+      var before = {};
+      for (var k in cur) before[k] = cur[k];
+      var set = s.set || {};
+      for (var key in set) cur[key] = set[key];
+      if (s.stack) stack = s.stack;
+      if (s.open) open = s.open;
+      var status = {};
+      for (var k2 in cur) status[k2] = cur[k2];
+      SNAP.push({
+        status: status,
+        changed: Object.keys(set).filter(function (id) { return before[id] !== cur[id]; }),
+        stack: stack.slice(),
+        open: open.slice()
+      });
+    });
+  })();
+
+  /* ================= library ================= */
+  function renderLibrary() {
+    document.getElementById("libCount").textContent =
+      "what the orchestrator can hand the tutor · " + Object.keys(TEMPLATES).length + " templates · " +
+      Object.keys(TOOLS).length + " tools · " + Object.keys(STATE_KEYS).length + " state values";
+    function col(title, dict) {
+      var html = "<div><h3>" + esc(title) + "</h3><dl>";
+      for (var k in dict) html += "<dt>" + esc(k) + "</dt><dd>" + esc(dict[k]) + "</dd>";
+      return html + "</dl></div>";
+    }
+    document.getElementById("libGrid").innerHTML =
+      col("Templates · system prompt blocks", TEMPLATES) + col("Tools", TOOLS) + col("State · filled in by the engine", STATE_KEYS);
+  }
+
+  /* ================= conversation ================= */
+  var stepEls = [];
+  function pills(assess) {
+    return assess.map(function (a) { return '<span class="pill ' + a[1] + '">' + esc(a[0]) + "</span>"; }).join("");
+  }
+  function backstage(s, i) {
+    var prev = prevAllow(i);
+    var unchanged = i > 0 && same(s.allow.t, prev.t) && same(prev.t, s.allow.t) && same(s.allow.tools, prev.tools) && same(prev.tools, s.allow.tools);
+    var engineText = unchanged
+      ? "Nothing to switch: same templates and tools as the last turn. It only refreshes the state values."
+      : "Builds the tutor's system prompt from " + s.allow.t.length + " templates filled with " + s.allow.s.length +
+        " state values, and switches on " + s.allow.tools.length + (s.allow.tools.length === 1 ? " tool." : " tools.");
+    var added = s.allow.t.filter(function (x) { return prev.t.indexOf(x) === -1; });
+    var lines = s.prompt.map(function (pl) {
+      var tag = pl[0], cls = "pline";
+      if (tag === "base") cls += " base";
+      else if (tag.indexOf("state") === 0) cls += " state";
+      else if (added.indexOf(tag) !== -1 && i > 0) cls += " new";
+      return '<div class="' + cls + '"><span class="ptag">[' + esc(tag) + "]</span><span>" + fmt(pl[1]) + "</span></div>";
+    }).join("");
+    var d = h("div", { "class": "backstage" });
+    d.innerHTML =
+      '<div class="bs-head"><span class="bs-label">Backstage</span><span class="bs-note">The learner never sees this part.</span></div>' +
+      '<div class="lane orch"><div class="lane-name">Orchestrator<span class="lane-sub">silent · decides</span></div><div class="lane-body">' +
+        '<div class="verdict">' + pills(s.assess) + '<span class="decision">→ ' + esc(s.decision) + "</span></div>" +
+        '<div class="reads"><span class="lbl">Read</span>' + fmt(s.orch.reads) + "</div>" +
+        '<ul class="updates">' + s.orch.graph.map(function (g) { return "<li>" + fmt(g) + "</li>"; }).join("") + "</ul>" +
+        '<p class="why">' + fmt(s.orch.why) + "</p>" +
+        '<div class="allows"><div class="allows-title">Allows the tutor:</div>' +
+          '<div class="allow-row"><span class="lbl">Templates</span><div class="chips">' + chipsHTML(s.allow.t, prev.t, TEMPLATES) + "</div></div>" +
+          '<div class="allow-row"><span class="lbl">Tools</span><div class="chips">' + chipsHTML(s.allow.tools, prev.tools, TOOLS) + "</div></div>" +
+          '<div class="allow-row"><span class="lbl">State</span><div class="chips">' + chipsHTML(s.allow.s, prev.s, STATE_KEYS, "st") + "</div></div>" +
+        "</div>" +
+      "</div></div>" +
+      '<div class="lane engine"><div class="lane-name">Engine<span class="lane-sub">code · assembles</span></div><div class="lane-body">' +
+        '<p class="eng-sum">' + esc(engineText) + "</p>" +
+        '<details class="prompt-d"><summary>What the tutor receives</summary><div class="prompt">' +
+          '<div class="prompt-h">System prompt, assembled</div>' + lines +
+          '<div class="ptools"><span class="ptag">[tools]</span><span>' + esc(s.allow.tools.join(" · ")) + "</span></div>" +
+        "</div></details>" +
+      "</div></div>";
+    return d;
+  }
+  function tutorMsg(parts) {
+    var html = '<div class="who">Tutor</div>';
+    parts.forEach(function (p) {
+      if (p.p) html += "<p>" + fmt(p.p) + "</p>";
+      else if (p.code) html += "<pre><code>" + esc(p.code) + "</code></pre>";
+      else if (p.quote) html += "<blockquote>" + fmt(p.quote) + "</blockquote>";
+    });
+    return h("div", { "class": "msg tutor" }, html);
+  }
+  function renderConversation() {
+    var wrap = document.getElementById("steps");
+    STEPS.forEach(function (s, i) {
+      var sec = h("section", { "class": "step", id: "step-" + i, "aria-label": "Step " + i + ": " + s.title });
+      var lab = h("button", { "class": "step-label", type: "button" },
+        '<span class="n">' + i + '</span><span class="t">' + esc(s.title) + "</span>" + pills(s.assess));
+      lab.addEventListener("click", function () { goTo(i); });
+      sec.appendChild(lab);
+      if (s.system) sec.appendChild(h("div", { "class": "system" }, "<b>ENGINE</b>" + fmt(s.system.replace(/^ENGINE /, ""))));
+      if (s.learner) {
+        if (s.learner.events) {
+          var ev = h("div", { "class": "events" });
+          s.learner.events.forEach(function (e) { ev.appendChild(h("div", { "class": "event" }, "<b>" + esc(e[0]) + "</b>" + fmt(e[1]))); });
+          sec.appendChild(ev);
+        }
+        if (s.learner.msg) sec.appendChild(h("div", { "class": "msg learner" }, '<div class="who">Learner</div><p>' + fmt(s.learner.msg) + "</p>"));
+      }
+      sec.appendChild(backstage(s, i));
+      sec.appendChild(tutorMsg(s.tutor));
+      if (s.after) sec.appendChild(h("div", { "class": "after" }, "<b>AFTER</b>" + fmt(s.after.replace(/^ENGINE · /, "ENGINE: "))));
+      wrap.appendChild(sec);
+      stepEls.push(sec);
+    });
+  }
+
+  /* ================= graph ================= */
+  var svg = document.getElementById("graph");
+  function buildGraph() {
+    var defs = mk("defs", {}, svg);
+    var marker = mk("marker", { id: "t3arrow", viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "7", markerHeight: "7", orient: "auto-start-reverse" }, defs);
+    mk("path", { d: "M0,0 L10,5 L0,10 z", "class": "arrowhead" }, marker);
+    var gE = mk("g", {}, svg);
+    EDGES.forEach(function (e) {
+      var p = mk("path", { d: e.d, "class": "edge" + (e.cls ? " " + e.cls : "") }, gE);
+      if (!e.noArrow) p.setAttribute("marker-end", "url(#t3arrow)");
+      e.el = p;
+      if (e.label) {
+        var t = mk("text", { x: e.label[0], y: e.label[1], "text-anchor": e.label[3], "class": "elabel" }, gE);
+        t.textContent = e.label[2];
+        e.lel = t;
+      }
+    });
+    var gN = mk("g", {}, svg);
+    Object.keys(NODES).forEach(function (id) {
+      var n = NODES[id];
+      var g = mk("g", { transform: "translate(" + n.x + "," + n.y + ")" }, gN);
+      mk("rect", { "class": "ring", x: -4, y: -4, width: n.w + 8, height: n.h + 8, rx: 13 }, g);
+      mk("rect", { "class": "flash", x: -3, y: -3, width: n.w + 6, height: n.h + 6, rx: 12 }, g);
+      mk("rect", { "class": "box", x: 0, y: 0, width: n.w, height: n.h, rx: 9 }, g);
+      if (n.type === "concept") {
+        mk("text", { "class": "cid", x: 11, y: n.h / 2 - 3 }, g).textContent = id;
+        mk("text", { "class": "cname", x: 11, y: n.h / 2 + 12 }, g).textContent = n.name;
+      } else {
+        mk("text", { "class": "kind", x: 11, y: 17 }, g).textContent = n.kind;
+        var t = mk("text", { "class": "title", x: 11, y: 35 }, g);
+        n.lines.forEach(function (ln, k) {
+          var sp = mk("tspan", { x: 11, dy: k ? 15 : 0 }, t);
+          sp.textContent = ln;
+        });
+      }
+      var tag = mk("g", { "class": "tag" }, g);
+      n.tagR = mk("rect", { height: 16, rx: 8 }, tag);
+      n.tagT = mk("text", { y: 11.5, "text-anchor": "middle" }, tag);
+      n.tagG = tag;
+      n.g = g;
+    });
+  }
+  function tagText(n, st) {
+    if (n.type !== "concept") return st;
+    if (st === "needed") return "?";
+    if (st === "known" && n.from) return "KNOWN · " + n.from;
+    return st.toUpperCase();
+  }
+  function setTag(n, text) {
+    n.tagT.textContent = text;
+    var w = text.length * 5.4 + 14;
+    try { var L = n.tagT.getComputedTextLength(); if (L > 0) w = L + 14; } catch (e) {}
+    w = Math.max(w, 22);
+    n.tagR.setAttribute("width", w.toFixed(1));
+    n.tagT.setAttribute("x", (w / 2).toFixed(1));
+    n.tagG.setAttribute("transform", "translate(" + (n.w - w - 8).toFixed(1) + ",-8)");
+  }
+  function refreshTags() {
+    var snap = SNAP[active];
+    if (!snap) return;
+    Object.keys(NODES).forEach(function (id) {
+      var st = snap.status[id];
+      if (st) setTag(NODES[id], tagText(NODES[id], st));
+    });
+  }
+
+  /* ================= step state ================= */
+  var active = -1;
+  var mStepNo = document.getElementById("mStepNo"), mTitle = document.getElementById("mTitle"), mAssess = document.getElementById("mAssess");
+  var mStack = document.getElementById("mStack"), mOpen = document.getElementById("mOpen");
+  var kT = document.getElementById("kT"), kTools = document.getElementById("kTools"), kS = document.getElementById("kS");
+  var prevBtn = document.getElementById("prevBtn"), nextBtn = document.getElementById("nextBtn");
+  var dPrev = document.getElementById("dPrev"), dNext = document.getElementById("dNext"), dStep = document.getElementById("dStep");
+
+  function setStep(i) {
+    if (i === active) return;
+    active = i;
+    var s = STEPS[i], snap = SNAP[i];
+    var top = snap.stack[snap.stack.length - 1];
+
+    Object.keys(NODES).forEach(function (id) {
+      var n = NODES[id], st = snap.status[id];
+      var cls = n.type === "concept" ? "g-concept" : "g-node";
+      if (!st) cls += " st-hidden";
+      else cls += n.type === "concept" ? " cs-" + st : " st-" + st;
+      if (top === id) cls += " is-focus";
+      if (n.type === "concept" && top && NODES[top].about === id) cls += " linked";
+      n.g.setAttribute("class", cls);
+      if (st) setTag(n, tagText(n, st));
+      if (snap.changed.indexOf(id) !== -1) {
+        void n.g.getBoundingClientRect();
+        n.g.classList.add("changed");
+      }
+    });
+    EDGES.forEach(function (e) {
+      var on = !e.needs || !!snap.status[e.needs];
+      e.el.classList.toggle("off", !on);
+      if (e.lel) e.lel.classList.toggle("off", !on);
+    });
+
+    mStepNo.textContent = i;
+    mTitle.textContent = s.title;
+    mAssess.textContent = s.assess.map(function (a) { return a[0]; }).join(" + ") + " → " + s.decision;
+
+    if (snap.stack.length) {
+      mStack.innerHTML = snap.stack.map(function (id, k) {
+        return '<span class="chip' + (k === snap.stack.length - 1 ? " top" : "") + '">' + id + "</span>";
+      }).join('<span class="sep">›</span>');
+    } else {
+      mStack.innerHTML = '<span class="none">empty · T3 is closed, T4 opens a new loop</span>';
+    }
+    mOpen.innerHTML = snap.open.length
+      ? snap.open.map(function (id) { return '<span class="chip">' + id + "</span>"; }).join("")
+      : '<span class="none">nothing</span>';
+
+    var prev = prevAllow(i);
+    kT.innerHTML = chipsHTML(s.allow.t, prev.t, TEMPLATES);
+    kTools.innerHTML = chipsHTML(s.allow.tools, prev.tools, TOOLS);
+    kS.innerHTML = chipsHTML(s.allow.s, prev.s, STATE_KEYS, "st");
+
+    prevBtn.disabled = dPrev.disabled = i === 0;
+    nextBtn.disabled = dNext.disabled = i === STEPS.length - 1;
+    dStep.textContent = i;
+
+    stepEls.forEach(function (el, k) { el.classList.toggle("is-active", k === i); });
+  }
+
+  /* ================= navigation + scroll-follow ================= */
+  var reduceMotion = false;
+  try { reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
+  var spyLocked = false;
+
+  function goTo(i) {
+    i = Math.max(0, Math.min(STEPS.length - 1, i));
+    setStep(i);
+    spyLocked = true;
+    stepEls[i].scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+  }
+  function spy() {
+    if (spyLocked) return;
+    var line = window.innerHeight * 0.28;
+    var idx = 0;
+    for (var k = 0; k < stepEls.length; k++) {
+      if (stepEls[k].getBoundingClientRect().top - 2 <= line) idx = k; else break;
+    }
+    setStep(idx);
+  }
+  var ticking = false;
+  window.addEventListener("scroll", function () {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function () { ticking = false; spy(); });
+  }, { passive: true });
+  ["wheel", "touchstart", "mousedown"].forEach(function (ev) {
+    window.addEventListener(ev, function () { spyLocked = false; }, { passive: true });
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    var tag = (e.target && e.target.tagName) || "";
+    if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
+    if (e.key === "ArrowRight") { e.preventDefault(); goTo(active + 1); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); goTo(active - 1); }
+    else spyLocked = false;
+  });
+  prevBtn.addEventListener("click", function () { goTo(active - 1); });
+  nextBtn.addEventListener("click", function () { goTo(active + 1); });
+  dPrev.addEventListener("click", function () { goTo(active - 1); });
+  dNext.addEventListener("click", function () { goTo(active + 1); });
+
+  /* phone: the graph opens as a sheet */
+  var map = document.getElementById("map"), dGraph = document.getElementById("dGraph");
+  function setSheet(open) {
+    map.classList.toggle("open", open);
+    dGraph.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) refreshTags();
+  }
+  dGraph.addEventListener("click", function () { setSheet(!map.classList.contains("open")); });
+  document.getElementById("sheetClose").addEventListener("click", function () { setSheet(false); });
+
+  /* backstage on/off */
+  var bsToggle = document.getElementById("bsToggle"), stepsEl = document.getElementById("steps");
+  try { if (localStorage.getItem("t3-backstage") === "0") bsToggle.checked = false; } catch (e) {}
+  function applyBs() { stepsEl.classList.toggle("hide-bs", !bsToggle.checked); }
+  bsToggle.addEventListener("change", function () {
+    applyBs();
+    try { localStorage.setItem("t3-backstage", bsToggle.checked ? "1" : "0"); } catch (e) {}
+  });
+
+  /* ================= boot ================= */
+  renderLibrary();
+  renderConversation();
+  buildGraph();
+  applyBs();
+  setStep(0);
+  var m = /^#step-(\d+)$/.exec(location.hash || "");
+  if (m) {
+    var target = Math.min(STEPS.length - 1, parseInt(m[1], 10));
+    setStep(target);
+    spyLocked = true;
+    stepEls[target].scrollIntoView({ block: "start" });
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(refreshTags);
+})();
+</script>
+</body>
+</html>

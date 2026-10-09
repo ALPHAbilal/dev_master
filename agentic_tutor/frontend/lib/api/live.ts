@@ -91,6 +91,7 @@ export function createLiveApi(base: string, identity: Identity): Api {
   return {
     codebases: () => request("/codebases"),
     register: (body) => request("/codebases", body),
+    importRepo: (body) => request("/codebases/import", body),
     open: (value) => request(`/codebases/${id(value)}/open`, {}),
     init: (body) => request("/session", body),
     map: () => request("/session/map", {}),
