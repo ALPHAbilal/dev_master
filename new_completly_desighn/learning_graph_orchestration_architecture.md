@@ -558,7 +558,7 @@ RESUME / COMPLETE      etc.                 etc.
                               |
                 +-------------+--------------+
                 |             |              |
-            CONTINUE        REDIRECT        RESUME
+            CONTINUE    START_DETOUR  RETURN_FROM_DETOUR
                 |             |              |
                 +-------------+--------------+
                               |
@@ -596,11 +596,13 @@ Learner interaction
 | ORCHESTRATOR ASSESSMENT      |
 | assessment: ON_TRACK / ...   |
 | confidence / supporting data |
-| graph_updates[]              |
+| graph_changes[]              |
 | next_focus_id                |
 | decision: CONTINUE /         |
-|           REDIRECT / RESUME /|
-|           VERIFY / COMPLETE  |
+|   START_DETOUR /             |
+|   RETURN_FROM_DETOUR /       |
+|   VERIFY_LEARNING /          |
+|   COMPLETE_TASK              |
 +---------------+--------------+
                 |
                 v
@@ -634,14 +636,14 @@ CASE B: NEW NESTED GAP
       -> orchestrator: GAP_DISCOVERED
       -> graph: create/link issue, preserve return context,
                 suspend old focus, activate needed subgoal
-      -> tutor: REDIRECT to subgoal
+      -> tutor: START_DETOUR to subgoal
 
 CASE C: GAP RESOLVED
   learner demonstrates target understanding
       -> orchestrator: GAP_RESOLVED
       -> graph: resolve issue, unblock dependents,
                 restore closest ready suspended focus
-      -> tutor: RESUME with bridge to interrupted activity
+      -> tutor: RETURN_FROM_DETOUR with bridge to interrupted activity
 ```
 
 ---
@@ -769,6 +771,7 @@ For a trivial task, evidence can be implicit in independent action. For an impor
 17. **Every readable file comes with a tool, and every tool comes with a guide:** what it does, when to use it, how to use it well, and why it is available this turn (§18).
 18. **Tools are custom abstractions by default.** An agent calls them with fixed parameters and gets a shaped result. Primitive SDK tools (`Read`, `Grep`, `Bash` ...) are given only where the job is open exploration and nothing gated is reachable (§18).
 19. **The learner can stop at any point.** The task parks with its focus stack, and comes back exactly there (§24).
+20. **The orchestrator sees only the decisions that are possible from the current state.** Code removes the rest before the call, and the validation rules still check after it (`BACKEND_SPEC.md` §7.5).
 
 ---
 
@@ -801,8 +804,8 @@ For a trivial task, evidence can be implicit in independent action. For an impor
   |      |                   |                    |              |
   |   ON TRACK          GAP(S) FOUND        NODE RESOLVED         |
   |      |                   |                    |              |
-  |   CONTINUE       graph issue(s)         unblock / RESUME     |
-  |      |            & dependencies              |              |
+  |   CONTINUE       graph issue(s)         unblock, then        |
+  |      |            & dependencies     RETURN_FROM_DETOUR      |
   |      |                   |                    |              |
   |      |         recursive nested detour        |              |
   |      |         with saved return path         |              |
@@ -862,7 +865,7 @@ In T3, I1 links to C15. I2 (codebase) and I3 (testing) link to nothing in the cr
 
 ## 16. The Concept Bank
 
-Crafter 1 builds one file per concept, per codebase, before any learner arrives. The bank may be huge. It only covers ideas this codebase actually uses; it is not a general course.
+The concept crafter builds one file per concept, per codebase, before any learner arrives. The bank may be huge. It only covers ideas this codebase actually uses; it is not a general course.
 
 ```text
 concepts/C15_loop_scope.md
@@ -882,7 +885,7 @@ prereqs:  [C04]
 ## Other ways to say it          (filled by discoveries, §17)
 ```
 
-**How Crafter 1 works:**
+**How the concept crafter works:**
 
 1. It starts at the entry points and follows the real call path.
 2. For every line, it asks: "What must a person know to understand this line?"
@@ -895,7 +898,7 @@ Code then checks that every anchor exists, that prerequisites don't form a cycle
 
 **One bank per learner per codebase.** The bank sits in the learner's workspace (§23), so discoveries change only that learner's bank. If banks are ever shared between learners of the same repo, discovered entries need a review step first.
 
-**PROPOSED: how big one concept is.** A concept is the smallest idea in this code that a learner can get wrong on its own. Crafter 1 applies four tests:
+**PROPOSED: how big one concept is.** A concept is the smallest idea in this code that a learner can get wrong on its own. The concept crafter applies four tests:
 
 | test | rule |
 |---|---|
@@ -990,7 +993,7 @@ read_file(path, around)
   When:  the learner is looking at code, or a trace needs its next step
   How:   read around an anchor or a line number, not the whole file
 
-search(query)
+search_repo(query)
   What:  where something is defined or used in the repo
   When:  the learner can't find something, or before pointing at a line
 ```
@@ -1021,7 +1024,7 @@ readable now:  concepts/C15  (I1 links to C15: use its Examples for the scratch-
 |---|---|---|
 | Crafters | `write_concept`, `write_task`, `write_ladder` (validate before writing) | `Read`, `Glob`, `Grep` on the repo copy. No `Bash` in phase 1 (§19). |
 | Orchestrator | `read_graph`, `update_graph`, `read_concept`, `read_journey`, `set_kit` | none |
-| Tutor | `read_concept`, `read_file(path, around)`, `search`, `read_journey`, `write_journey` (close only) | none |
+| Tutor | `read_concept`, `read_file(path, around)`, `search_repo`, `read_journey`, `write_journey` (close only) | none |
 
 The rule: primitives only where the agent's job is open exploration and nothing gated can be reached. Everywhere else, custom tools.
 
@@ -1048,7 +1051,7 @@ This case tests whether the orchestrator really works as this spec says.
    -> tutor kit: guided_trace · readable files: check/test_t3.py, concepts/D1
    -> the learner traces the fake client and explains it
    -> GAP_RESOLVED: I3 RESOLVED, D1 gets the learner's evidence
-   -> RESUME: back to T4 with a bridge to where it paused
+   -> RETURN_FROM_DETOUR: back to T4 with a bridge to where it paused
    No crafter runs. No new task is created.
 ```
 
@@ -1082,16 +1085,16 @@ The current product (tutor_v2 + its frontend) already shows the learner where th
 |---|---|---|
 | task opens | `• Started <task>` | `journey_started` |
 | evidence added while on track | `✓ Did <evidence>` | (new: tutor_v2 showed only graded answers) |
-| node created + REDIRECT at depth 1 | `⚠ Found a gap <why>` then `↳ Went to learn first — <node>` | `gap` + `detour_started` |
-| node created + REDIRECT deeper | `↳ Needed first — <node>` | `detour_started` (depth > 0) |
+| node created + START_DETOUR at depth 1 | `⚠ Found a gap <why>` then `↳ Went to learn first — <node>` | `gap` + `detour_started` |
+| node created + START_DETOUR deeper | `↳ Needed first — <node>` | `detour_started` (depth > 0) |
 | evidence showing a wrong belief | `~ Almost <what they thought>` | `answer_evaluated` SHAKY |
 | wrong belief later disproved | `✓ Cleared up — ~~<belief>~~` | semantic node `disproved` |
 | node RESOLVED | `★ Cleared — <node>` | `unit_distilled` |
-| RESUME | `↩ Came back to <node>` + `picking up: <return note>` | `parent_resumed` + resume question |
+| RETURN_FROM_DETOUR | `↩ Came back to <node>` + `picking up: <return note>` | `parent_resumed` + resume question |
 | node saved, not blocking | `○ Saved for later <node>` | `gap_opened` / sibling note |
 | side question | `@ side question <title>` (opens its thread) | `aside` |
 | concept proven | `✓ Proved <evidence>` | `answer_evaluated` SOLID |
-| task COMPLETE | `★ Done — <goal> · you now know <concepts>` | `journey_completed` |
+| COMPLETE_TASK | `★ Done — <goal> · you now know <concepts>` | `journey_completed` |
 | current focus | `◉ You are here — <the tutor's current question>` | driver state |
 
 **T3 as the learner would see it at the close:**
@@ -1133,18 +1136,18 @@ Three crafters run once per codebase, before any learner, in a strict order. Eac
  repo ─► [ scrub secrets · outline · find entry points ]          (code)
             │
             ▼
- CRAFTER 1 · concepts ──► concepts/  ──► VALIDATE 1 ──fail──► back to Crafter 1
+ CONCEPT CRAFTER ───────► concepts/  ──► VALIDATE 1 ──fail──► back to the concept crafter
                                             │ pass
- CRAFTER 2 · tasks ─────► tasks/     ──► VALIDATE 2 ──fail──► back to Crafter 2
+ TASK CRAFTER ──────────► tasks/     ──► VALIDATE 2 ──fail──► back to the task crafter
                                             │ pass
- CRAFTER 3 · ladder ────► ladder.md  ──► VALIDATE 3 ──fail──► back to Crafter 3
+ LADDER BUILDER ────────► ladder.md  ──► VALIDATE 3 ──fail──► back to the ladder builder
                                             │ pass
                                     the first task can open
 ```
 
-**Crafter 1, concepts:** see §16.
+**Concept crafter:** see §16.
 
-**Crafter 2, tasks.** It reads the repo and `concepts/` through tools, then:
+**Task crafter.** It reads the repo and `concepts/` through tools, then:
 
 1. **Finds change points**, places where a real change makes sense: TODO comments, hardcoded values, a correct line that can be broken on purpose (debug tier), missing pieces, real weaknesses.
 2. **Turns each change point into a task**: a one-line goal, a tier, the concepts the correct solution touches, the files, a done-check test and a reference patch (the answer key).
@@ -1161,7 +1164,7 @@ tasks/T3_guest_error/
 
 Phase 1 (`BACKEND_SPEC.md`, D8 and A2): there is no done-check test. `check/` is dropped, the reference solution stays, and VALIDATE 2 checks structure only.
 
-**Crafter 3, ladder.** It orders the tasks into `ladder.md`:
+**Ladder builder.** It orders the tasks into `ladder.md`:
 
 - Tiers go in order: understand → change → debug → modify → assemble → build → solo.
 - Prerequisites come first.
@@ -1188,12 +1191,12 @@ One workspace per learner per codebase.
 ```text
 /workspace/<repo>/
 ├── repo/                          the learner's code (learning branch), secrets scrubbed
-├── concepts/                      CRAFTER 1, plus labeled discoveries (§17)
+├── concepts/                      concept crafter, plus labeled discoveries (§17)
 │   ├── C15_loop_scope.md          crafted; discovered entries labeled inside
 │   └── D1_fake_client.md          a discovered concept
-├── tasks/                         CRAFTER 2, one folder per task
+├── tasks/                         task crafter, one folder per task
 │   └── T3_guest_error/            task.md · check/ · reference.patch (locked)
-├── ladder.md                      CRAFTER 3, the task order
+├── ladder.md                      ladder builder, the task order
 ├── learner/                       survives between tasks
 │   ├── graph/
 │   │   ├── knowledge.md           status per concept (PROPOSED: computed, §15)
@@ -1265,9 +1268,9 @@ Every change to what an agent can read is logged with its reason.
 
 | agent | kind | runs | reads | writes | never |
 |---|---|---|---|---|---|
-| Crafter 1 · concepts | LLM | once per codebase | the repo | `concepts/` | sees a learner |
-| Crafter 2 · tasks | LLM | after VALIDATE 1 | the repo, `concepts/` | `tasks/` | sees a learner |
-| Crafter 3 · ladder | LLM or code (§26) | after VALIDATE 2 | `tasks/`, `concepts/` | `ladder.md` | sees a learner |
+| Concept crafter | LLM | once per codebase | the repo | `concepts/` | sees a learner |
+| Task crafter | LLM | after VALIDATE 1 | the repo, `concepts/` | `tasks/` | sees a learner |
+| Ladder builder | LLM or code (§26) | after VALIDATE 2 | `tasks/`, `concepts/` | `ladder.md` | sees a learner |
 | Orchestrator | LLM | every learner message; fresh per task | the message, the graph, files it chooses | the graph, the tutor's kit | speaks to the learner |
 | Tutor | LLM | one conversation per task; fresh per task | the files in its kit | turns; the journey entry at close | grades or picks what comes next |
 | Engine | code | always | everything | file plumbing, gates, logs, revisions | decides anything that needs judgment |
@@ -1294,8 +1297,8 @@ Raised in the design review and not settled yet:
 
 Still open from Spec v0.2:
 
-10. **Crafter 2's output.** A strictly unordered bag, or a rough order that Crafter 3 enforces.
-11. **Crafter 3.** An agent, or plain code. Its rules are explicit, so a topological sort could do it.
+10. **The task crafter's output.** A strictly unordered bag, or a rough order that the ladder builder enforces.
+11. **The ladder builder.** An agent, or plain code. Its rules are explicit, so a topological sort could do it.
 12. **When the orchestrator runs.** On every message, or behind a cheap code pre-filter ("stop", "I know this").
 13. **Bottom-out.** When the answer key may be shown, and how "I don't know" counts.
 14. **A separate judge.** v0.2's examiner for attempts, or the orchestrator alone.

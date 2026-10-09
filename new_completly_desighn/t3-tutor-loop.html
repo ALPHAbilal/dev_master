@@ -370,35 +370,35 @@ details.prompt-d>summary{cursor:pointer;font-weight:600;font-size:13px;color:var
 
   var TEMPLATES = {
     base: "Who the tutor is. Always on. Never types the fix, never shows the answer key.",
-    task_intro: "Presents the task: the report, the goal, the done-check.",
-    task_frame: "Keeps the task goal in view while they work.",
+    introduce_task: "Presents the task: the report, the goal, the done-check.",
+    keep_goal_in_view: "Keeps the task goal in view while they work.",
     guide_debugging: "Reproduce, locate, then make the real error visible.",
-    detour_concept: "Pauses the task to teach one missing idea.",
+    teach_one_concept: "Pauses the task to teach one missing idea.",
     experiment_first: "A tiny runnable example before any explanation.",
     guided_trace: "Walks through code the learner is reading.",
-    resume_bridge: "Reconnects to a paused goal using its saved context.",
+    bridge_back: "Reconnects to a paused goal using its saved context.",
     guide_fix: "Guides toward the fix without typing it.",
-    park_side_question: "Acknowledges a non-blocking question and saves it.",
-    probe: "One short question to confirm understanding. No hints.",
-    close: "Wraps up the task and writes the journey entry."
+    answer_side_question: "Acknowledges a non-blocking question and saves it.",
+    probe_understanding: "One short question to confirm understanding. No hints.",
+    close_task: "Wraps up the task and writes the journey entry."
   };
   var TOOLS = {
     read_file: "Read files in the learner's repo.",
-    search: "Search the repo.",
+    search_repo: "Search the repo.",
     scratch_pad: "Shared pad for tiny examples. The learner runs them in VS Code (phase 1).",
     read_concept: "Read a concept file such as C15.",
     write_journey: "Write the journey entry. Closing only."
   };
   var STATE_KEYS = {
-    task: "The task's goal, file and done-check.",
-    known: "Concepts the learner already has.",
-    focus: "The current node and where it stands.",
+    task_goal: "The task's goal, file and done-check.",
+    known_concepts: "Concepts the learner already has.",
+    current_focus: "The current node and where it stands.",
     return_to: "Where to go back after a detour.",
-    watch_for: "A misconception seen in this session.",
-    evidence_wanted: "What the learner must show to close the focus.",
+    misconception_to_watch: "A misconception seen in this session.",
+    closes_when: "What the learner must show to close the focus.",
     probe_target: "The concept to check.",
     open_issues: "Recorded issues not being worked on now.",
-    journey: "The path the learner took through the task."
+    journey_so_far: "The path the learner took through the task."
   };
 
   /* ================= the graph layout (viewBox 360 x 440) ================= */
@@ -438,12 +438,12 @@ details.prompt-d>summary{cursor:pointer;font-weight:600;font-size:13px;color:var
         graph: ["+ T3 · ACTIVE (root)", "T3 requires C15 · C17 · C13", "C04 · C05 already known → reuse, never re-teach"],
         why: "A new task always starts a fresh loop with a small kit."
       },
-      allow: { t: ["base", "task_intro"], tools: ["read_file", "search"], s: ["task", "known"] },
+      allow: { t: ["base", "introduce_task"], tools: ["read_file", "search_repo"], s: ["task_goal", "known_concepts"] },
       prompt: [
         ["base", BASE],
-        ["task_intro", "Present the task: the bug report, the goal, and how it is checked. Then ask where they would start."],
-        ["state · task", "T3 · fix · Guests always get \"Une erreur s'est produite\" · file app.py · done when check/test_t3.py passes"],
-        ["state · known", "C04 tuple unpacking (T1) · C05 dict.get (T2). Do not re-teach them."]
+        ["introduce_task", "Present the task: the bug report, the goal, and how it is checked. Then ask where they would start."],
+        ["state · task_goal", "T3 · fix · Guests always get \"Une erreur s'est produite\" · file app.py · done when check/test_t3.py passes"],
+        ["state · known_concepts", "C04 tuple unpacking (T1) · C05 dict.get (T2). Do not re-teach them."]
       ],
       tutor: [
         { p: "New task: **T3**. A bug report came in from production:" },
@@ -466,14 +466,14 @@ details.prompt-d>summary{cursor:pointer;font-weight:600;font-size:13px;color:var
         graph: ["T3 · + evidence: reproduced the bug"],
         why: "Finding where the message comes from is the task itself. A question is evidence, not proof of a gap."
       },
-      allow: { t: ["base", "task_frame", "guide_debugging"], tools: ["read_file", "search"], s: ["task", "known", "focus"] },
+      allow: { t: ["base", "keep_goal_in_view", "guide_debugging"], tools: ["read_file", "search_repo"], s: ["task_goal", "known_concepts", "current_focus"] },
       prompt: [
         ["base", BASE],
-        ["task_frame", "Keep the goal in view: guests must get a real answer."],
+        ["keep_goal_in_view", "Keep the goal in view: guests must get a real answer."],
         ["guide_debugging", "Help them reproduce, locate, then make the real error visible. One step at a time. Ask, don't tell."],
-        ["state · task", "T3 · guests get the generic error · app.py"],
-        ["state · known", "C04 · C05"],
-        ["state · focus", "T3 · bug reproduced as a guest"]
+        ["state · task_goal", "T3 · guests get the generic error · app.py"],
+        ["state · known_concepts", "C04 · C05"],
+        ["state · current_focus", "T3 · bug reproduced as a guest"]
       ],
       tutor: [{ p: "Good, reproducing first is the right move. That sentence is a string literal somewhere in `app.py`. Search for it. What kind of block is it sitting in?" }]
     },
@@ -490,14 +490,14 @@ details.prompt-d>summary{cursor:pointer;font-weight:600;font-size:13px;color:var
         graph: ["T3 · + evidence: found the broad except (line 821)", "C17 · ? → uncertain"],
         why: "They spotted the except but haven't used that yet, so C17 is only uncertain. Nothing to switch."
       },
-      allow: { t: ["base", "task_frame", "guide_debugging"], tools: ["read_file", "search"], s: ["task", "known", "focus"] },
+      allow: { t: ["base", "keep_goal_in_view", "guide_debugging"], tools: ["read_file", "search_repo"], s: ["task_goal", "known_concepts", "current_focus"] },
       prompt: [
         ["base", BASE],
-        ["task_frame", "Keep the goal in view: guests must get a real answer."],
+        ["keep_goal_in_view", "Keep the goal in view: guests must get a real answer."],
         ["guide_debugging", "Help them reproduce, locate, then make the real error visible. One step at a time. Ask, don't tell."],
-        ["state · task", "T3 · guests get the generic error · app.py"],
-        ["state · known", "C04 · C05"],
-        ["state · focus", "T3 · found the broad except at line 821"]
+        ["state · task_goal", "T3 · guests get the generic error · app.py"],
+        ["state · known_concepts", "C04 · C05"],
+        ["state · current_focus", "T3 · found the broad except at line 821"]
       ],
       tutor: [{ p: "Exactly. That `except` catches every error and swaps it for a polite message, so the real error is hiding in `e`. How could you see it?" }],
       set: { C17: "uncertain" }
@@ -512,7 +512,7 @@ details.prompt-d>summary{cursor:pointer;font-weight:600;font-size:13px;color:var
         msg: "UnboundLocalError on `label`! But label is right there in the loop on line 684?! How can it not exist?"
       },
       assess: [["GAP_DISCOVERED · knowledge", "bad"]],
-      decision: "REDIRECT → I1",
+      decision: "START_DETOUR → I1",
       orch: {
         reads: "the message · the pasted run output · node T3 · `concepts/C15`",
         graph: [
@@ -523,15 +523,15 @@ details.prompt-d>summary{cursor:pointer;font-weight:600;font-size:13px;color:var
         ],
         why: "They expect `label` to exist because it is written in the loop. That is a gap in how loop variables live, which matches bank concept C15, so the tutor can use C15's examples. `for label, link` also uses unpacking, but C04 is known, so no detour there."
       },
-      allow: { t: ["base", "detour_concept", "experiment_first"], tools: ["scratch_pad", "read_concept"], s: ["focus", "return_to", "watch_for", "evidence_wanted"] },
+      allow: { t: ["base", "teach_one_concept", "experiment_first"], tools: ["scratch_pad", "read_concept"], s: ["current_focus", "return_to", "misconception_to_watch", "closes_when"] },
       prompt: [
         ["base", BASE],
-        ["detour_concept", "Pause the task. Teach one idea only: a loop variable only exists if the loop ran. Use concept file C15."],
+        ["teach_one_concept", "Pause the task. Teach one idea only: a loop variable only exists if the loop ran. Use concept file C15."],
         ["experiment_first", "Start with a tiny runnable example in the scratch pad. Ask for a prediction before they run it."],
-        ["state · focus", "I1 · a loop variable only exists if the loop ran"],
+        ["state · current_focus", "I1 · a loop variable only exists if the loop ran"],
         ["state · return_to", "T3 · has the traceback; line 722 reads label. Don't solve T3 here."],
-        ["state · watch_for", "expects a variable written in a loop to exist after it, even if the loop never ran (their words)"],
-        ["state · evidence_wanted", "They explain why label is unbound for a guest."]
+        ["state · misconception_to_watch", "expects a variable written in a loop to exist after it, even if the loop never ran (their words)"],
+        ["state · closes_when", "They explain why label is unbound for a guest."]
       ],
       tutor: [
         { p: "Good catch. This one surprises a lot of people. Let's step out of `app.py` for a minute. In the scratch pad:" },
@@ -551,15 +551,15 @@ details.prompt-d>summary{cursor:pointer;font-weight:600;font-size:13px;color:var
         graph: ["I1 · + evidence: predicted None (JS habit, in their own words)", "I1 · watch for: JS habit (said by the learner, not assumed)"],
         why: "An expected miss. Let the run teach it instead of an explanation."
       },
-      allow: { t: ["base", "detour_concept", "experiment_first"], tools: ["scratch_pad", "read_concept"], s: ["focus", "return_to", "watch_for", "evidence_wanted"] },
+      allow: { t: ["base", "teach_one_concept", "experiment_first"], tools: ["scratch_pad", "read_concept"], s: ["current_focus", "return_to", "misconception_to_watch", "closes_when"] },
       prompt: [
         ["base", BASE],
-        ["detour_concept", "Pause the task. Teach one idea only: a loop variable only exists if the loop ran. Use concept file C15."],
+        ["teach_one_concept", "Pause the task. Teach one idea only: a loop variable only exists if the loop ran. Use concept file C15."],
         ["experiment_first", "Start with a tiny runnable example in the scratch pad. Ask for a prediction before they run it."],
-        ["state · focus", "I1 · predicted None (JS habit confirmed)"],
+        ["state · current_focus", "I1 · predicted None (JS habit confirmed)"],
         ["state · return_to", "T3 · has the traceback; line 722 reads label. Don't solve T3 here."],
-        ["state · watch_for", "JS habit, said by the learner: expects None or undefined after an empty loop"],
-        ["state · evidence_wanted", "They explain why label is unbound for a guest."]
+        ["state · misconception_to_watch", "JS habit, said by the learner: expects None or undefined after an empty loop"],
+        ["state · closes_when", "They explain why label is unbound for a guest."]
       ],
       tutor: [{ p: "Run it and see." }]
     },
@@ -570,7 +570,7 @@ details.prompt-d>summary{cursor:pointer;font-weight:600;font-size:13px;color:var
         msg: "Same error! So `x` only exists if the loop ran at least once. And `last(['a', 'b'])` gives `'b'` because x keeps its last value after the loop. OK... but why would the loop on line 684 run zero times for a guest?"
       },
       assess: [["DEPENDENCY_MISSING · codebase", "warn"]],
-      decision: "REDIRECT → I2",
+      decision: "START_DETOUR → I2",
       orch: {
         reads: "the message · the pasted run output · node I1",
         graph: [
@@ -580,11 +580,11 @@ details.prompt-d>summary{cursor:pointer;font-weight:600;font-size:13px;color:var
         ],
         why: "The idea is clear in the toy. Using it on app.py needs one more fact: what the loop iterates over for a guest."
       },
-      allow: { t: ["base", "guided_trace"], tools: ["read_file", "search"], s: ["focus", "return_to"] },
+      allow: { t: ["base", "guided_trace"], tools: ["read_file", "search_repo"], s: ["current_focus", "return_to"] },
       prompt: [
         ["base", BASE],
         ["guided_trace", "Walk through the code they are reading. Point to exact lines and ask what they see. Keep it short."],
-        ["state · focus", "I2 · why the loop on line 684 runs 0 times for a guest"],
+        ["state · current_focus", "I2 · why the loop on line 684 runs 0 times for a guest"],
         ["state · return_to", "I1 · they get last([]); next, connect it to label."]
       ],
       tutor: [{ p: "Great question. Let's trace it. Line 684 loops over `self._record_process_links(...)`. Open that method on line 459. What does it return when the request has no `user_id`?" }],
@@ -595,20 +595,20 @@ details.prompt-d>summary{cursor:pointer;font-weight:600;font-size:13px;color:var
       title: "Trace the guest path",
       learner: { msg: "Lines 469–470: `if not base or not user_id: return []`. A guest has no user_id, so it returns an empty list." },
       assess: [["GAP_RESOLVED · I2", "ok"]],
-      decision: "RESUME → I1",
+      decision: "RETURN_FROM_DETOUR → I1",
       orch: {
         reads: "the message · node I2 · I1's saved context",
         graph: ["I2 → RESOLVED (read lines 469–470)", "I1 → ACTIVE (closest paused goal, nothing blocks it)"],
         why: "Resume the nearest suspended goal and hand the tutor the context I1 saved when it was paused."
       },
-      allow: { t: ["base", "resume_bridge", "detour_concept"], tools: ["read_file", "scratch_pad"], s: ["focus", "return_to", "evidence_wanted"] },
+      allow: { t: ["base", "bridge_back", "teach_one_concept"], tools: ["read_file", "scratch_pad"], s: ["current_focus", "return_to", "closes_when"] },
       prompt: [
         ["base", BASE],
-        ["resume_bridge", "Reconnect to the paused goal with one bridging sentence, then one question."],
-        ["detour_concept", "Teach one idea only: a loop variable only exists if the loop ran."],
-        ["state · focus", "I1 (resumed) · they get last([]); now connect it to label on line 684"],
+        ["bridge_back", "Reconnect to the paused goal with one bridging sentence, then one question."],
+        ["teach_one_concept", "Teach one idea only: a loop variable only exists if the loop ran."],
+        ["state · current_focus", "I1 (resumed) · they get last([]); now connect it to label on line 684"],
         ["state · return_to", "T3 · has the traceback; line 722 reads label"],
-        ["state · evidence_wanted", "They explain why label is unbound for a guest."]
+        ["state · closes_when", "They explain why label is unbound for a guest."]
       ],
       tutor: [{ p: "Right. Now put that next to your scratch pad. For a guest, the loop on line 684 gets `[]`. So what is `label` after that loop?" }],
       set: { I2: "RESOLVED", I1: "ACTIVE" },
@@ -618,21 +618,21 @@ details.prompt-d>summary{cursor:pointer;font-weight:600;font-size:13px;color:var
       title: "Connect it back",
       learner: { msg: "Nothing. It never gets assigned, exactly like x in last([]). Then line 722 reads label and crashes, and the except on line 821 hides it." },
       assess: [["GAP_RESOLVED · I1", "ok"]],
-      decision: "RESUME → T3",
+      decision: "RETURN_FROM_DETOUR → T3",
       orch: {
         reads: "the message · node I1 · T3's saved context",
         graph: ["I1 → RESOLVED", "C15 · missing → known (explained it on the real code)", "T3 → ACTIVE"],
         why: "The evidence I1 asked for is there: they explained why label is unbound for a guest."
       },
-      allow: { t: ["base", "task_frame", "resume_bridge", "guide_fix"], tools: ["read_file", "search"], s: ["task", "known", "focus"] },
+      allow: { t: ["base", "keep_goal_in_view", "bridge_back", "guide_fix"], tools: ["read_file", "search_repo"], s: ["task_goal", "known_concepts", "current_focus"] },
       prompt: [
         ["base", BASE],
-        ["task_frame", "Keep the goal in view: guests must get a real answer."],
-        ["resume_bridge", "Reconnect to the paused goal with one bridging sentence, then one question."],
+        ["keep_goal_in_view", "Keep the goal in view: guests must get a real answer."],
+        ["bridge_back", "Reconnect to the paused goal with one bridging sentence, then one question."],
         ["guide_fix", "Guide them to the fix. Never type it for them. They run the check themselves."],
-        ["state · task", "T3 · guests get the generic error · app.py"],
-        ["state · known", "C04 · C05 · C15 (new)"],
-        ["state · focus", "T3 (resumed) · root cause found: label is unbound for guests"]
+        ["state · task_goal", "T3 · guests get the generic error · app.py"],
+        ["state · known_concepts", "C04 · C05 · C15 (new)"],
+        ["state · current_focus", "T3 (resumed) · root cause found: label is unbound for guests"]
       ],
       tutor: [{ p: "That's the whole bug. Back to T3. Look at line 722 again: `label != 'candidate'`. A link label is never \"candidate\". Which variable in `chat()` can actually be `'candidate'`?" }],
       set: { I1: "RESOLVED", C15: "known", T3: "ACTIVE" },
@@ -646,16 +646,16 @@ details.prompt-d>summary{cursor:pointer;font-weight:600;font-size:13px;color:var
       orch: {
         reads: "the message · node T3",
         graph: ["T3 · + evidence: found question_label (line 610)"],
-        why: "Right variable, right reason. The bridge is done, so resume_bridge is switched off."
+        why: "Right variable, right reason. The bridge is done, so bridge_back is switched off."
       },
-      allow: { t: ["base", "task_frame", "guide_fix"], tools: ["read_file", "search"], s: ["task", "known", "focus"] },
+      allow: { t: ["base", "keep_goal_in_view", "guide_fix"], tools: ["read_file", "search_repo"], s: ["task_goal", "known_concepts", "current_focus"] },
       prompt: [
         ["base", BASE],
-        ["task_frame", "Keep the goal in view: guests must get a real answer."],
+        ["keep_goal_in_view", "Keep the goal in view: guests must get a real answer."],
         ["guide_fix", "Guide them to the fix. Never type it for them. They run the check themselves."],
-        ["state · task", "T3 · guests get the generic error · app.py"],
-        ["state · known", "C04 · C05 · C15"],
-        ["state · focus", "T3 · knows the fix: question_label"]
+        ["state · task_goal", "T3 · guests get the generic error · app.py"],
+        ["state · known_concepts", "C04 · C05 · C15"],
+        ["state · current_focus", "T3 · knows the fix: question_label"]
       ],
       tutor: [{ p: "Yes. Make the change, then run the check." }]
     },
@@ -669,8 +669,8 @@ details.prompt-d>summary{cursor:pointer;font-weight:600;font-size:13px;color:var
         ],
         msg: "2 passed! Wait, how does that test even talk to the chatbot without an OpenAI key?"
       },
-      assess: [["GOAL MET → VERIFY", "accent"], ["SIDE GAP · not blocking", "neutral"]],
-      decision: "VERIFY · probe C13",
+      assess: [["GOAL MET → VERIFY_LEARNING", "accent"], ["SIDE GAP · not blocking", "neutral"]],
+      decision: "VERIFY_LEARNING · probe C13",
       orch: {
         reads: "the message · the pasted check result · node T3",
         graph: [
@@ -680,12 +680,12 @@ details.prompt-d>summary{cursor:pointer;font-weight:600;font-size:13px;color:var
         ],
         why: "The code works. Learning evidence is thin on C13, so one probe. I3 is saved, not chased now."
       },
-      allow: { t: ["base", "park_side_question", "probe"], tools: ["read_file"], s: ["focus", "probe_target", "open_issues"] },
+      allow: { t: ["base", "answer_side_question", "probe_understanding"], tools: ["read_file"], s: ["current_focus", "probe_target", "open_issues"] },
       prompt: [
         ["base", BASE],
-        ["park_side_question", "Acknowledge the side question in one sentence, give at most a one-line answer, and say it's saved for later."],
-        ["probe", "Ask ONE short question that checks the target concept. No hints."],
-        ["state · focus", "T3 · check passed (2/2) · verifying learning"],
+        ["answer_side_question", "Acknowledge the side question in one sentence, give at most a one-line answer, and say it's saved for later."],
+        ["probe_understanding", "Ask ONE short question that checks the target concept. No hints."],
+        ["state · current_focus", "T3 · check passed (2/2) · verifying learning"],
         ["state · probe_target", "C13 · what the if on line 722 decides"],
         ["state · open_issues", "I3 · how the test fakes OpenAI (saved)"]
       ],
@@ -697,18 +697,18 @@ details.prompt-d>summary{cursor:pointer;font-weight:600;font-size:13px;color:var
       title: "Probe and close",
       learner: { msg: "Whether the model gets the pricing tool. `tools` is the list of functions OpenAI is allowed to call, and candidates don't get the pricing one." },
       assess: [["TASK_COMPLETED", "ok"]],
-      decision: "COMPLETE",
+      decision: "COMPLETE_TASK",
       orch: {
         reads: "the message · node T3 · open issues",
         graph: ["C13 · uncertain → known", "T3 → RESOLVED", "I3 stays OPEN → carried to a later task"],
         why: "Task success (the check) and learning success (C15, C17, C13) are both there."
       },
-      allow: { t: ["base", "close"], tools: ["write_journey"], s: ["task", "journey", "open_issues"] },
+      allow: { t: ["base", "close_task"], tools: ["write_journey"], s: ["task_goal", "journey_so_far", "open_issues"] },
       prompt: [
         ["base", BASE],
-        ["close", "Wrap up in two sentences: what they fixed and what they learned. Then write the journey entry."],
-        ["state · task", "T3 · guests get the generic error · app.py"],
-        ["state · journey", "reproduced → found except 821 → I1 loop scope (I2 nested) → fixed line 722 → probe C13"],
+        ["close_task", "Wrap up in two sentences: what they fixed and what they learned. Then write the journey entry."],
+        ["state · task_goal", "T3 · guests get the generic error · app.py"],
+        ["state · journey_so_far", "reproduced → found except 821 → I1 loop scope (I2 nested) → fixed line 722 → probe C13"],
         ["state · open_issues", "I3 · carried to a later task"]
       ],
       tutor: [{ p: "T3 done. You found a real production bug: a loop variable read after a loop that never ran, hidden by a broad `except`. It's saved in your journey. Next up is T4." }],

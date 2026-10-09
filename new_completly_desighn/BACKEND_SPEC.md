@@ -24,19 +24,20 @@
 | D10 | **No help tracking for now.** |
 | D11 | **Side questions are recorded on the graph and handled with the pieces that already exist**: answer briefly and save it (like I3), or follow it as an ordinary detour. There is no new kind of node (§9.5). |
 | D12 | **A new package next to tutor_v2**, then a switch, then tutor_v2 is deleted. **A new API**; the frontend is updated in its own later step. |
+| D13 | **Code removes impossible decisions before each orchestrator call** (the decision menu, §7.5). `verify_learning` and `complete_task` are possible only when the focus is the task itself, never inside a detour (V13, V14). |
 
 ### Assumed by me, waiting for your confirmation
 
 | # | assumption | why |
 |---|---|---|
-| A1 | **Lifecycle** is OPEN, RESOLVED or DROPPED. **Attention** is focus, paused or idle. **Readiness** is computed. | It answers your "OPEN vs ACTIVE" question: ACTIVE was really about attention. |
-| A2 | Crafter 2 still writes a **locked reference solution** per task. The orchestrator may read it to judge "built correctly", and the tutor may read it only through a gate (§8.6). There is no `check/` folder. | It makes D8 checkable. |
+| A1 | **Lifecycle** is OPEN, RESOLVED or DROPPED. **Attention** is focused, paused_on_stack or set_aside. **Readiness** is computed. | It answers your "OPEN vs ACTIVE" question: ACTIVE was really about attention. |
+| A2 | The task crafter still writes a **locked reference solution** per task. The orchestrator may read it to judge "built correctly", and the tutor may read it only through a gate (§8.6). There is no `check/` folder. | It makes D8 checkable. |
 | A3 | **Config is a folder of text files in the repo.** One environment variable, `CONFIG_DIR`, points to it. | Templates are long, which suits files better than environment variables. Files are also versioned in git and editable without touching code. |
 | A4 | `continue` may carry **evidence-only changes** (new evidence, a concept seen), but never a kit and never an explanation. | Without this, on-track progress ("✓ Did reproduced the bug") would never reach the learner's map. **This is the one assumption that changes D2. Please decide.** |
 | A5 | The package is named `tutor_graph`. | `tutor_v3` is already the name of your CLI skill. |
 | A6 | **The orchestrator is called fresh on every turn.** Its memory is the graph. | This is stricter than "fresh per task", and cheaper. |
 | A7 | **A workspace is one user plus one imported repo.** It replaces tutor_v2's separate `codebases` and `sessions` tables. | One bank per learner per codebase (§16 of the design). |
-| A8 | **The tutor's answer-key gate** opens only with the `answer` template, and only after **2 or more recorded failed attempts** on the current node. | §24 left the bottom-out rule open. This is the smallest rule that keeps "never before trying". |
+| A8 | **The tutor's answer-key gate** opens only with the `show_answer` template, and only after **2 or more recorded failed attempts** on the current node. | §24 left the bottom-out rule open. This is the smallest rule that keeps "never before trying". |
 
 ---
 
@@ -61,11 +62,11 @@
                                        │   revision + 1                  │
                                        │ 4 TUTOR (Haiku 5.5, streamed)   │◄── config/tutor/* (templates
                                        │   append-only conversation      │    resolved from short names)
-                                       │   + <kit> block if not continue │
+                                       │   + <tutor_kit> if not continue │
                                        │ 5 save the reply, revision + 1  │
                                        └────────────────────────────────┘
                                                   │
-   CRAFTING JOB (at import, once) ── Agent SDK: Crafter 1 → Crafter 2 → code: Crafter 3
+   CRAFTING JOB (at import, once) ── Agent SDK: concept crafter → task crafter → code: ladder builder
                                                   │
                      Supabase Postgres  ◄─────────┴─────────►  repo copy on the Fly volume (read-only)
 ```
@@ -78,7 +79,7 @@
 agentic_tutor/backend/tutor_graph/
 ├── __main__.py            uvicorn entrypoint (one worker, like tutor_v2)
 ├── settings.py            environment variables (§3.2)
-├── library.py             loads CONFIG_DIR: templates, pieces, tool guides, story patterns, models
+├── config_loader.py       loads CONFIG_DIR: templates, pieces, tool guides, story patterns, models
 ├── db/
 │   ├── migrations/        SQL migrations for Supabase Postgres (§4)
 │   ├── pool.py            psycopg 3 async pool; transaction() helper
@@ -91,27 +92,28 @@ agentic_tutor/backend/tutor_graph/
 │   └── view.py            the compact graph view for the orchestrator (§7.3)
 ├── orchestrator/
 │   ├── positions.py       graph position → instruction pieces (deterministic, §7.2)
+│   ├── menu.py            graph state → the decisions possible this turn (§7.5)
 │   ├── context.py         assembles the orchestrator call
 │   ├── decision.py        the decision schema + parsing (§7.4)
 │   └── run.py             tool loop until submit_decision
 ├── tutor/
 │   ├── conversation.py    append-only message store, raw content blocks
-│   ├── kit.py             short names → <kit> block (§8.3)
+│   ├── kit.py             template names → <tutor_kit> block (§8.3)
 │   ├── tools.py           tutor tools + gates (§8.5)
 │   └── run.py             streamed call, tool loop, compaction (§8.7)
 ├── tasks/
 │   ├── lifecycle.py       open · close · next · park · resume (§9)
 │   └── discoveries.py     pending discoveries → bank at close (§9.4)
 ├── story/
-│   └── project.py         change → story line (§10)
+│   └── story_lines.py     change → story line (§10)
 ├── crafting/
 │   ├── job.py             background job + progress events
-│   ├── prestep.py         scrub secrets, outline, entry points
-│   ├── crafter1.py        Agent SDK run + write_concept tool
-│   ├── crafter2.py        Agent SDK run + write_task tool
-│   ├── crafter3.py        plain code: the ladder
+│   ├── prepare_repo.py    scrub secrets, outline, entry points
+│   ├── concept_crafter.py Agent SDK run + write_concept tool
+│   ├── task_crafter.py    Agent SDK run + write_task tool
+│   ├── ladder_builder.py  plain code: the ladder
 │   └── validate.py        VALIDATE 1/2/3
-├── claude.py              Claude API client: retries, refusal handling, token logging
+├── claude_client.py       Claude API client: retries, refusal handling, token logging
 ├── api/
 │   ├── app.py             FastAPI app, routes (§12)
 │   ├── sse.py             SSE helpers
@@ -127,12 +129,12 @@ agentic_tutor/backend/config/        ← CONFIG_DIR (A3)
 │   └── pieces/*.md        one piece per position
 ├── tutor/
 │   ├── base.md            the tutor's fixed system prompt
-│   ├── templates/*.md     one file per template; the file name IS the short name (§8.3)
+│   ├── templates/*.md     one file per template; the file name IS the template name (§8.3)
 │   └── state.yaml         state keys and how each value is rendered
 ├── tools/*.md             one guide per tool: what · when · when not · how (§8.5)
 ├── crafters/
-│   ├── concepts.md        Crafter 1 instructions, including the four size tests
-│   └── tasks.md           Crafter 2 instructions
+│   ├── concepts.md        concept crafter instructions, including the four size tests
+│   └── tasks.md           task crafter instructions
 └── story.yaml             change kind → story line pattern (§10)
 ```
 
@@ -143,10 +145,10 @@ agentic_tutor/backend/config/        ← CONFIG_DIR (A3)
 ### 3.1 `config/models.yaml`
 
 ```yaml
-orchestrator: { model: claude-haiku-5-5, effort: medium, max_tokens: 4000,  max_tool_rounds: 6 }
-tutor:        { model: claude-haiku-5-5, effort: medium, max_tokens: 8000,  compact_at_tokens: 80000 }
-crafter1:     { model: claude-haiku-5-5, effort: high,   max_turns: 200 }
-crafter2:     { model: claude-haiku-5-5, effort: high,   max_turns: 200 }
+orchestrator:    { model: claude-haiku-5-5, effort: medium, max_tokens: 4000,  max_tool_rounds: 6 }
+tutor:           { model: claude-haiku-5-5, effort: medium, max_tokens: 8000,  compact_at_tokens: 80000 }
+concept_crafter: { model: claude-haiku-5-5, effort: high,   max_turns: 200 }
+task_crafter:    { model: claude-haiku-5-5, effort: high,   max_turns: 200 }
 ```
 
 **Why 80,000:** Haiku 5.5 costs $0.10 / $0.50 per million tokens while a prompt stays under 100,000 tokens, and 5× more above that. Every agent prompt must stay under 100K (§13.3).
@@ -164,7 +166,7 @@ crafter2:     { model: claude-haiku-5-5, effort: high,   max_turns: 200 }
 | `ALLOWED_ORIGINS`, `ALLOWED_ORIGIN_REGEX` | CORS (as tutor_v2) |
 | `DEV_USER_IDS` | user ids allowed on `/dev/*` routes (§12.3) |
 
-`library.py` loads and checks the config once at startup:
+`config_loader.py` loads and checks the config once at startup:
 - every template named in `positions.yaml`, `story.yaml` or a tool guide exists;
 - every file parses.
 
@@ -179,7 +181,7 @@ Every table has `workspace_id`, and row-level security keys on the owner.
 ```text
 workspaces        id · owner_id (auth.users) · name · git_url · repo_path
                   · status (crafting|ready|failed) · revision bigint · created_at
-crafting_runs     id · workspace_id · stage (prestep|crafter1|validate1|crafter2|validate2|crafter3|done)
+crafting_runs     id · workspace_id · stage (prepare_repo|concept_crafter|validate1|task_crafter|validate2|ladder_builder|done)
                   · status · counts jsonb · error · started_at · finished_at
 
 concepts          workspace_id · id ("C15" | "D1") · name · kind · claim · proof
@@ -195,14 +197,14 @@ task_runs         id · workspace_id · task_id · status (open|parked|resolved)
                   · opened_at · closed_at · journey_text
 
 nodes             id uuid · workspace_id · short_id ("T3" | "I1") · kind (task|issue)
-                  · category · title · lifecycle (OPEN|RESOLVED|DROPPED) · attention (focus|paused|idle)
-                  · parent_id · bank_concept_id · closes_when · return_note · watch
+                  · category · title · lifecycle (OPEN|RESOLVED|DROPPED) · attention (focused|paused_on_stack|set_aside)
+                  · parent_id · bank_concept_id · closes_when · return_note · misconception_seen
                   · created_run_id · created_turn · resolved_turn
 focus_stack       task_run_id · position int · node_id          (bottom = the task's root node)
 edges             workspace_id · from_node · to_node · type (detour|side|depends_on)
 
 evidence          workspace_id · id ("E11") · target_kind (node|concept) · target_id
-                  · polarity ('+' shows | '-' gap | '?' unclear) · text
+                  · signal (understands|gap|unclear) · observation
                   · source (message|attachment) · message_id · turn_id · created_at
 
 turns             id · task_run_id · seq · client_message_id (idempotency) · learner_message_id
@@ -213,7 +215,7 @@ messages          id · workspace_id · task_run_id · role (learner|tutor) · s
                   · mode (normal|side) · created_at
 changes           id ("5.3" = turn.seq . ordinal) · task_run_id · turn_id · kind · payload jsonb
                   · story_line text · depth int · node_ids · evidence_ids · created_at
-pending_discoveries  workspace_id · task_run_id · kind (misconception|other_way|concept)
+pending_discoveries  workspace_id · task_run_id · discovery_type (misconception|alternative_explanation|new_concept)
                   · concept_id · text · evidence_id
 tool_calls        turn_id · agent · tool · args jsonb · refused bool · ordinal
 llm_calls         turn_id · agent · model · input_tokens · output_tokens · cache_read_tokens
@@ -242,24 +244,24 @@ llm_calls         turn_id · agent · model · input_tokens · output_tokens · 
 | part | values | stored? |
 |---|---|---|
 | lifecycle | OPEN → RESOLVED, or OPEN → DROPPED | yes |
-| attention | focus (exactly one per open run) · paused (on the focus stack, waiting) · idle | yes |
+| attention | focused (exactly one per open run) · paused_on_stack (on the focus stack, waiting) · set_aside | yes |
 | readiness | blocked when a `depends_on` target is still OPEN; otherwise ready | **no**, always computed |
 
-### 5.2 Change operations (inside a decision)
+### 5.2 Graph changes (inside a decision)
 
-| op | fields | effect |
+| change | fields | effect |
 |---|---|---|
-| `create` | `ref, cat, title, parent, closes_when?, bank?` | new OPEN issue node. Code assigns the short id (I4) and maps `ref` to it. |
-| `focus` | `id` | the node becomes the focus and is pushed on the stack |
-| `pause` | `id, note` | the node leaves focus and stays on the stack with a return note |
-| `save` | `id` | the node goes idle: saved for later, like I3 in T3 |
-| `resolve` | `id` | lifecycle RESOLVED; popped if it is on the stack |
-| `drop` | `id, why` | lifecycle DROPPED (a wrong diagnosis); popped if it is on the stack |
-| `evidence` | `on (node or concept id), text, pol (+\|-\|?), from (message\|attachment)` | new evidence. Code assigns the E-id. |
-| `link` | `id, bank (concept id \| null)` | sets or clears the bank link, at any time |
-| `watch` | `id, text` | a misconception seen in the learner's own words |
-| `depends` | `from, to` | a `depends_on` edge (feeds readiness) |
-| `discover` | `kind (misconception\|other_way\|concept), concept?, text, evidence (E-id)` | queued; written to the bank at close (§9.4) |
+| `create_issue` | `temp_id, category, title, parent_id, closes_when?, concept_id?` | new OPEN issue node. Code assigns the short id (I4) and maps `temp_id` to it. |
+| `set_focus` | `node_id` | the node becomes the focus and is pushed on the stack |
+| `pause` | `node_id, return_note` | the node leaves focus and stays on the stack with a return note |
+| `save_for_later` | `node_id` | the node is set aside: saved for later, like I3 in T3 |
+| `resolve` | `node_id` | lifecycle RESOLVED; popped if it is on the stack |
+| `drop_wrong_diagnosis` | `node_id, reason` | lifecycle DROPPED (a wrong diagnosis); popped if it is on the stack |
+| `add_evidence` | `target_id (node or concept id), observation, signal (understands\|gap\|unclear), source (message\|attachment)` | new evidence. Code assigns the E-id. |
+| `link_to_concept` | `node_id, concept_id (or null)` | sets or clears the bank link, at any time |
+| `note_misconception` | `node_id, misconception` | a misconception seen in the learner's own words |
+| `add_dependency` | `node_id, depends_on_id` | a `depends_on` edge (feeds readiness) |
+| `queue_discovery` | `discovery_type (misconception\|alternative_explanation\|new_concept), concept_id?, text, evidence_id` | queued; written to the bank at close (§9.4) |
 
 ### 5.3 Validation rules
 
@@ -267,18 +269,20 @@ All of these are code. A decision that breaks any rule is rejected as a whole, a
 
 | rule | check |
 |---|---|
-| V1 | It matches the decision schema (§7.4). `continue` has no `kit` and no `why`. Other decisions have a `kit`. |
+| V1 | It matches the decision schema (§7.4). `continue` has no `tutor_kit` and no `designer_note`. Other decisions have a `tutor_kit`. |
 | V2 | Ids exist in this workspace. Every `ref` used is created in the same decision. |
-| V3 | After applying: exactly one focus, unless the decision is `complete` or `park`. |
-| V4 | `redirect`: the new focus is a node created now or an existing OPEN node. The old focus gets a `pause` with a non-empty note. |
-| V5 | `resume`: the orchestrator does not choose. **Code picks the closest paused node on the stack that is ready** (architecture §7A). It fails if there is none. |
-| V6 | `resolve` needs at least one `+` evidence on that node from **this** turn or an earlier turn of this run. |
-| V7 | `complete` (the root task): there is `+` evidence of the task's purpose in this run, **and** every concept in `tasks.concepts` computes to `known` (§5.4). |
-| V8 | Kit template names exist in `config/tutor/templates/`. State keys exist in `state.yaml`. Every readable path exists and passes the gates (§8.6). |
-| V9 | `link`, `evidence on concept`, and `discover` with a concept: the concept exists. |
-| V10 | `discover` cites an evidence id that exists. |
-| V11 | **A4:** `continue` may contain only `evidence`, `watch`, `link` and `discover`. |
-| V12 | `drop` and `resolve` on the root task only through `complete`. |
+| V3 | After applying: exactly one focus, unless the decision is `complete_task` or `park_task`. |
+| V4 | `start_detour`: the new focus is a node created now or an existing OPEN node. The old focus gets a `pause` with a non-empty `return_note`. |
+| V5 | `return_from_detour`: the orchestrator does not choose. **Code picks the closest paused node on the stack that is ready** (architecture §7A). It fails if there is none. |
+| V6 | `resolve` needs at least one `understands` evidence on that node from **this** turn or an earlier turn of this run. |
+| V7 | `complete_task` (the root task): there is `understands` evidence of the task's purpose in this run, **and** every concept in `tasks.concepts` computes to `known` (§5.4). |
+| V8 | Tutor kit template names exist in `config/tutor/templates/`. State keys exist in `state.yaml`. Every readable path exists and passes the gates (§8.6). |
+| V9 | `link_to_concept`, `add_evidence` on a concept, and `queue_discovery` with a concept: the concept exists. |
+| V10 | `queue_discovery` cites an evidence id that exists. |
+| V11 | **A4:** `continue` may contain only `add_evidence`, `note_misconception`, `link_to_concept` and `queue_discovery`. |
+| V12 | `drop_wrong_diagnosis` and `resolve` on the root task only through `complete_task`. |
+| V13 | `verify_learning`: the focus is the root task (stack depth 1), and there is `understands` evidence of the task's purpose in this run. |
+| V14 | `complete_task`: the focus is the root task (stack depth 1). Inside a detour, return first. This adds to V7. |
 
 There is **no depth limit** (D9).
 
@@ -289,9 +293,9 @@ A SQL view, `concept_knowledge`, computes each concept's status from its evidenc
 | status | rule |
 |---|---|
 | no evidence | no evidence at all |
-| known | the latest evidence is `+` |
-| missing | the latest evidence is `-` |
-| uncertain | the latest evidence is `?` |
+| known | the latest evidence is `understands` |
+| missing | the latest evidence is `gap` |
+| uncertain | the latest evidence is `unclear` |
 
 A late link, a removed link or new contrary evidence recomputes the status automatically. There is no help level (D10).
 
@@ -307,15 +311,15 @@ A late link, a removed link or new contrary evidence recomputes the status autom
  2  save the learner message → turn.status = received                 (own small txn)
  3  ORCHESTRATOR: build context (§7) → call → submit_decision
       invalid (§5.3)? → one retry with the validation errors appended
-      still invalid, refused, or API error → decision = {"d":"continue"} (logged)
+      still invalid, refused, or API error → decision = {"decision":"continue"} (logged)
  4  COMMIT (one transaction):
       apply changes · write evidence · write `changes` rows with story lines + depth
       · turn.status = decided · workspace.revision + 1
  5  TUTOR (streamed to the client, §8): conversation + new user turn
-      (learner text + attachments + <kit> block if the decision is not continue)
+      (learner text + attachments + <tutor_kit> block if the decision is not continue)
  6  save the tutor reply (raw content blocks) · turn.status = answered · revision + 1
- 7  if the decision was `complete` → close the task (§9.2) → open the next one (§9.3)
-    if it was `park` → park (§9.6)
+ 7  if the decision was `complete_task` → close the task (§9.2) → open the next one (§9.3)
+    if it was `park_task` → park (§9.6)
  8  release the lock
 ```
 
@@ -341,7 +345,7 @@ user:     [position pieces]   chosen by code (§7.2)
           [graph view]        rendered by code (§7.3)
           [last tutor message]
           [learner message + attachments]
-          [menu]              template names allowed now, one line each
+          [menu]              the decisions possible now (§7.5) + template names, one line each
 ```
 
 ### 7.2 Position pieces: code picks them from the graph (D3)
@@ -354,11 +358,11 @@ user:     [position pieces]   chosen by code (§7.2)
 | `on_task` | stack depth = 1 (the focus is the root) | stay with the task; a question is evidence, not a gap |
 | `in_detour` | stack depth ≥ 2 | keep the return path; resolve when `closes_when` is met |
 | `deep` | stack depth ≥ 4 | check you are still serving the root; prefer resolving upward |
-| `returned` | the previous decision was `resume` | bridge from the return note before anything new |
-| `stuck` | 3 or more turns on the same focus with no new `+` evidence | change the approach (`reframe`), or show the answer under the gate |
-| `goal_met` | `+` purpose evidence exists, but some needed concept is not `known` | verify the missing concepts with one probe each |
-| `saved_waiting` | an idle (saved) node exists in this run | notice when the learner wants to go back to it; it then becomes an ordinary detour |
-| `resumed` | first turn after a park | open from the return note |
+| `back_from_detour` | the previous decision was `return_from_detour` | bridge from the return note before anything new |
+| `stuck` | 3 or more turns on the same focus with no new `understands` evidence | change the approach (`reframe_explanation`), or show the answer under the gate (`show_answer`) |
+| `goal_met` | `understands` evidence of the purpose exists, but some needed concept is not `known` | verify the missing concepts with one probe each |
+| `saved_waiting` | a set_aside (saved) node exists in this run | notice when the learner wants to go back to it; it then becomes an ordinary detour |
+| `back_from_park` | first turn after a park | open from the return note |
 | `carried` | OPEN nodes carried from earlier tasks | notice when the learner's words touch one |
 
 ### 7.3 The graph view (code-rendered, compact)
@@ -366,13 +370,13 @@ user:     [position pieces]   chosen by code (§7.2)
 ```text
 TASK T3 (fix) · goal: guests get a real answer again · needs C15 C17 C13
 STACK  T3 › I1 › [I2]            ← focus in brackets
-  I2  issue·codebase · "Why the loop on line 684 runs 0 times for a guest" · bank: none
+  I2  issue·codebase · "Why the loop on line 684 runs 0 times for a guest" · concept: none
       closes_when: (not set)
-  I1  paused · note: "you get last([]); now connect it to label" · bank: C15
-  T3  paused · note: "you have the traceback; line 722 reads label"
+  I1  paused_on_stack · return_note: "you get last([]); now connect it to label" · concept: C15
+  T3  paused_on_stack · return_note: "you have the traceback; line 722 reads label"
 OPEN ELSEWHERE  —
 CONCEPTS  C15 missing · C17 known · C13 no evidence
-RECENT EVIDENCE  E5 I1 + explained x after the loop
+RECENT EVIDENCE  E5 I1 understands · explained x after the loop
 ```
 
 ### 7.4 The decision (D2: if/else)
@@ -380,43 +384,77 @@ RECENT EVIDENCE  E5 I1 + explained x after the loop
 **On track, nothing to change:**
 
 ```json
-{"d": "continue"}
+{"decision": "continue"}
 ```
 
 **On track with evidence (A4):**
 
 ```json
-{"d": "continue", "g": [{"op": "evidence", "on": "T3", "text": "reproduced the bug as a guest", "pol": "+", "from": "attachment"}]}
+{"decision": "continue",
+ "graph_changes": [{"change": "add_evidence", "target_id": "T3", "observation": "reproduced the bug as a guest",
+                    "signal": "understands", "source": "attachment"}]}
 ```
 
 **Anything else**, here T3 step 3:
 
 ```json
-{"d": "redirect",
- "a": [{"k": "GAP_DISCOVERED", "cat": "knowledge"}],
- "g": [
-   {"op": "create", "ref": "n1", "kind": "issue", "cat": "knowledge", "parent": "T3",
-    "title": "A loop variable only exists if the loop ran",
-    "closes_when": "they explain why label is unbound for a guest", "bank": "C15"},
-   {"op": "watch", "id": "n1", "text": "expects label to exist because it is written in the loop"},
-   {"op": "evidence", "on": "C17", "text": "made the hidden error visible", "pol": "+", "from": "attachment"},
-   {"op": "evidence", "on": "C15", "text": "did not know label can be left unset", "pol": "-", "from": "message"},
-   {"op": "pause", "id": "T3", "note": "you have the traceback; line 722 reads label"},
-   {"op": "focus", "id": "n1"}],
- "kit": {"t": ["detour", "example"], "s": ["focus", "return_to", "watch", "closes_when"],
-         "f": [{"p": "concepts/C15", "why": "I1 links to C15: use its Examples"}]},
- "why": "label is unset because the loop never ran for a guest"}
+{
+  "decision": "start_detour",
+  "assessments": [{"kind": "GAP_DISCOVERED", "category": "knowledge"}],
+  "graph_changes": [
+    {"change": "create_issue", "temp_id": "new1", "category": "knowledge", "parent_id": "T3",
+     "title": "A loop variable only exists if the loop ran",
+     "closes_when": "they explain why label is unbound for a guest", "concept_id": "C15"},
+    {"change": "note_misconception", "node_id": "new1",
+     "misconception": "expects label to exist because it is written in the loop"},
+    {"change": "add_evidence", "target_id": "C17", "observation": "made the hidden error visible",
+     "signal": "understands", "source": "attachment"},
+    {"change": "add_evidence", "target_id": "C15", "observation": "did not know label can be left unset",
+     "signal": "gap", "source": "message"},
+    {"change": "pause", "node_id": "T3", "return_note": "you have the traceback; line 722 reads label"},
+    {"change": "set_focus", "node_id": "new1"}
+  ],
+  "tutor_kit": {
+    "templates": ["teach_one_concept", "experiment_first"],
+    "state_keys": ["current_focus", "return_to", "misconception_to_watch", "closes_when"],
+    "readable_files": [{"path": "concepts/C15", "reason_this_turn": "I1 links to C15: use its Examples"}]
+  },
+  "designer_note": "label is unset because the loop never ran for a guest"
+}
 ```
 
 | key | meaning |
 |---|---|
-| `d` | `continue` · `redirect` · `resume` · `verify` · `adjust` · `complete` · `park` |
-| `a` | assessments, a list (several per turn are allowed) |
-| `g` | graph changes (§5.2) |
-| `kit` | `t` templates · `s` state keys · `f` readable files, each with the "why this turn" line |
-| `why` | one line, for the designer's view only. The learner never sees it. |
+| `decision` | `continue` · `start_detour` · `return_from_detour` · `verify_learning` · `change_approach` · `complete_task` · `park_task` |
+| `assessments` | what the orchestrator detected, a list (several per turn are allowed); each has a `kind` and a `category` |
+| `graph_changes` | the changes to the graph (§5.2) |
+| `tutor_kit` | `templates` · `state_keys` · `readable_files`, each file with a `path` and its `reason_this_turn` |
+| `designer_note` | one line, for the designer's view only. The learner never sees it. |
 
 `submit_decision` is a **strict** tool (the schema is enforced). Code then enforces the if/else (V1, V11). The run allows at most `max_tool_rounds` reading-tool rounds before it must submit.
+
+### 7.5 The decision menu: code removes impossible decisions (D13)
+
+Before each call, code works out which decisions are possible from the current state, and the `[menu]` lists only those. The orchestrator can't pick an impossible one. The validation rules (§5.3) still run after the call, as the safety net.
+
+```text
+                     ON THE TASK (stack = [T3])        IN A DETOUR (stack = [T3, I1, …])
+                     ──────────────────────────        ─────────────────────────────────
+continue             ✓                                 ✓
+start_detour         ✓                                 ✓  nested; no depth limit (D9)
+return_from_detour   ✗  nothing to return to (V5)      ✓
+verify_learning      ✓  only when the goal is met      ✗  (V13)
+change_approach      ✓                                 ✓
+complete_task        ✓  only when the goal is met      ✗  (V14)
+                        and every concept is known (V7)
+park_task            ✓  always                         ✓  always
+```
+
+"The goal is met" means there is `understands` evidence of the task's purpose in this run.
+
+**One source of truth.** `orchestrator/menu.py` builds the menu from the same conditions as V5, V7, V13 and V14, so the menu and the validation can never disagree. A decision that is not on the menu fails those same rules.
+
+**Why:** an impossible option costs a rejected call and a retry (§6, step 3). Removing it before the call is cheaper, and the orchestrator has fewer ways to go wrong.
 
 ---
 
@@ -428,7 +466,7 @@ RECENT EVIDENCE  E5 I1 + explained x after the loop
 system:   config/tutor/base.md                                        (fixed, cached)
 tools:    read_concept · read_file · search_repo · read_journey · read_transcript
           · read_reference · write_journey                            (fixed, cached)
-messages: [user: learner turn 1 + <kit>] [assistant] [tool_use/result] … [user: turn n (+ <kit>)]
+messages: [user: learner turn 1 + <tutor_kit>] [assistant] [tool_use/result] … [user: turn n (+ <tutor_kit>)]
 ```
 
 - Earlier turns are **never edited**. Haiku 5.5 invalidates thinking blocks when history changes. Assistant content blocks are stored raw and replayed unchanged.
@@ -444,43 +482,43 @@ These are readable without a kit line:
 - `learner/graph/knowledge.md`, only the rows for those concepts
 - `learner/journey/INDEX.md`
 
-The kit's `f` list adds to this set for the current focus.
+The tutor kit's `readable_files` list adds to this set for the current focus.
 
-### 8.3 Templates: the short name IS the file name (D2)
+### 8.3 Templates: the template name IS the file name (D2)
 
-| name | file | from the T3 library |
+| name | file | old name |
 |---|---|---|
-| `intro` | `templates/intro.md` | task_intro |
-| `frame` | `templates/frame.md` | task_frame |
-| `debug` | `templates/debug.md` | guide_debugging |
-| `detour` | `templates/detour.md` | detour_concept |
-| `example` | `templates/example.md` | experiment_first (the learner runs it in their own editor, D7) |
-| `trace` | `templates/trace.md` | guided_trace |
-| `bridge` | `templates/bridge.md` | resume_bridge |
-| `fix` | `templates/fix.md` | guide_fix |
-| `side` | `templates/side.md` | park_side_question |
-| `probe` | `templates/probe.md` | probe |
-| `close` | `templates/close.md` | close |
-| `reframe` | `templates/reframe.md` | **new**: no existing piece covers being stuck (architecture §4, STAGNATING) |
-| `answer` | `templates/answer.md` | **new**: no existing piece shows the answer; it sits behind the gate (A8) |
+| `introduce_task` | `templates/introduce_task.md` | intro · task_intro |
+| `keep_goal_in_view` | `templates/keep_goal_in_view.md` | frame · task_frame |
+| `guide_debugging` | `templates/guide_debugging.md` | debug · guide_debugging |
+| `teach_one_concept` | `templates/teach_one_concept.md` | detour · detour_concept |
+| `experiment_first` | `templates/experiment_first.md` | example · experiment_first (the learner runs it in their own editor, D7) |
+| `guided_trace` | `templates/guided_trace.md` | trace · guided_trace |
+| `bridge_back` | `templates/bridge_back.md` | bridge · resume_bridge |
+| `guide_fix` | `templates/guide_fix.md` | fix · guide_fix |
+| `answer_side_question` | `templates/answer_side_question.md` | side · park_side_question |
+| `probe_understanding` | `templates/probe_understanding.md` | probe |
+| `close_task` | `templates/close_task.md` | close |
+| `reframe_explanation` | `templates/reframe_explanation.md` | reframe. **New**: no existing piece covers being stuck (architecture §4, STAGNATING) |
+| `show_answer` | `templates/show_answer.md` | answer. **New**: no existing piece shows the answer; it sits behind the gate (A8) |
 
 The engine renders the block. Here is T3 step 3:
 
 ```text
-<kit>
-[detour] Pause the task. Teach one idea only. Don't solve the task here.
-[example] Start with a tiny example the learner runs in their own editor. Ask for a prediction first.
-focus: I1 · A loop variable only exists if the loop ran
+<tutor_kit>
+[teach_one_concept] Pause the task. Teach one idea only. Don't solve the task here.
+[experiment_first] Start with a tiny example the learner runs in their own editor. Ask for a prediction first.
+current_focus: I1 · A loop variable only exists if the loop ran
 return_to: T3 · you have the traceback; line 722 reads label
-watch: expects label to exist because it is written in the loop
+misconception_to_watch: expects label to exist because it is written in the loop
 closes_when: they explain why label is unbound for a guest
 readable now: concepts/C15 (I1 links to C15: use its Examples)
-</kit>
+</tutor_kit>
 ```
 
 ### 8.4 State keys (`config/tutor/state.yaml`)
 
-`task` · `known` · `focus` · `return_to` · `watch` · `closes_when` · `probe_target` · `open_issues` · `journey`. Code fills each value from the graph.
+`task_goal` · `known_concepts` · `current_focus` · `return_to` · `misconception_to_watch` · `closes_when` · `probe_target` · `open_issues` · `journey_so_far`. Code fills each value from the graph.
 
 ### 8.5 Tools: every tool's description is its guide
 
@@ -502,7 +540,7 @@ Every call is logged in `tool_calls`, including refused ones.
 
 | resource | open when |
 |---|---|
-| reference solution, **tutor** | the kit has `answer` **and** 2 or more `-` evidence on the current focus in this run (A8) |
+| reference solution, **tutor** | the tutor kit has `show_answer` **and** 2 or more `gap` evidence on the current focus in this run (A8) |
 | reference solution, **orchestrator** | always (it judges "built correctly", D8, A2) |
 | `write_journey` | the turn is the close turn (§9.2) |
 | a past journey or transcript | listed in this turn's kit |
@@ -524,13 +562,13 @@ Every call is logged in `tool_calls`, including refused ones.
 ### 9.1 Open
 
 1. Create a `task_run` and the root node (crafted, focus).
-2. Run a first tutor turn with no learner message, using the kit `intro` + `frame`. After a previous task, the kit is `bridge` + `intro`, with `journey/<previous>` readable: the existing bridge piece, fed the last task's journey.
+2. Run a first tutor turn with no learner message, using the kit `introduce_task` + `keep_goal_in_view`. After a previous task, the kit is `bridge_back` + `introduce_task`, with `journey/<previous>` readable: the existing bridge piece, fed the last task's journey.
 
 The orchestrator and the tutor both start fresh.
 
-### 9.2 Close (`complete` passed V7)
+### 9.2 Close (`complete_task` passed V7)
 
-1. A tutor turn with the kit `close`. `write_journey` is open, and the tutor writes the journey entry.
+1. A tutor turn with the kit `close_task`. `write_journey` is open, and the tutor writes the journey entry.
 2. Code then, in one transaction:
    - resolves the root;
    - writes the INDEX line (from the journey);
@@ -544,13 +582,13 @@ The engine opens the first task in `ladder_position` order that has no resolved 
 
 ### 9.4 Discoveries (architecture §17)
 
-`discover` ops are queued in `pending_discoveries`. At close, code writes them:
+`queue_discovery` changes are queued in `pending_discoveries`. At close, code writes them:
 
-| kind | written to |
+| discovery_type | written to |
 |---|---|
 | `misconception` | a `concept_sections` row (misconceptions), `source = discovered`, `found_in = {task, turn, node}`, plus `evidence_id` |
-| `other_way` | a `concept_sections` row (other_ways), labeled the same way |
-| `concept` | a new `concepts` row with the next D-id, `source = discovered`. The node that found it gets `bank_concept_id = D…` |
+| `alternative_explanation` | a `concept_sections` row (other_ways), labeled the same way |
+| `new_concept` | a new `concepts` row with the next D-id, `source = discovered`. The node that found it gets `bank_concept_id = D…` |
 
 Crafted rows are never updated.
 
@@ -560,8 +598,8 @@ A side question becomes an ordinary **issue** node, recorded on the graph and sh
 
 | situation | handled with | in T3 |
 |---|---|---|
-| not blocking; the learner just wondered | answer briefly with the `side` template, then `save` (idle, saved for later) | step 9: I3 "how the test fakes OpenAI" |
-| the learner wants to go there now | an ordinary detour: `redirect`, `pause` with a return note, then `detour` / `trace` / `example` | the same as I1 |
+| not blocking; the learner just wondered | answer briefly with the `answer_side_question` template, then `save_for_later` (set_aside) | step 9: I3 "how the test fakes OpenAI" |
+| the learner wants to go there now | an ordinary detour: `start_detour`, `pause` with a `return_note`, then `teach_one_concept` / `guided_trace` / `experiment_first` | the same as I1 |
 | it is really part of the task | `continue` | step 1: "where does this message come from?" |
 
 A saved issue is carried while it stays open, and any later task can pick it up (architecture §20).
@@ -570,28 +608,28 @@ The frontend's existing "Side question" switch is stored on the message as `mode
 
 ### 9.6 Park and resume
 
-- **Park:** a `park` decision, or `POST /park`. The run becomes `parked`, and the stack, nodes and conversation stay as they are.
-- **Resume:** `POST /resume` opens fresh agents on the same run. The first tutor turn uses `bridge` with the focus's return note. The story shows `↩ Came back to … · picking up: …`.
+- **Park:** a `park_task` decision, or `POST /park`. The run becomes `parked`, and the stack, nodes and conversation stay as they are.
+- **Resume:** `POST /resume` opens fresh agents on the same run. The first tutor turn uses `bridge_back` with the focus's return note. The story shows `↩ Came back to … · picking up: …`.
 
 ---
 
 ## 10. The Story Map (architecture §21)
 
-When a change is committed, `story/project.py` turns it into **one plain-English line**. The patterns come from `config/story.yaml`, and the line is written in the same transaction as the change.
+When a change is committed, `story/story_lines.py` turns it into **one plain-English line**. The patterns come from `config/story.yaml`, and the line is written in the same transaction as the change.
 
 | change | line pattern |
 |---|---|
 | run opened | `• Started {task.goal}` |
-| `evidence` `+` on a node | `✓ Did {text}` |
-| `evidence` `+` on a concept | `✓ Proved {text}` |
-| `evidence` `-` | `~ Almost {text}` |
-| `create` issue + `focus` at depth 1 | `⚠ Found a gap {why}` then `↳ Went to learn first — {title}` |
-| `create` issue + `focus` deeper | `↳ Needed first — {title}` |
-| `save` | `○ Saved for later {title}` |
+| `add_evidence` (`understands`) on a node | `✓ Did {observation}` |
+| `add_evidence` (`understands`) on a concept | `✓ Proved {observation}` |
+| `add_evidence` (`gap`) | `~ Almost {observation}` |
+| `create_issue` + `set_focus` at depth 1 | `⚠ Found a gap {designer_note}` then `↳ Went to learn first — {title}` |
+| `create_issue` + `set_focus` deeper | `↳ Needed first — {title}` |
+| `save_for_later` | `○ Saved for later {title}` |
 | `resolve` | `★ Cleared — {title}` |
-| `resume` (code-picked) | `↩ Came back to {title}`, plus `picking up: {return_note}` on the next line |
-| a `watch` belief later contradicted by `+` | `✓ Cleared up — {belief}` (struck through) |
-| `drop` | `✕ Not the problem after all — {title}` |
+| `return_from_detour` (code-picked) | `↩ Came back to {title}`, plus `picking up: {return_note}` on the next line |
+| a `note_misconception` belief later contradicted by `understands` evidence | `✓ Cleared up — {belief}` (struck through) |
+| `drop_wrong_diagnosis` | `✕ Not the problem after all — {title}` |
 | run resolved | `★ Done — {goal} · you now know {concepts}` |
 | the current focus (computed at read time, not stored) | `◉ You are here — {last tutor question}` |
 
@@ -609,12 +647,12 @@ A background job starts on import. One job per workspace, in the same process; p
 
 | stage | runs on | does |
 |---|---|---|
-| prestep | code | clone (reused `importer.py`); drop secret files (`.env*`, keys); outline Python files with the reused `structure.py`; list candidate entry points |
-| Crafter 1 | Agent SDK + Haiku 5.5 | built-in `Read`, `Glob`, `Grep` (cwd = the repo copy, read-only) + MCP tools `write_concept`, `list_concepts`. Follows `config/crafters/concepts.md` (the four size tests). |
+| prepare_repo | code | clone (reused `importer.py`); drop secret files (`.env*`, keys); outline Python files with the reused `structure.py`; list candidate entry points |
+| concept crafter | Agent SDK + Haiku 5.5 | built-in `Read`, `Glob`, `Grep` (cwd = the repo copy, read-only) + MCP tools `write_concept`, `list_concepts`. Follows `config/crafters/concepts.md` (the four size tests). |
 | VALIDATE 1 | code | per concept, at write time: schema, claim, proof, at least one misconception, every anchor's text found under its symbol (hash stored). At the end: no prerequisite cycles, no duplicates. |
-| Crafter 2 | Agent SDK + Haiku 5.5 | `Read`, `Glob`, `Grep` + `list_concepts`, `read_concept`, `write_task` (goal, tier, story, why, concepts, files, `reference_solution`, `real_bug`) |
+| task crafter | Agent SDK + Haiku 5.5 | `Read`, `Glob`, `Grep` + `list_concepts`, `read_concept`, `write_task` (goal, tier, story, why, concepts, files, `reference_solution`, `real_bug`) |
 | VALIDATE 2 | code | concepts and files exist; a reference solution is present. Warnings: a tier with no task, a concept with no task. **Nothing runs** (D7, D8). |
-| Crafter 3 | **code** | tier order, then prerequisites first, then at most 2 new concepts per task (greedy; a violation is logged, not fatal) → `ladder_position` |
+| ladder builder | **code** | tier order, then prerequisites first, then at most 2 new concepts per task (greedy; a violation is logged, not fatal) → `ladder_position` |
 | VALIDATE 3 | code | every task appears once |
 
 **What the Agent SDK is allowed to use:**
@@ -682,7 +720,7 @@ Orchestrator output, assessments, positions, kits and internal states never appe
 |---|---|
 | `auth.py` | **reused** unchanged |
 | `importer.py` | **reused** unchanged |
-| `structure.py` | **reused** for the crafting prestep outline |
+| `structure.py` | **reused** for the crafting prepare_repo outline |
 | `app.py` per-workspace write lock, SSE `event()` helper, scan replay log | **pattern reused**, rewritten |
 | `sdk_runtime.py` permission setup (`allowed_tools`, `disallowed_tools`, `setting_sources`) | **pattern reused** for the crafters |
 | `Dockerfile` (Node + Claude CLI for the Agent SDK), `fly.toml` | **adapted**; deployed as a second Fly app until the switch |
@@ -694,14 +732,14 @@ Orchestrator output, assessments, positions, kits and internal states never appe
 
 | level | what | model |
 |---|---|---|
-| unit | every rule V1–V12; each position condition; each story pattern; kit rendering; every tool gate; `concept_knowledge` | none |
+| unit | every rule V1–V14; the decision menu (§7.5); each position condition; each story pattern; kit rendering; every tool gate; `concept_knowledge` | none |
 | replay **T3** | a scripted orchestrator (the 11 decisions of T3) and a scripted tutor drive 11 turns. Check the graph, the focus stack, the evidence ids and the story lines against architecture §21 line by line. | fakes |
 | acceptance **§20** | in T4, the learner asks about the fake client. The carried I3 is refocused, resolved, and the learner is returned to T4. No crafter runs, no task is created. | fakes |
 | crafting | a small fixture repo → concepts pass VALIDATE 1, tasks pass VALIDATE 2, the ladder obeys the rules | fakes for the SDK |
 | failure | invalid decision → retry → continue; tutor failure → retry re-runs only the tutor; refusal → neutral reply | fakes |
 | live smoke | one real task on a small repo with Haiku 5.5. Record decisions, cost per turn and the largest prompt. | **real** (costs money; run by hand) |
 
-The agents are reached through one seam, `claude.py`, so every test except the live smoke runs offline (the tutor_v2 pattern).
+The agents are reached through one seam, `claude_client.py`, so every test except the live smoke runs offline (the tutor_v2 pattern).
 
 ---
 
@@ -710,12 +748,12 @@ The agents are reached through one seam, `claude.py`, so every test except the l
 | step | delivers | done when |
 |---|---|---|
 | M0 | package skeleton, settings, config loader + a starter config, Postgres migrations on Supabase, reused auth | the server starts; the config check passes |
-| M1 | the graph: model, rules V1–V12, apply, `concept_knowledge`, story projection | unit tests green |
-| M2 | the orchestrator: positions, graph view, decision schema, run loop | the T3 decisions validate and commit (fakes) |
+| M1 | the graph: model, rules V1–V14, apply, `concept_knowledge`, story projection | unit tests green |
+| M2 | the orchestrator: positions, decision menu, graph view, decision schema, run loop | the T3 decisions validate and commit (fakes) |
 | M3 | the tutor: conversation store, kit, tools + gates, streaming, compaction | gates and streaming tests green (fakes) |
 | M4 | the turn pipeline + learner API + SSE | **the T3 replay passes end to end** |
 | M5 | the task lifecycle: open, close, next, park, resume, discoveries, side questions | **the §20 acceptance passes** |
-| M6 | crafting: prestep, Crafter 1/2 on the Agent SDK, Crafter 3, validation, progress stream | the fixture repo crafts end to end |
+| M6 | crafting: prepare_repo, the concept and task crafters on the Agent SDK, the ladder builder, validation, progress stream | the fixture repo crafts end to end |
 | M7 | designer routes, the live smoke with Haiku 5.5, cost report; deploy as a second Fly app | the smoke run is reviewed by you |
 | M8 | the switch: point the frontend at the new app (frontend step), then delete tutor_v2 | your call |
 
@@ -727,6 +765,6 @@ The agents are reached through one seam, `claude.py`, so every test except the l
 |---|---|
 | Haiku 5.5 may diagnose or judge evidence too weakly for the orchestrator | M7 measures it on real turns. The model is one line in `models.yaml`. |
 | Haiku 5.5 may not accept mid-conversation system messages | The kit already goes in the user turn (§8.1). |
-| Large repos can push the crafters past 100K tokens (5× price) | Log it in M6. Fan Crafter 1 out per module if needed (architecture §16). |
+| Large repos can push the crafters past 100K tokens (5× price) | Log it in M6. Fan the concept crafter out per module if needed (architecture §16). |
 | Pasted code is self-reported (D7) | Evidence keeps its `source`, so the orchestrator knows what was pasted. A later phase can add a real run. |
 | `continue` without evidence (if A4 is rejected) | The on-track story lines disappear. Decide A4 before M1. |
