@@ -1,6 +1,6 @@
-// Sample data for demo mode only. Task T3 and its turns follow the T3 scenario in
+// Sample data for demo mode only. Task 3 and its turns follow the task 3 scenario in
 // new_completly_desighn/LEGO.md §8–§10; the other tasks are placeholders for the ladder.
-import type { StoryKind } from "./types";
+import type { LadderIssue, StoryKind } from "./types";
 
 export interface CraftedBox {
   number: number;
@@ -37,9 +37,9 @@ export interface Step {
     number: number;
     title: string;
     parent_issue_id: string | null;
-    status: "open" | "saved";
+    status: LadderIssue["status"];
   };
-  issue_status?: [string, "cleared" | "already_knew"];
+  issue_status?: [string, LadderIssue["status"]][];
   where?: { issue_id: string | null; depth: number; you_are_here: string };
   close_task?: boolean;
 }
@@ -48,7 +48,7 @@ export const WORKSPACE_NAME = "chatbot_final_version";
 
 export const TASKS: CraftedTask[] = [
   {
-    id: "T1",
+    id: "task-1",
     number: 1,
     title: "trace one question through the chatbot",
     goal: "predict the chatbot's answer to one question, then check it",
@@ -66,7 +66,7 @@ export const TASKS: CraftedTask[] = [
       "Your first task: pick one question a recruiter might ask. Before you run it, predict what the chatbot answers.",
   },
   {
-    id: "T2",
+    id: "task-2",
     number: 2,
     title: "unknown labels need a fallback",
     goal: "a question with an unknown label gets a clear answer",
@@ -84,7 +84,7 @@ export const TASKS: CraftedTask[] = [
       "Next: when a question comes with a label the app doesn't know, it crashes. Where does the app look the label up?",
   },
   {
-    id: "T3",
+    id: "task-3",
     number: 3,
     title: "guests always get the generic error",
     goal: "guests get a real answer again",
@@ -112,7 +112,7 @@ export const TASKS: CraftedTask[] = [
       "Here's your task: as a guest, the chatbot always answers \"Une erreur s'est produite\". The goal: guests get a real answer. Your task sheet shows what you'll prove along the way. Where would you start?",
   },
   {
-    id: "T4",
+    id: "task-4",
     number: 4,
     title: "recruiters can filter offers by city",
     goal: "a recruiter who names a city sees only that city's offers",
@@ -132,10 +132,10 @@ export const TASKS: CraftedTask[] = [
       },
     ],
     opening:
-      "You fixed the guest error in task T3. Next: recruiters want to filter offers by city. Where does the app build the list of offers it sends back?",
+      "You fixed the guest error. Next: recruiters want to filter offers by city. Where does the app build the list of offers it sends back?",
   },
   {
-    id: "T5",
+    id: "task-5",
     number: 5,
     title: "log every question a guest asks",
     goal: "every guest question is written to a log file",
@@ -152,7 +152,7 @@ export const TASKS: CraftedTask[] = [
     opening: "Next: the team wants to see what guests ask. Where would you record each question?",
   },
   {
-    id: "T6",
+    id: "task-6",
     number: 6,
     title: "conversations survive a restart",
     goal: "a conversation is still there after the app restarts",
@@ -173,7 +173,7 @@ export const TASKS: CraftedTask[] = [
 // What happened in the two finished tasks, kept short.
 export const HISTORY: { task_id: string; steps: Step[] }[] = [
   {
-    task_id: "T1",
+    task_id: "task-1",
     steps: [
       {
         learner: null,
@@ -195,7 +195,7 @@ export const HISTORY: { task_id: string; steps: Step[] }[] = [
     ],
   },
   {
-    task_id: "T2",
+    task_id: "task-2",
     steps: [
       {
         learner: null,
@@ -218,12 +218,13 @@ export const HISTORY: { task_id: string; steps: Step[] }[] = [
   },
 ];
 
-const I1 = "a loop variable only exists if the loop ran";
-const I2 = "why the loop on line 684 runs 0 times for a guest";
+const ISSUE_1 = "a loop variable only exists if the loop ran";
+const ISSUE_2 = "why the loop on line 684 runs 0 times for a guest";
+const ISSUE_3 = "how the test fakes OpenAI";
 const TASK = "guests always get the generic error";
 
-// Task T3, turn by turn. Demo mode starts after turn 5.
-export const T3_STEPS: Step[] = [
+// Task 3, turn by turn. Demo mode starts after turn 5.
+export const TASK_3_STEPS: Step[] = [
   {
     learner: null,
     tutor: TASKS[2].opening,
@@ -253,16 +254,16 @@ export const T3_STEPS: Step[] = [
     ticks: [2],
     story: [
       ["ticked", "finds the real error behind the generic message", 0, null],
-      ["found_a_gap", "label doesn't exist for a guest", 0, "I1"],
-      ["went_to_learn_first", I1, 0, "I1"],
+      ["found_a_gap", "label doesn't exist for a guest", 0, "issue-1"],
+      ["went_to_learn_first", ISSUE_1, 0, "issue-1"],
     ],
-    open_issue: { id: "I1", number: 1, title: I1, parent_issue_id: null, status: "open" },
-    where: { issue_id: "I1", depth: 1, you_are_here: I1 },
+    open_issue: { id: "issue-1", number: 1, title: ISSUE_1, parent_issue_id: null, status: "now" },
+    where: { issue_id: "issue-1", depth: 1, you_are_here: ISSUE_1 },
   },
   {
     learner: "None? In JS it would be undefined.",
     tutor: "Good guess from JavaScript. Run it and see. What does Python actually say?",
-    story: [["almost", "you expected None after an empty loop", 1, "I1"]],
+    story: [["almost", "you expected None after an empty loop", 1, "issue-1"]],
   },
   {
     learner:
@@ -271,11 +272,12 @@ export const T3_STEPS: Step[] = [
       "Let's trace it. Line 684 loops over a list. Where does that list come from for a guest? Follow it back.",
     tools: ["reading app.py, lines 680 to 690"],
     story: [
-      ["did", "ran last([]) and saw the same error", 1, "I1"],
-      ["needed_first", I2, 1, "I2"],
+      ["did", "ran last([]) and saw the same error", 1, "issue-1"],
+      ["needed_first", ISSUE_2, 1, "issue-2"],
     ],
-    open_issue: { id: "I2", number: 2, title: I2, parent_issue_id: "I1", status: "open" },
-    where: { issue_id: "I2", depth: 2, you_are_here: I2 },
+    open_issue: { id: "issue-2", number: 2, title: ISSUE_2, parent_issue_id: "issue-1", status: "now" },
+    issue_status: [["issue-1", "on_hold"]],
+    where: { issue_id: "issue-2", depth: 2, you_are_here: ISSUE_2 },
   },
   {
     learner:
@@ -284,11 +286,11 @@ export const T3_STEPS: Step[] = [
       "Right: for a guest the loop gets []. Now connect it: after a loop over [], what is label?",
     tools: ["reading app.py, lines 460 to 475"],
     story: [
-      ["cleared", I2, 2, "I2"],
-      ["came_back", I1, 1, "I1", "you get last([]) now; connect it to label"],
+      ["cleared", ISSUE_2, 2, "issue-2"],
+      ["came_back", ISSUE_1, 1, "issue-1", "you get last([]) now; connect it to label"],
     ],
-    issue_status: ["I2", "cleared"],
-    where: { issue_id: "I1", depth: 1, you_are_here: I1 },
+    issue_status: [["issue-2", "cleared"], ["issue-1", "now"]],
+    where: { issue_id: "issue-1", depth: 1, you_are_here: ISSUE_1 },
   },
   {
     learner:
@@ -296,10 +298,10 @@ export const T3_STEPS: Step[] = [
     tutor:
       "That's it. Back to the task: you have the traceback, and you know why label is unbound. What should line 722 use instead?",
     story: [
-      ["cleared", I1, 1, "I1"],
+      ["cleared", ISSUE_1, 1, "issue-1"],
       ["came_back", TASK, 0, null, "you have the traceback; line 722 reads label"],
     ],
-    issue_status: ["I1", "cleared"],
+    issue_status: [["issue-1", "cleared"]],
     where: { issue_id: null, depth: 0, you_are_here: TASK },
   },
   {
@@ -321,35 +323,50 @@ export const T3_STEPS: Step[] = [
     ticks: [1],
     story: [
       ["ticked", "the fix works: a guest gets a real answer", 0, null],
-      ["saved_for_later", "how the test fakes OpenAI", 0, "I3"],
+      ["saved_for_later", ISSUE_3, 0, "issue-3"],
     ],
     open_issue: {
-      id: "I3",
+      id: "issue-3",
       number: 3,
-      title: "how the test fakes OpenAI",
+      title: ISSUE_3,
       parent_issue_id: null,
-      status: "saved",
+      status: "on_hold",
     },
   },
   {
     learner:
       "Whether the model gets the pricing tool. `tools` is the list of functions OpenAI is allowed to call, and candidates don't get the pricing one.",
     tutor:
-      "Done: guests get a real answer, and you can explain every step, from the hidden error to the empty loop to what the label decides. I wrote the path you took into your journey.",
+      "Yes: the label decides whether the model gets the pricing tool. Every box is ticked, but one thing is still waiting before the next task: how the test fakes OpenAI. Open tests/conftest.py. Where does the test get its OpenAI client?",
     ticks: [4],
     story: [
       ["ticked", "explains what the label decides in the request", 0, null],
+      ["picked_up", ISSUE_3, 0, "issue-3"],
+    ],
+    issue_status: [["issue-3", "now"]],
+    where: { issue_id: "issue-3", depth: 1, you_are_here: ISSUE_3 },
+  },
+  {
+    learner:
+      "A fixture swaps app.client for FakeClient, which always returns a canned answer. So the test never calls OpenAI and needs no key.",
+    tutor:
+      "Exactly: a fake that returns canned answers. Nothing is waiting anymore, so this task is done: you can explain every step, from the hidden error to the empty loop to what the label decides. I wrote the path you took into your journey.",
+    tools: ["reading tests/conftest.py"],
+    story: [
+      ["cleared", ISSUE_3, 1, "issue-3"],
       ["done", "guests get a real answer again", 0, null],
     ],
+    issue_status: [["issue-3", "cleared"]],
     close_task: true,
   },
 ];
-export const T3_START = 6; // the next step to play: turns 0 to 5 are already done
+// The next step to play: turns 0 to 5 are already done.
+export const TASK_3_START = 6;
 
 const lines: string[] = Array(830).fill("");
 const put = (at: number, text: string[]) =>
   text.forEach((line, i) => (lines[at - 1 + i] = line));
-put(1, ["# app.py · a sample excerpt for demo mode: only the lines task T3 talks about"]);
+put(1, ["# app.py · a sample excerpt for demo mode: only the lines task 3 talks about"]);
 put(12, ['QUESTION_LABELS = {"recruiter", "candidate", "both"}']);
 put(468, [
   "def get_offers(base, user_id):",
@@ -367,7 +384,24 @@ put(821, [
   "        # never show a crash to the user",
   "        return \"Une erreur s'est produite\"",
 ]);
-export const FILES: Record<string, string> = { "app.py": lines.join("\n") };
+const conftest = [
+  "# tests/conftest.py · a sample excerpt for demo mode",
+  "import pytest",
+  "import app",
+  "",
+  "class FakeClient:",
+  "    def create(self, **request):",
+  '        return {"answer": "Voici nos offres de stage…"}',
+  "",
+  "@pytest.fixture(autouse=True)",
+  "def fake_openai(monkeypatch):",
+  '    monkeypatch.setattr(app, "client", FakeClient())',
+  "",
+];
+export const FILES: Record<string, string> = {
+  "app.py": lines.join("\n"),
+  "tests/conftest.py": conftest.join("\n"),
+};
 
 export const SCRATCH = {
   name: "scratch.py",

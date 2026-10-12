@@ -7,7 +7,7 @@ Checked 2026-10-11 against two sources:
 
 **Claude Haiku 5.5 was released on 2026-10-07, after the bundled reference was written.** Every Haiku 5.5 fact below comes from live documentation only. Confirm each one at build time with `client.models.retrieve("claude-haiku-5-5")` and a first test call.
 
-Companion to `LEGO.md` (draft 0.19).
+Companion to `LEGO.md` (draft 0.20).
 
 ---
 
@@ -112,7 +112,7 @@ The tutor's instructions for this turn go in its system prompt, and code rebuild
  released          2026-10-07
 ```
 
-The research agent suggested a stronger model for the evaluator if its accuracy matters most. Your decision is Haiku 5.5 for every agent. We measure that choice with the T3 scenario before changing anything.
+The research agent suggested a stronger model for the evaluator if its accuracy matters most. Your decision is Haiku 5.5 for every agent. We measure that choice with the task 3 scenario before changing anything.
 
 ---
 

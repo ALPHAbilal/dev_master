@@ -11,6 +11,8 @@ const LABELS: Record<StoryKind, [string, string, string, string]> = {
   went_to_learn_first: ["↳ ", "Went to learn first — ", "g", "cy b"],
   needed_first: ["↳ ", "Needed first — ", "g", "cy b"],
   saved_for_later: ["○ ", "Saved for later  ", "dm", "dm"],
+  put_on_hold: ["‖ ", "Put on hold — ", "dm", "dm"],
+  picked_up: ["↳ ", "Picked up — ", "g", "cy b"],
   cleared: ["★ ", "Cleared — ", "o", "cy"],
   already_knew: ["✕ ", "Already knew it — ", "o", "cy"],
   came_back: ["↩ ", "Came back to ", "o b", "cy b"],

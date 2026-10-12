@@ -1,10 +1,10 @@
 # Frontend: what changes
 
-Draft 0.5 · 2026-10-12 · companion to `LEGO.md` (draft 0.19)
+Draft 0.6 · 2026-10-12 · companion to `LEGO.md` (draft 0.20)
 
 **The rule:** we keep the screen we have and change only what the new design needs. The backend spec then serves exactly the contract in §7.
 
-**Brand rule:** the screen never numbers things. No "task T3", "box 2", "concept 17" or "issue I1": the order of a list already says the order. IDs live in the data and in these design docs, never on screen.
+**Brand rule:** the screen never numbers things. No "task 3", "box 2", "concept 17" or "issue 1": the order of a list already says the order. IDs live in the data and in these design docs, never on screen.
 
 **Style: Quiet** (chosen 2026-10-12 from three minimalist variations). Flat and still: no marks, no colored edges, no glow, pulse, sweep or blinking, and no helper sentences. State is the text's tone: dark is proven or happening now, grey is done, pale is not open yet. A box not proven yet is a blank bar. The only labels are the task's tier and its files, as small grey tags; a file tag opens the file in the Codebase panel. Sizes and spacing come from claude.ai; the fonts and colors stay ours:
 
@@ -21,7 +21,7 @@ Draft 0.5 · 2026-10-12 · companion to `LEGO.md` (draft 0.19)
  small text       13px on 17px
 ```
 
-**Status:** built in `agentic_tutor/frontend` (demo mode), not committed yet. Typecheck clean, 6 of 6 tests pass, the production build succeeds.
+**Status:** built in `agentic_tutor/frontend` (demo mode). Draft 0.6 adds the waiting room (§3, §4, §7). Typecheck clean, 7 of 7 tests pass, the production build succeeds.
 
 ---
 
@@ -145,14 +145,29 @@ It sits in the second sidebar, which opens when a task is clicked (§2, state 3)
  each box: ticked or not                       boxes · ticked_at_turn
  each concept box's text                       boxes · box, only once ticked;
                                                before that, a blank bar
- the issues, nested, with saved · cleared ·    the graph
-   already knew it
+ the issues: the waiting room, nested, in      issues · LEGO.md §17
+   priority order; dark is now, pale is on
+   hold, grey is cleared or already knew it
 
  NOT SHOWN: difficulties · had_it_then_missed · times_it_came_up
             they are for the tutor; the story already shows those moments
 ```
 
 A concept that was checked and then missed goes back to ☐. Nothing else marks it.
+
+**The Issues group is the waiting room** (decided 2026-10-12). It shows every issue of the task, nested under the issue it was named in, in the priority order the server sends. No numbers and no labels: the tone says the state.
+
+```
+ Issues                                 ∧
+ ╰ a loop variable only exists if …         ◄ pale: on hold, with its note
+   ╭────────────────────────────────╮
+   ╰ why the loop on line 684 runs … │      ◄ dark: now
+   ╰────────────────────────────────╯
+ ╰ how the test fakes OpenAI                ◄ pale: on hold, waits its turn
+ ╰ run the test                             ◄ grey: cleared
+```
+
+The task can't close while anything in it is still dark or pale.
 
 ---
 
@@ -169,6 +184,8 @@ A concept that was checked and then missed goes back to ☐. Nothing else marks 
  ↳ Went to learn first — <issue>          ↳ Went to learn first —         same
  ↳ Needed first — <issue>                 ↳ Needed first —                same
  ○ Saved for later <issue>                ○ Noted for later               new word
+ ‖ Put on hold — <issue>                  nothing                         new line
+ ↳ Picked up — <issue>                    nothing                         new line
  ★ Cleared — <issue>                      ★ Sealed — you own              new word
  ✕ Already knew it — <issue>              nothing                         new line
  ↩ Came back to <step above>              ↩ Came back to                  same
@@ -287,7 +304,8 @@ LadderTask     { id, number, title, goal, tier, files,
                  status: done | current | later,
                  sheet: TaskSheet, issues: LadderIssue[] }
 LadderIssue    { id, number, title, parent_issue_id,
-                 status: open | saved | cleared | already_knew }
+                 status: now | on_hold | cleared | already_knew }
+               ladder[].issues = the waiting room, in priority order
 Where          { task_id, issue_id, depth, you_are_here,
                  tutor: waiting_for_you | answering }
 
@@ -297,7 +315,9 @@ Box            { number, text (a concept's box: null until ticked), ticked_at_tu
 
 StoryLine      { id, task_id, issue_id, turn, depth, kind, text, picking_up }
                kind: started · did · ticked · almost · found_a_gap · went_to_learn_first ·
-                     needed_first · saved_for_later · cleared · already_knew · came_back · done
+                     needed_first · saved_for_later · put_on_hold · picked_up · cleared ·
+                     already_knew · came_back · done
+IDs            written in full, never shortened: "task-3", "issue-1"
 Message        { id, task_id, turn, role: learner | tutor, text, attachments }
 Attachment     { kind: repository_code | editor_code | conversation, label, text, source }
 
@@ -319,7 +339,7 @@ preparing      step { name: copying | concepts | tasks | ordering, state: runnin
  POST  /workspaces/import                       { name, git_url } → preparing starts
  GET   /workspaces/{id}/preparing               stream: step · concept · task · ready · failed
  GET   /workspaces/{id}/tasks/{task}            one task, as in the ladder
- POST  /workspaces/{id}/start                   opens task T1; the tutor speaks first
+ POST  /workspaces/{id}/start                   opens task 1; the tutor speaks first
  GET   /workspaces/{id}?since={revision}        the snapshot, or "unchanged"
  POST  /workspaces/{id}/messages                { client_message_id, text, attachments }
  POST  /workspaces/{id}/stop                    the tutor stops its reply where it is
@@ -339,17 +359,21 @@ preparing      step { name: copying | concepts | tasks | ordering, state: runnin
  ────────────────────────────────────  ──────────────────────────────────────────────────
  lib/api/types.ts                      rewritten: §7
  lib/api/live.ts                       the routes in §8
- lib/api/demo.ts                       new: the T3 scenario, turn by turn; replaces demo.json
+ lib/api/demo.ts                       new: the task 3 scenario, turn by turn; replaces
+                                       demo.json; 0.6: the waiting room, full IDs, and a
+                                       last issue picked up after every box is ticked
  lib/api/stub.ts                       rewritten: plays demo.ts in memory
  lib/session.tsx                       rewritten: one workspace, one snapshot; send() · stop()
  lib/scanner.ts · scanner-demo.json    removed
  lib/auth.tsx · lib/editor.ts          unchanged
  components/Sidebar.tsx                one short row per task, titles only; icons and Settings
                                        removed; « and » fold and unfold it
- components/TaskPanel.tsx              new: the second sidebar (§2, state 3)
+ components/TaskPanel.tsx              new: the second sidebar (§2, state 3); its Issues
+                                       group is the waiting room (§3)
  components/Icon.tsx                   two new glyphs: « and »
  next.config.mjs                       the development badge is off: it covered »
- components/Map.tsx                    the new story lines; lines open turns
+ components/Map.tsx                    the new story lines; lines open turns; 0.6: put on
+                                       hold, picked up
  components/Conversation.tsx           side threads and the switch removed; tick notes;
                                        task lines; opens at the clicked turn; one-row
                                        composer whose send turns into stop while answering
@@ -377,7 +401,7 @@ preparing      step { name: copying | concepts | tasks | ordering, state: runnin
 
 ```
  1  the contract       lib/api/types.ts, §7                done
- 2  the demo data      demo.ts + stub.ts, the T3 scenario  done
+ 2  the demo data      demo.ts + stub.ts, the task 3 scenario  done
  3  the screen         sidebar · Map · Conversation · Editor · Codebase · import page   done
  4  clean out          park · resume · side threads · batches · axes · stations         done
  5  check              typecheck · tests · production build · demo mode in a browser    done
@@ -418,4 +442,7 @@ preparing      step { name: copying | concepts | tasks | ordering, state: runnin
  ·  between tasks                     the conversation runs on, with a    my proposal
                                       thin line holding the next task's
                                       title
+ ·  the waiting room on screen        the task panel's Issues group,      you, 2026-10-12
+                                      in priority order; dark now, pale
+                                      on hold, grey cleared
 ```

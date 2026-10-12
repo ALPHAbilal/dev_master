@@ -87,6 +87,9 @@
 .tutor-screen .tp-item.on { color: #1e2024; }
 .tutor-screen .t-text { min-width: 0; overflow-wrap: anywhere; }
 .tutor-screen .t-issue.focus { color: #1e2024; font-weight: 600; }
+/* the waiting room: dark is now, pale is on hold, grey is done */
+.tutor-screen .t-issue.is-now { color: #1e2024; }
+.tutor-screen .t-issue.is-on_hold { color: #c3c1ba; }
 .tutor-screen .t-issue:is(.is-cleared, .is-already_knew) { color: #a8a6a0; }
 .tutor-screen .t-issue.on { background: rgba(79, 114, 144, 0.15); border-color: #4f7290; color: #1e2024; }
 /* a task not open yet: everything pale and still */

@@ -32,9 +32,9 @@ Set the Vercel project root to `agentic_tutor/frontend`, use the Next.js preset,
 `lib/api/types.ts` is the wire contract, described in `new_completly_desighn/FRONTEND.md` §7–§8. It is page 1 of the backend spec: the backend serves exactly these routes.
 
 - One snapshot per workspace, with a revision number. The stream sends `revision` when it changes, plus `tutor` (the reply, piece by piece) and `tool` (what the tutor is reading).
-- Two sidebars on the left, following the reference design's layout. The first lists the repositories and their tasks, one short row each. A click on a task folds it into its rail and opens the second: the task's goal, tier, files, the job box, its concepts with their boxes, and its issues. A concept's box shows its text only once it is ticked; the server sends `null` until then, and the screen shows a blank bar.
+- Two sidebars on the left, following the reference design's layout. The first lists the repositories and their tasks, one short row each. A click on a task folds it into its rail and opens the second: the task's goal, tier, files, the job box, its concepts with their boxes, and its issues: the waiting room, in priority order, where dark is now, pale is on hold and grey is done. A concept's box shows its text only once it is ticked; the server sends `null` until then, and the screen shows a blank bar.
 - Brand rule: the screen never numbers things (no task, box, concept or issue numbers); the order of a list says it.
 - The answer key, the orchestrator's answers, the stuck level and the tutor's instructions never reach this screen.
-- Demo mode (`stub.ts` + `demo.ts`) plays task T3 of the design's scenario from turn 6; each message plays the next turn, and the last one closes task T3 and opens task T4. Importing any `https://` URL simulates the four preparing steps.
+- Demo mode (`stub.ts` + `demo.ts`) plays task 3 of the design's scenario from turn 6; each message plays the next turn. The fifth ticks the last box, but an issue still waits, so it is picked up; the sixth clears it, which closes task 3 and opens task 4. Importing any `https://` URL simulates the four preparing steps.
 
 On this Windows machine, Application Control blocks Next's native SWC binary. The scripts use webpack so Next can use its supported WASM fallback without changing system security settings.

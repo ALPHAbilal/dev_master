@@ -7,7 +7,8 @@ export interface Selection {
   issue_id: Id | null;
 }
 // Quiet style: no marks, no numbers. Dark text is proven or happening now, grey is
-// done, pale is not open yet; a box not proven yet is a blank bar.
+// done, pale is not open yet or on hold; a box not proven yet is a blank bar.
+// The Issues group is the waiting room, in the priority order the server sends.
 const HIDDEN = [64, 82, 52, 74, 90, 58];
 function BoxRow({ box, open }: { box: Box; open(turn: number): void }) {
   if (box.ticked_at_turn == null || box.text == null)

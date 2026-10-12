@@ -1,8 +1,8 @@
 # Backend spec: `tutor_graph`
 
-Draft 0.2 · 2026-10-12 · builds `LEGO.md` (draft 0.19) behind the contract in `FRONTEND.md` (draft 0.5), on Supabase, with Claude as `BUILD_WITH_CLAUDE.md` maps it. Replaces draft 0.1, which is in `archive/new_completly_desighn/`.
+Draft 0.3 · 2026-10-12 · builds `LEGO.md` (draft 0.20) behind the contract in `FRONTEND.md` (draft 0.6), on Supabase, with Claude as `BUILD_WITH_CLAUDE.md` maps it. Replaces draft 0.1, which is in `archive/new_completly_desighn/`.
 
-**Naming rule:** no abbreviations; every ID appears with its name (task T3, issue I1, concept 15, box 2). On the learner's screen, no IDs at all (`FRONTEND.md`, brand rule).
+**Naming rule:** no abbreviations; every ID is written in full (task 3, issue 1, concept 15, box 2), never shortened (never T3, I1 or C15). In the API, IDs are `task-3` and `issue-1`. Whatever a model reads or writes is the full label, word + number + name, made by `engine/names.py` only. On the learner's screen, no IDs at all (`FRONTEND.md`, brand rule).
 
 ---
 
@@ -16,8 +16,8 @@ Draft 0.2 · 2026-10-12 · builds `LEGO.md` (draft 0.19) behind the contract in 
                  (eu-central-1)
  model           Claude Haiku 5.5 (claude-haiku-5-5) for every agent
  agents          orchestrator, evaluator, tutor on the Claude API; the two crafters on the Agent SDK
- agentic layer   LEGO.md 0.19 as written: cards, pieces, plates, the question tree, the task sheet,
-                 the stuck ladder, checkpoints
+ agentic layer   LEGO.md 0.20 as written: cards, pieces, plates, the question tree, the task sheet,
+                 the stuck ladder, checkpoints, the waiting room
  contract        FRONTEND.md §7–§8; the frontend is built and runs it in demo mode
  context         fresh agents per task; instructions are never history; no caching, no compaction
  phase 1         no code runs on the server; the learner pastes code and output
@@ -36,26 +36,28 @@ Draft 0.2 · 2026-10-12 · builds `LEGO.md` (draft 0.19) behind the contract in 
                                      but cannot create one yet; email link
 ```
 
-### My proposals for the open holes of LEGO.md §16
+### The holes of LEGO.md §16, decided one by one
 
 ```
- hole                                         proposal
+ hole                                         decided 2026-10-12
  ───────────────────────────────────────────  ──────────────────────────────────────────────────
- an exact match of the learner's words is     code compares after folding case, spaces, quote
- fragile                                      marks and dashes
- a proof spread over two turns                learner_words becomes a list of up to 3 quotes;
-                                              each one must be found
- the proof is pasted code                     a message's attachments count as the learner's
-                                              words
- the words prove they were said, not that     accepted: code checks where the words come from;
- they prove the box                           the evaluator's verdict is the judgment
- "kind" is a number                           kind becomes a name: "debugging", not 7
- one turn mixes kinds; kinds flip             accepted: one kind per turn, the main one; the
-                                              tutor's instructions follow it
- a box explained inside an issue ticks only   evaluate may judge an unticked box inside an issue
- on the next turn                             too, so it ticks at once
- the issue → concept link is a guess          accepted: it is the orchestrator's label
- the tutor's new pieces are not written       written during the build (§20, step 3), as config
+ the learner's words: an exact match, two     no quotes at all: the evaluator answers met, not
+ turns, pasted code, proof of the box         met or unclear, nothing else; no learner_words
+                                              anywhere; no words matcher
+ "kind" is a number                           a name: "kind_of_work": "debugging"
+ IDs and labels                               task 3, issue 1, never T3 or I1; a model reads
+                                              and writes full labels from engine/names.py
+ one turn mixes kinds; kinds flip             the waiting room (LEGO.md §17): every need is an
+                                              issue; in an issue, the tutor follows the issue's
+                                              own kind of work
+ ─────────────────────────────────────────── still open
+ a box explained inside an issue ticks only   open: LEGO.md hole 16
+ on the next turn
+ the issue → concept link is a guess          open: LEGO.md hole 4
+ kinds overlap with UNCERTAIN and the stuck   open: LEGO.md hole 13
+ ladder
+ a GAP's difficulty has no what_went_wrong    open: LEGO.md hole 18
+ the tutor's new pieces are not written       open: now, or during the build (§20, step 3)
 ```
 
 ---
@@ -104,6 +106,8 @@ agentic_tutor/backend/tutor_graph/
 ├── engine/                  code only; never calls a model
 │   ├── where.py             the stack: where we are, the card (B or C), depth, focus
 │   ├── facts.py             every fact a piece can ask for (LEGO §12, facts)
+│   ├── names.py             the only place a label is made, and turned back into a row
+│   │                        (LEGO §11.3)
 │   ├── checks.py            the yes/no questions code asks the graph (LEGO §12, checks)
 │   ├── cards.py             which pieces go on which plate, per card (LEGO §7)
 │   ├── tree.py              builds this turn's answer format from the question tree (LEGO §3)
@@ -111,9 +115,9 @@ agentic_tutor/backend/tutor_graph/
 │   ├── effects.py           every effect, in one transaction (§9)
 │   ├── sheet.py             the task sheet (§10)
 │   ├── stuck.py             the stuck ladder (§11)
+│   ├── waiting_room.py      priority, what is now, on hold, moving up (LEGO §17)
 │   ├── story.py             effect → story line
 │   ├── checkpoints.py       one checkpoint per turn; pull_checkpoints (§12)
-│   ├── words.py             finds the learner's quoted words in their turns (§7.3)
 │   └── turn.py              one learner turn, end to end (§5)
 ├── agents/
 │   ├── claude.py            the one seam to the Claude API: calls, retries, refusals, cost log
@@ -124,7 +128,7 @@ agentic_tutor/backend/tutor_graph/
 │   └── pieces.py            loads the config pieces; fills their studs
 ├── tasks/
 │   ├── lifecycle.py         open (card A) · close (card E) · next
-│   └── discoveries.py       saved side questions and concept gaps → the concept bank
+│   └── discoveries.py       side questions and concept issues → the concept bank
 ├── preparing/               the crafting line (LEGO §13)
 │   ├── job.py               runs the four steps; publishes the preparing events
 │   ├── copy_repository.py   clone, scrub secrets, outline (reused importer.py, structure.py)
@@ -142,11 +146,13 @@ agentic_tutor/backend/tutor_graph/
 agentic_tutor/backend/config/
 ├── models.yaml              per agent: model, effort, max tokens, tool rounds
 ├── tree.yaml                the questions, their options and short descriptions (LEGO §3)
-├── kinds.yaml               the ten kinds of work: name, description, tutor pieces (LEGO §4)
+├── kinds.yaml               the ten kinds of work: name, description, judged_by, and the
+│                            tutor's kit: pieces, tools, files (LEGO §4, §17.9)
+├── priority.yaml            priority 1 to 5, computed from an issue's card (LEGO §17.2)
 ├── stuck.yaml               the levels, their whys, each why's tutor piece (LEGO §9)
 ├── cards.yaml               per card: the fixed and gated pieces of each plate (LEGO §7)
 ├── pieces/
-│   ├── orchestrator/*.md    base · on_task · in_issue · stuck · saved_waiting · deep
+│   ├── orchestrator/*.md    base · on_task · in_issue · stuck · waiting_room · deep
 │   ├── evaluator/*.md       task_box · closes_when
 │   └── tutor/*.md           base and every piece of LEGO §12
 ├── tools/*.md               one guide per tool: what · when · when not · how
@@ -194,8 +200,22 @@ question_1:
     turns_away: asks about something off the current path
 
 # kinds.yaml (excerpt)
-debugging:  { description: finding why it fails, tutor: [guide_debugging] }
-a_concept:  { description: an idea they need,    tutor: [teach_one_concept, experiment_first] }
+debugging:
+  description: finding why it fails
+  judged_by: orchestrator
+  tutor: { pieces: [guide_debugging], tools: [], files: [] }
+concept:
+  description: an idea they need
+  judged_by: evaluator
+  tutor: { pieces: [teach_one_concept, experiment_first], tools: [read_concept],
+           files: [the linked concept] }
+
+# priority.yaml
+- { priority: 1, when: { kind_of_work: frustration } }
+- { priority: 2, when: { blocks: true, kind_of_work: [concept, task_meaning] } }
+- { priority: 3, when: { blocks: true } }
+- { priority: 4, when: { blocks: false, from: [progress, problem] } }
+- { priority: 5, when: { blocks: false, from: [turns_away] } }
 
 # stuck.yaml (excerpt)
 levels:
@@ -222,6 +242,7 @@ Changing a description, a level or a piece is a config change, never a code chan
 **The startup check.** The server refuses to start when the config is broken:
 
 - every piece named in `cards.yaml`, `kinds.yaml` or `stuck.yaml` exists;
+- every kind of work has a `judged_by` and a priority rule that reaches it;
 - every stud is a fact that `facts.py` knows;
 - the tree builds a valid answer format for every situation.
 
@@ -243,8 +264,8 @@ All tables live in a schema named `tutor`. Supabase's data API does not expose i
  concept_sections   workspace_id · concept_number · section (what_it_is | examples |
                     misconceptions | other_ways) · position · text
  concept_anchors    workspace_id · concept_number · file · symbol · line_text · text_hash
- tasks              workspace_id · id (T3) · number · ladder_position · title · goal · tier · files
-                    · status (done | current | later) · opened_at · closed_at
+ tasks              workspace_id · number (task 3; "task-3" in the API) · ladder_position · title
+                    · goal · tier · files · status (done | current | later) · opened_at · closed_at
  boxes              workspace_id · task_id · number · concept_number (empty = the job box) · text
                     · suggested_position
  answer_keys        workspace_id · task_id · text           read by one function only (§7.4)
@@ -253,17 +274,22 @@ All tables live in a schema named `tutor`. Supabase's data API does not expose i
 ### 4.2 The learning
 
 ```
- box_ticks          workspace_id · task_id · box_number · ticked_at_turn · learner_words
+ box_ticks          workspace_id · task_id · box_number · ticked_at_turn
  concept_progress   workspace_id · task_id · concept_number · checked · times_it_came_up
  difficulties       workspace_id · task_id · concept_number · turn · what_went_wrong
-                    · learner_words · had_it_then_missed · issue_id
- issues             workspace_id · id (I1) · number · opened_in_task · parent_issue_id · title
-                    · kind_of_work · closes_when · why_for_learner · concept_number · misconception
-                    · status (open | saved | cleared | already_knew) · opened_at_turn · closed_at_turn
+                    · had_it_then_missed · issue_id
+ issues             workspace_id · number (issue 1; "issue-1" in the API) · opened_in_task
+                    · parent_issue_id · title · kind_of_work · blocks · closes_when
+                    · why_for_learner · concept_number · misconception · from_leaf
+                    · priority · judged_by · position (the order inside its parent)
+                    · status (now | on_hold | cleared | already_knew) · note
+                    · named_at_turn · closed_at_turn
+                    the waiting room = this task's issues; LEGO.md §17
  stack              workspace_id · position · task_id or issue_id · return_note
-                    bottom = the task; top = where we are
+                    bottom = the task; top = the issue that is now
  progress           workspace_id · task_id · turn · issue_id · did
  stuck_counters     workspace_id · focus (a task or an issue) · turns_without_progress
+                    kept while the issue is on hold
  journeys           workspace_id · task_id · text           written by the tutor at the close
 ```
 
@@ -278,7 +304,7 @@ All tables live in a schema named `tutor`. Supabase's data API does not expose i
                     · attachments (json) · content_blocks (json: the tutor's text, tool calls and
                     their results; never thinking) · created_at
  verdicts           workspace_id · task_id · turn · target (a box or an issue)
-                    · verdict (met | not_met | unclear) · learner_words · words_found
+                    · verdict (met | not_met | unclear)
  story_lines        id · workspace_id · task_id · issue_id · turn · depth · kind · text · picking_up
  checkpoints        workspace_id · task_id · turn · leaf · body (json: what the learner said, the
                     leaf, the verdicts, the tool calls, the reply, where we were)
@@ -295,7 +321,8 @@ All tables live in a schema named `tutor`. Supabase's data API does not expose i
  workspace                 workspaces, plus tasks done and tasks total
  ladder[].sheet            boxes + box_ticks + concept_progress; a concept box's text is sent
                            only once ticked, as null before
- ladder[].issues           issues opened in that task
+ ladder[].issues           the task's waiting room: its issues, in priority order, nested by
+                           parent_issue_id
  where                     stack: its top is the focus; the last turn's status says whether the
                            tutor is answering
  story                     story_lines
@@ -320,10 +347,11 @@ All tables live in a schema named `tutor`. Supabase's data API does not expose i
      at once                                                                  transaction 2
   6  code checks the answer (§6.4); broken → one more try, with the problems
      listed; still broken → no change, logged
-  7  EFFECTS, all at once (§9): progress · difficulty · issue opened, saved or
-     cleared · back one step · stuck counter · task sheet · story lines ·
-     checkpoint · turn decided · revision + 1                                 transaction 3
-  8  task done? the job box ☑ and every concept checked → card E
+  7  EFFECTS, all at once (§9): progress · difficulty · issues named, picked,
+     put on hold or cleared · back one step · what is now · stuck counter ·
+     task sheet · story lines · checkpoint · turn decided · revision + 1      transaction 3
+  8  task done? the job box ☑, every concept checked and the waiting room
+     empty → card E
   9  TUTOR, with the plate of the card the turn ends in (§8); the reply
      streams to the learner; stop ends it where it is
  10  save the reply · turn answered or stopped · revision + 1                 transaction 4
@@ -362,8 +390,8 @@ All tables live in a schema named `tutor`. Supabase's data API does not expose i
    and the tutor's last reply
  gated: orchestrator.stuck + this level's    ◇ level 1 and up    ◇ level 1 and up
    whys
- gated: orchestrator.saved_waiting + the     ◇ if any saved      ◇ if any saved
-   saved issues
+ gated: orchestrator.waiting_room + the     ◇ if any on hold    ◇ if any on hold
+   issues on hold
  gated: orchestrator.deep                    —                   ◇ 4 levels deep
  ──────────────────────────────────────────  ──────────────────  ──────────────────
  about 2,500 – 4,500 tokens                  NEVER: the answer key, the tutor's instructions
@@ -374,17 +402,17 @@ All tables live in a schema named `tutor`. Supabase's data API does not expose i
 `engine/tree.py` turns `tree.yaml` and the graph into one JSON schema for this turn, sent as the structured output format:
 
 - every branch is one alternative (`anyOf`); a branch that can't exist this turn is not in it;
-- every list of allowed values is closed (`enum`): the kinds of work, this level's whys, the probe targets, the saved issues, the concept bank, this task's turns;
+- every list of allowed values is closed (`enum`): the kinds of work, this level's whys, the probe targets, the issues on hold, the concept bank, this task's turns; every ID in these lists is a full label from `engine/names.py`;
 - every object is closed (`additionalProperties: false`); no recursion, no minimum or maximum.
 
 ```
  situation                          the format contains
  ─────────────────────────────────  ──────────────────────────────────────────────────────────
- on the task, level 0, none saved   shows: progress | problem (unsure | wrong_idea | missing)
+ on the task, level 0, none on hold shows: progress | problem (unsure | wrong_idea | missing)
                                     | turns_away (go_now: no | yes, a new issue)
  in an issue                        + still_an_issue first; false only after "met" this turn
  stuck level 1 and up               + problem: stuck, with this level's whys
- a saved issue exists               + turns_away: yes, a saved issue
+ an issue on hold exists            + turns_away: yes, an issue on hold
 ```
 
 ### 6.3 Its tools
@@ -392,7 +420,7 @@ All tables live in a schema named `tutor`. Supabase's data API does not expose i
 ```
  TOOL               INPUT                       WHAT CODE DOES
  ─────────────────  ──────────────────────────  ─────────────────────────────────────────────
- read_concept       concept                     a concept, from its sections and anchors
+ read_concept       concept, as its label       a concept, from its sections and anchors
  read_file          path, around_line           120 lines of the repository copy
  search_repo        pattern                     at most 50 matches in the repository copy
  read_journey       task                        a closed task's journey
@@ -408,9 +436,10 @@ Every tool's description is its guide, from `config/tools/`. Inputs are closed, 
 ### 6.4 Code checks its answer
 
 ```
- still_an_issue is false        only after the evaluator said met this turn
+ still_an_issue is false        the green flag: for an issue the evaluator judges, only
+                                after it said met this turn; only for the issue that is now
  a gap that blocks              has a return_note
- a wrong idea                   its learner_words are found in this turn (§7.3)
+ every label                    turns back into a row through engine/names.py
  tutor_files                    every path exists and passes the gates (§16)
  progress                       its turns exist in this task
  ──────────────────────────────────────────────────────────────────────────────────────────
@@ -440,15 +469,15 @@ One request carries the tools and the structured answer format. The model may ca
 ### 7.2 Its answer
 
 ```json
-{ "target": "box 2", "verdict": "met", "learner_words": ["UnboundLocalError on `label`!"] }
+{ "target": "box 2 · finds the real error behind the generic message", "verdict": "met" }
 ```
 
-`verdict` is `met`, `not_met` or `unclear`. `learner_words` holds up to 3 quotes, and is empty unless met.
+`verdict` is `met`, `not_met` or `unclear`. Nothing else: no free text, so the answer key can't leak through it.
 
 ### 7.3 Code checks the verdict
 
 - The target is the one asked.
-- Each quote is found in the learner's own messages or attachments in this task. The match folds case, spaces, quote marks and dashes first.
+- The verdict is one of the three values, and there are no other fields.
 - Any failed check counts as `unclear`.
 - Met on a box: the box ticks at once, recording the turn (§10). Met on an issue: Question 0 may now answer "no".
 
@@ -462,7 +491,7 @@ One request carries the tools and the structured answer format. The model may ca
 
 ### 8.1 Its pieces
 
-Code picks them from the card the turn ends in, the leaf, the kind of work and, when stuck, the why. The mapping is `LEGO.md` §4, §7 and §9, kept in `cards.yaml`, `kinds.yaml` and `stuck.yaml`.
+Code picks them from the card the turn ends in, the leaf, the kind of work and, when stuck, the why. In an issue, the kind of work is the issue's own; on the task, it is the turn's main kind from ON_TRACK; after BACK to the task, it is the task's last one. The mapping is `LEGO.md` §4, §7, §9 and §17, kept in `cards.yaml`, `kinds.yaml` and `stuck.yaml`.
 
 ### 8.2 Its system prompt, rebuilt every turn
 
@@ -488,6 +517,7 @@ Never an old instruction. Never old thinking: the newest models reject old think
 
 ```
  read_concept · read_file · search_repo        always
+ the kit's tools                               the tools the kind of work brings (kinds.yaml)
  write_journey                                 card E only: the journey of the task
 ```
 
@@ -519,13 +549,16 @@ The gates are in §16.
                                                               concept_progress
  record_difficulty      WRONG_IDEA, or a GAP about a concept  difficulties ·             almost (wrong idea)
                                                               concept_progress
- open_issue             a GAP that blocks · WANTS_TO_GO       issues · stack             found_a_gap, then
-                                                                                         went_to_learn_first
-                                                                                         or needed_first
- save_issue             a GAP that can wait · SIDE_QUESTION   issues                     saved_for_later
- back_one_step          BACK                                  issues · stack             cleared or
-                                                                                         already_knew, then
-                                                                                         came_back
+ add_to_waiting_room    every gap · SIDE_QUESTION · a new     issues: on hold, with      found_a_gap, or
+                        issue from WANTS_TO_GO                its priority               saved_for_later
+ pick_now               something changed: an issue cleared,  issues · stack             went_to_learn_first,
+                        a new issue named, or the learner                                needed_first or
+                        asks; LEGO.md §17.3                                              picked_up
+ put_on_hold            the learner switches away, or leaves  issues: on hold, with      put_on_hold
+                        an issue unfinished                   its note · stack
+ back_one_step          BACK                                  issues · stack; the        cleared or
+                                                              issues on hold inside it   already_knew, then
+                                                              move up                    came_back
  raise or reset stuck   every turn                            stuck_counters             —
  checkpoint             every turn                            checkpoints                —
  close_task             card E                                tasks · journeys ·         done
@@ -543,14 +576,14 @@ Every effect of a turn commits in one transaction, together with its story lines
 - **A concept is checked** when all of its boxes are ticked.
 - **It goes back to unchecked** when a WRONG_IDEA or a GAP about it comes after. A `had_it_then_missed` row then keeps the turn, the issue and the angle.
 - **times_it_came_up** grows on every turn that touches the concept: a leaf names it, the focus issue is linked to it, or one of its boxes is judged.
-- **The task is done** when the job box is ticked and every concept is checked.
+- **The task is done** when the job box is ticked, every concept is checked, and the waiting room is empty.
 - **Who reads it:** the tutor (always) and the orchestrator (every turn). The evaluator never does. The learner gets the view of §4.4: no difficulties, and no box text before the tick.
 
 ---
 
 ## 11. The stuck ladder
 
-- **A counter per focus** (the task, or an issue) counts the turns with no progress: no progress line, no box ticked, no met. A WRONG_IDEA counts as no progress.
+- **A counter per focus** (the task, or an issue) counts the turns with no progress: no progress line, no box ticked, no met. A WRONG_IDEA counts as no progress. An issue on hold keeps its count.
 - **Turns become a level:** 0–1 turns → level 0, 2 → level 1, 3 → level 2, 4 or more → level 3. The thresholds and each level's set of whys live in `stuck.yaml`.
 - **Any progress** resets the counter.
 - **At level 1 and up**, the tree grows the stuck branch with this level's whys. The orchestrator picks one, and code snaps that why's tutor piece.
@@ -570,7 +603,7 @@ Every effect of a turn commits in one transaction, together with its story lines
  last N turns                                the last N checkpoints
  since the focus opened                      every turn since the task or the issue opened
  every turn signed with one leaf             for example every STUCK turn
- every turn about an issue or a box          for example issue I1, or box 3
+ every turn about an issue or a box          for example issue 1, or box 3
 ```
 
 - **The evaluator's copy** holds only what the learner and the tutor said.
@@ -581,11 +614,11 @@ Every effect of a turn commits in one transaction, together with its story lines
 ## 13. Tasks: open, close, next
 
 - **Open, card A.** Code puts the task on the stack, creates a fresh sheet and writes "started"; the tutor speaks first, as turn 0.
-- **Close, card E.** Code writes "done". The tutor closes the task and writes the journey. Then:
+- **Close, card E.** Only when the job box is ticked, every concept is checked and the waiting room is empty. Every box ticked with issues still on hold: code picks them one by one first (`LEGO.md` §17.3). Code writes "done". The tutor closes the task and writes the journey. Then:
   - the sheet is kept as the task's record;
-  - each saved side question, and each concept gap with no concept in the bank, becomes a raw concept in the bank, labeled discovered (`LEGO.md` §10);
-  - the next task on the ladder opens with fresh agents.
-- **Saved issues stay open across tasks.** WANTS_TO_GO can pick a saved issue up in a later task; it then joins the stack of the current task.
+  - each side question, and each `concept` issue with no concept in the bank, becomes a raw concept in the bank, labeled discovered (`LEGO.md` §10);
+  - the next task on the ladder opens with fresh agents and an empty waiting room.
+- **Nothing passes to the next task.** For now, an issue can't be dropped.
 - **All tasks done:** `where` becomes empty, and the composer has nowhere to send.
 
 ---
@@ -700,12 +733,13 @@ Haiku 5.5 costs $0.10 per million input tokens and $0.50 per million output toke
  ────────────────────  ────────────────────────────────────────────────────────────  ────────────
  unit                  the tree → answer format, for every situation · the answer    none
                        checks · every effect · the task sheet rules · the stuck
-                       ladder · story lines · the words matcher · the gates · the
-                       answer key read by one function only
+                       ladder · story lines · names.py both ways · the waiting room:
+                       priority, what is now, switches, on hold, moving up, the
+                       close · the gates · the answer key read by one function only
  contract              the snapshot matches FRONTEND.md §7 field by field; a concept  none
                        box's text is null until ticked
- the T3 replay         scripted agents play the 11 turns of LEGO.md §8; the          scripted
-                       snapshot after each turn must equal the frontend's demo
+ the task 3 replay     scripted agents play the 12 turns of the task 3 scenario;     scripted
+                       the snapshot after each turn must equal the frontend's demo
                        data, lib/api/demo.ts
  failures              a broken answer → one retry → no change · the tutor fails →   scripted
                        only step 9 re-runs · stop mid-reply · a refusal · a restart
@@ -741,17 +775,17 @@ Haiku 5.5 costs $0.10 per million input tokens and $0.50 per million output toke
  ──────────────────  ──────────────────────────────────────────────────────  ─────────────────────────────────
  1  foundations      the migrations · the package · the config loader ·      the server starts; the config
                      auth · /health                                           check passes
- 2  the read side    snapshot, ladder, task and file routes, on a T3 seed     the frontend in live mode shows
-                     loaded into Postgres                                     T3 from the backend
- 3  the engine       where · checks · cards · the tree → format · the         unit tests green; the T3 replay
-                     answer checks · effects · sheet · stuck · story ·        passes with scripted leaves
-                     checkpoints · the piece texts
- 4  the agents       claude.py; orchestrator, evaluator and tutor with        the T3 replay passes end to end
-                     scripted models                                          with scripted agents
- 5  live turns       messages, stream and stop routes; resuming unfinished    the frontend plays T3 against the
-                     turns                                                    backend, agents scripted
- 6  real models      the Haiku 5.5 test call; then real agents on the T3      you read a real T3 session; the
-                     seed                                                     cost per turn is recorded
+ 2  the read side    snapshot, ladder, task and file routes, on a task 3      the frontend in live mode shows
+                     seed loaded into Postgres                                task 3 from the backend
+ 3  the engine       where · names · checks · cards · the tree → format ·     unit tests green; the task 3
+                     the answer checks · effects · the waiting room ·         replay passes with scripted
+                     sheet · stuck · story · checkpoints · the piece texts    leaves
+ 4  the agents       claude.py; orchestrator, evaluator and tutor with        the task 3 replay passes end to
+                     scripted models                                          end with scripted agents
+ 5  live turns       messages, stream and stop routes; resuming unfinished    the frontend plays task 3 against
+                     turns                                                    the backend, agents scripted
+ 6  real models      the Haiku 5.5 test call; then real agents on the task    you read a real task 3 session;
+                     3 seed                                                   the cost per turn is recorded
  7  preparing        the import route, the job, both crafters, the checks,    a small real repository prepares
                      the ordering, the preparing stream                       end to end
  8  ship             tutor_graph replaces tutor_v2 in the current Fly app;   you learn one task on your own
@@ -787,8 +821,11 @@ Haiku 5.5 costs $0.10 per million input tokens and $0.50 per million output toke
 ```
  1  restore the Supabase project now           yes: restored                          you, 2026-10-12
  2  how learners sign in                       a link by email only                   you, 2026-10-12
- 3  the proposals in §0 for LEGO.md's holes    one by one                             you, 2026-10-12
-                                               WAITING: each hole decided in turn
+ 3  LEGO.md's holes                            one by one: quotes removed · kinds     you, 2026-10-12
+                                               as names · full labels · the waiting
+                                               room (LEGO.md §17); holes 4, 13, 16,
+                                               18 and the tutor's new pieces are
+                                               still open (§0)
  4  where the new backend runs                 replaces tutor_v2 completely, in the   you, 2026-10-12
                                                current Fly app
 ```

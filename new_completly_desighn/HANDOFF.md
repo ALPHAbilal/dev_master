@@ -6,13 +6,15 @@ Updated 2026-10-12. Claude's memory stays on the laptop it was made on. This fil
 
 ```
  1  HANDOFF.md                  this file
- 2  LEGO.md                     the agentic layer, draft 0.19: pieces, plates, cards, the question
-                                tree, the task sheet, the stuck ladder, checkpoints
+ 2  LEGO.md                     the agentic layer, draft 0.20: pieces, plates, cards, the question
+                                tree, the task sheet, the stuck ladder, checkpoints, the waiting
+                                room (§17)
  3  BUILD_WITH_CLAUDE.md        every piece on the Claude API and the Agent SDK, checked
- 4  FRONTEND.md                 the learner's screen, draft 0.5: built; its contract is §7–§8
- 5  BACKEND_SPEC.md             the backend to build next, draft 0.2; its §22 lists the decisions
-                                waiting
- 6  t3-agent-walkthrough.html   task T3, turn by turn, for every agent
+ 4  FRONTEND.md                 the learner's screen, draft 0.6: built; its contract is §7–§8
+ 5  BACKEND_SPEC.md             the backend to build next, draft 0.3; its §0 lists what is still
+                                open
+ 6  t3-agent-walkthrough.html   task 3, turn by turn, for every agent; drawn from LEGO.md 0.19,
+                                so it still shows quotes and saved issues
                                 https://claude.ai/artifact/ETjegAK3D4uBfi8jkezNFv
  7  sidebar-variations.html     the three minimalist styles; Quiet (variation 1) was chosen
                                 https://claude.ai/artifact/U2LqzQA7FrtVQHErkJmZnX
@@ -22,16 +24,18 @@ Old designs are in `archive/` (see `archive/README.md`). Don't build from them.
 
 **To resume with Claude on the other laptop,** open Claude Code in `dev_master` and say:
 
-> Read `new_completly_desighn/HANDOFF.md`, then `BACKEND_SPEC.md`. We continue with the decisions in its §22, then build step 1.
+> Read `new_completly_desighn/HANDOFF.md`, then `LEGO.md` §16–§17 and `BACKEND_SPEC.md` §0. We close the open holes, then build step 1.
 
 ## 2. Where we are
 
 ```
- [x] the agentic layer designed                      LEGO.md 0.19
+ [x] the agentic layer designed                      LEGO.md 0.20
  [x] the Claude mapping checked                      BUILD_WITH_CLAUDE.md
- [x] the frontend rebuilt for the new design         agentic_tutor/frontend, demo mode
- [x] the backend spec written                        BACKEND_SPEC.md 0.2
- [~] the 4 decisions of BACKEND_SPEC.md §22         3 done; the holes, one by one
+ [x] the frontend rebuilt for the new design         agentic_tutor/frontend, demo mode, 0.6
+ [x] the backend spec written                        BACKEND_SPEC.md 0.3
+ [x] the 4 decisions of BACKEND_SPEC.md §22
+ [~] LEGO.md's holes, one by one                     open: holes 4, 13, 16, 18 and the tutor's
+                                                     new pieces
  [ ] build steps 1 to 9                              BACKEND_SPEC.md §20
 ```
 
@@ -46,7 +50,7 @@ Old designs are in `archive/` (see `archive/README.md`). Don't build from them.
  npm run build
 ```
 
-Demo mode plays task T3 from turn 6. Any message plays the next turn, and the fifth closes T3 and opens T4. Importing any `https://` address shows the preparing steps.
+Demo mode plays task 3 from turn 6. Any message plays the next turn. The fifth ticks the last box while an issue still waits, so that issue is picked up; the sixth clears it, which closes task 3 and opens task 4. Importing any `https://` address shows the preparing steps.
 
 ## 4. Infrastructure
 
@@ -67,8 +71,9 @@ Demo mode plays task T3 from turn 6. Any message plays the next turn, and the fi
 ## 5. The rules the user set
 
 ```
- naming       no abbreviations; in documents, every ID with its name: task T3, issue I1,
-              concept 15, box 2
+ naming       no abbreviations; every ID written in full: task 3, issue 1, concept 15,
+              box 2, never T3, I1 or C15; a model reads and writes full labels (word +
+              number + name), made by engine/names.py only
  screen       no numbering on the learner's screen (the brand rule); no helper sentences or
               descriptive labels: the design says it
  style        Quiet, minimalist: flat and still; no colored edge bars; no glow, pulse, shimmer,
@@ -83,14 +88,27 @@ Demo mode plays task T3 from turn 6. Any message plays the next turn, and the fi
               inside diagrams; draw only what really exists
  choosing     show options as variations side by side, so the user picks
  teaching     the answer is never given; the answer key stays locked
+ git          Claude commits; the user pushes, from Windows PowerShell
 ```
 
-## 6. Decisions (BACKEND_SPEC.md §22)
+## 6. Decisions (BACKEND_SPEC.md §22 and LEGO.md §16)
 
 ```
  1  restore the Supabase project now               done
  2  how learners sign in                           a link by email only
- 3  the 9 proposals for LEGO.md's holes (§0)       WAITING: decided one by one
+ 3  LEGO.md's holes                                one by one; see below
  4  where the new backend runs                     replaces tutor_v2 completely, in the
                                                    current Fly app
+```
+
+Decided on 2026-10-12, in LEGO.md 0.20:
+
+```
+ quotes          removed everywhere: the evaluator answers met | not met | unclear only
+ kinds of work   names, not numbers: "kind_of_work": "debugging"
+ labels          word + number + name; engine/names.py makes every one
+ waiting room    LEGO.md §17: every need is an issue, ordered by priority 1 to 5; the
+                 learner wins a switch; nothing is lost; the task closes only when the
+                 waiting room is empty; on screen, the task panel's Issues group
+ still open      holes 4, 13, 16, 18 · the tutor's new pieces: now or during the build
 ```

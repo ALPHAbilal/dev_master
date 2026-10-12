@@ -2,6 +2,8 @@
 // Page 1 of the backend spec: new_completly_desighn/FRONTEND.md §7.
 export type Id = string;
 
+// IDs are written in full, never shortened: "task-3", "issue-1".
+
 // One learner + one imported repository.
 export interface Workspace {
   id: Id;
@@ -24,22 +26,23 @@ export interface Snapshot {
 // One task of the ladder, with everything the sidebar shows under it.
 export interface LadderTask {
   id: Id;
-  number: number; // task T3
+  number: number; // task 3
   title: string; // guests always get the generic error
   goal: string;
   tier: string; // the task crafter's tier, such as "debug"
   files: string[];
   status: "done" | "current" | "later";
   sheet: TaskSheet;
-  issues: LadderIssue[]; // in the order they opened
+  issues: LadderIssue[]; // the waiting room, in priority order: the server orders it
 }
 
 export interface LadderIssue {
   id: Id;
-  number: number; // issue I1
+  number: number; // issue 1
   title: string;
   parent_issue_id: Id | null; // null = right under the task
-  status: "open" | "saved" | "cleared" | "already_knew";
+  // now: the focus · on_hold: waiting, or paused with a note · cleared, already_knew: done
+  status: "now" | "on_hold" | "cleared" | "already_knew";
 }
 
 // Where the learner is now.
@@ -87,6 +90,8 @@ export type StoryKind =
   | "went_to_learn_first"
   | "needed_first"
   | "saved_for_later"
+  | "put_on_hold"
+  | "picked_up"
   | "cleared"
   | "already_knew"
   | "came_back"

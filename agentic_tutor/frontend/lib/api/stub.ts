@@ -1,9 +1,9 @@
-// Demo mode: the same contract as live.ts, in memory, playing the T3 scenario.
+// Demo mode: the same contract as live.ts, in memory, playing the task 3 scenario.
 import {
   FILES,
   HISTORY,
-  T3_START,
-  T3_STEPS,
+  TASK_3_START,
+  TASK_3_STEPS,
   TASKS,
   WORKSPACE_NAME,
   type CraftedTask,
@@ -132,9 +132,9 @@ export function createStubApi(options: { delay?: number } = {}): Api {
   function apply(s: State, task_id: string, turn: number, step: Step) {
     for (const box of step.ticks ?? []) s.ticks[task_id][box] = turn;
     if (step.open_issue) s.issues[task_id].push({ ...step.open_issue });
-    if (step.issue_status) {
-      const issue = s.issues[task_id].find((i) => i.id === step.issue_status![0]);
-      if (issue) issue.status = step.issue_status[1];
+    for (const [id, status] of step.issue_status ?? []) {
+      const issue = s.issues[task_id].find((i) => i.id === id);
+      if (issue) issue.status = status;
     }
     for (const value of step.story) line(s, task_id, turn, value);
     if (step.where) s.where = { task_id, ...step.where, tutor: "waiting_for_you" };
@@ -190,8 +190,8 @@ export function createStubApi(options: { delay?: number } = {}): Api {
   {
     const demo = fresh("demo", WORKSPACE_NAME, "ready");
     for (const past of HISTORY) replay(demo, crafted(past.task_id), past.steps);
-    replay(demo, crafted("T3"), T3_STEPS.slice(0, T3_START));
-    demo.script = T3_STEPS.slice(T3_START);
+    replay(demo, crafted("task-3"), TASK_3_STEPS.slice(0, TASK_3_START));
+    demo.script = TASK_3_STEPS.slice(TASK_3_START);
   }
 
   return {
