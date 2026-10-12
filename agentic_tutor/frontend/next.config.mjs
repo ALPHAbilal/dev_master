@@ -4,5 +4,6 @@ const transport = process.env.NEXT_PUBLIC_TRANSPORT || "stub";
 if (!["stub", "live"].includes(transport))
   throw new Error("NEXT_PUBLIC_TRANSPORT must be live or stub");
 /** @type {import('next').NextConfig} */
-const config = { agentRules: false };
+// The development badge sits on top of the sidebar rail's expand button.
+const config = { agentRules: false, devIndicators: false };
 export default config;

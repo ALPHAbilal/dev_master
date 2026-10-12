@@ -1,10 +1,9 @@
 "use client";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTutor } from "@/lib/session";
-import type { Id, Message, Ref } from "@/lib/api/types";
+import type { Attachment, Id, Message } from "@/lib/api/types";
 import Icon from "./Icon";
 import { RefChip, RefList } from "./Refs";
-import { payload } from "./Map";
 function autosize(el: HTMLTextAreaElement) {
   el.style.height = "auto";
   el.style.height = el.scrollHeight + "px";
@@ -51,7 +50,7 @@ function Code({ code, lang }: { code: string; lang: string }) {
                 <span className="src">
                   {(line || " ")
                     .split(
-                      /("[^"\n]*"|'[^'\n]*'|#.*$|\b(?:def|return|for|if|not|in|and|or|else|None|True|False)\b)/g,
+                      /("[^"\n]*"|'[^'\n]*'|#.*$|\b(?:def|return|for|if|not|in|and|or|else|None|True|False|pass)\b)/g,
                     )
                     .map((token, index) => (
                       <span
@@ -61,7 +60,7 @@ function Code({ code, lang }: { code: string; lang: string }) {
                             ? "c"
                             : /^["']/.test(token)
                               ? "s"
-                              : /^(def|return|for|if|not|in|and|or|else|None|True|False)$/.test(
+                              : /^(def|return|for|if|not|in|and|or|else|None|True|False|pass)$/.test(
                                     token,
                                   )
                                 ? "k"
@@ -81,7 +80,7 @@ function Code({ code, lang }: { code: string; lang: string }) {
   );
 }
 function MessageBody({ message }: { message: Message }) {
-  const pieces = message.content.split(/(```[^\n]*\n[\s\S]*?```)/g);
+  const pieces = message.text.split(/(```[^\n]*\n[\s\S]*?```)/g);
   return (
     <>
       {pieces.map((part, i) =>
@@ -91,365 +90,244 @@ function MessageBody({ message }: { message: Message }) {
             lang={part.slice(3, part.indexOf("\n")) || "py"}
             code={part.slice(part.indexOf("\n") + 1, -3).replace(/\n$/, "")}
           />
-        ) : (
+        ) : part.trim() ? (
           <div className="say" key={i}>
-            <Text content={part} />
+            <Text content={part.trim()} />
           </div>
-        ),
+        ) : null,
       )}
-      <RefList refs={message.refs || []} />
+      <RefList refs={message.attachments || []} />
     </>
   );
 }
-function AsideThread({ id, expanded }: { id: string; expanded: boolean }) {
-  const tutor = useTutor(),
-    thread = tutor.snapshot?.aside_threads.find((t) => t.id === id);
-  const [closed, setClosed] = useState(!expanded),
-    [question, setQuestion] = useState("");
-  const request = useRef<string | null>(null);
-  useEffect(() => {
-    if (expanded) {
-      setClosed(false);
-      const timer = setTimeout(
-        () =>
-          document
-            .getElementById(`aside-${id}`)
-            ?.scrollIntoView({ block: "center" }),
-        0,
-      );
-      return () => clearTimeout(timer);
-    }
-  }, [expanded, id]);
-  async function send() {
-    if (!question.trim() || tutor.busy) return;
-    request.current ||= crypto.randomUUID();
-    const ack = await tutor.aside(question.trim(), [], request.current, id);
-    if (ack) {
-      request.current = null;
-      setQuestion("");
-    }
-  }
-  return (
-    <div
-      className={"aside" + (closed ? " collapsed" : "")}
-      id={`aside-${id}`}
-      data-id={id}
-    >
-      <div className="aside-eyebrow">aside</div>
-      <div className="aside-cell">
-        <button
-          className="aside-head"
-          aria-expanded={!closed}
-          onClick={() => setClosed(!closed)}
-        >
-          <span className="ah-title">{thread?.title || "Side question"}</span>
-          <span className="ah-caret">{closed ? "+" : "−"}</span>
-        </button>
-        <div className="aside-body" inert={closed}>
-          <div className="aside-inner">
-            <div className="aside-pad">
-              {tutor.snapshot?.conversation
-                .filter((m) => m.thread_id === id)
-                .map((m) => (
-                  <div
-                    className={"aside-qa " + m.role}
-                    key={m.id}
-                    data-message-id={m.id}
-                  >
-                    <MessageBody message={m} />
-                  </div>
-                ))}
-              {Object.values(tutor.tokens)
-                .filter((t) => t.thread_id === id)
-                .map((t) => (
-                  <div className="aside-qa tutor" key={t.turn_id}>
-                    <span className="say">{t.text}</span>
-                  </div>
-                ))}
-              <div className="aside-ask">
-                <textarea
-                  rows={1}
-                  placeholder="Ask a follow-up…"
-                  value={question}
-                  onChange={(e) => {
-                    setQuestion(e.target.value);
-                    request.current = null;
-                    autosize(e.target);
-                  }}
-                  onKeyDown={(e) => {
-                    if (
-                      e.key === "Enter" &&
-                      !e.shiftKey &&
-                      !e.nativeEvent.isComposing
-                    ) {
-                      e.preventDefault();
-                      void send();
-                    }
-                  }}
-                />
-                <button
-                  className="send"
-                  title="Ask"
-                  disabled={tutor.busy || !question.trim()}
-                  onClick={() => void send()}
-                >
-                  <Icon name="arrow" size={13} />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+// A turn to show: set when the learner clicks a story line or a ticked box.
+export interface Target {
+  task_id: Id;
+  turn: number;
+  at: number;
 }
 export default function Conversation({
-  refs,
-  setRefs,
-  expanded,
-  openAside,
+  visible,
+  target,
+  attachments,
+  setAttachments,
   attach,
 }: {
-  refs: Ref[];
-  setRefs(refs: Ref[]): void;
-  expanded: string | null;
-  openAside(id: string): void;
-  attach(ref: Ref, x: number, y: number): void;
+  visible: boolean;
+  target: Target | null;
+  attachments: Attachment[];
+  setAttachments(attachments: Attachment[]): void;
+  attach(attachment: Attachment, x: number, y: number): void;
 }) {
   const tutor = useTutor(),
-    [mode, setMode] = useState<"answer" | "aside">("answer"),
+    snapshot = tutor.snapshot,
     [text, setText] = useState("");
   const request = useRef<string | null>(null),
     input = useRef<HTMLTextAreaElement>(null),
     end = useRef<HTMLDivElement>(null),
     previousCount = useRef(0);
-  const count = tutor.snapshot?.conversation.length || 0;
+  const messages = snapshot?.conversation || [];
+  const pending = Object.values(tutor.live).filter(
+    (l) =>
+      !messages.some(
+        (m) => m.role === "tutor" && m.task_id === l.task_id && m.turn === l.turn,
+      ),
+  );
+  const count = messages.length + pending.reduce((n, l) => n + l.text.length, 0);
   useEffect(() => {
     if (previousCount.current && count > previousCount.current)
       end.current?.scrollIntoView({ block: "end", behavior: "smooth" });
     previousCount.current = count;
   }, [count]);
-  useEffect(() => {
-    if (refs.length) input.current?.focus();
-  }, [refs.length]);
-  async function send() {
-    if ((!text.trim() && !refs.length) || tutor.busy) return;
-    let success: unknown;
-    if (mode === "aside") {
-      request.current ||= crypto.randomUUID();
-      const origin = refs.find((r) => r.kind === "convo");
-      const ack = await tutor.aside(
-        text.trim(),
-        refs,
-        request.current,
-        undefined,
-        origin?.kind === "convo" ? origin.source.message_id : undefined,
+  // On show: the clicked turn, flashed; otherwise the latest message.
+  const shown = messages.length > 0;
+  useLayoutEffect(() => {
+    if (!visible || !shown) return;
+    const turn =
+      target &&
+      document.querySelector<HTMLElement>(
+        `#convo [data-task="${CSS.escape(target.task_id)}"][data-turn="${target.turn}"]`,
       );
-      if (ack) {
-        openAside(ack.thread_id);
-        success = ack;
-      }
-    } else success = await tutor.answer(text.trim(), refs);
-    if (success) {
-      setText("");
-      setRefs([]);
+    if (!turn) {
+      end.current?.scrollIntoView({ block: "end" });
+      return;
+    }
+    turn.scrollIntoView({ block: "center" });
+    document
+      .querySelectorAll("#convo .turn.target")
+      .forEach((t) => t !== turn && t.classList.remove("target"));
+    turn.classList.add("target");
+  }, [visible, target, shown]);
+  useEffect(() => {
+    if (attachments.length) input.current?.focus();
+  }, [attachments.length]);
+  async function send() {
+    if ((!text.trim() && !attachments.length) || tutor.busy || answering) return;
+    request.current ||= crypto.randomUUID();
+    // The box empties at once; if the message can't be sent, it comes back.
+    const sent = { text, attachments, id: request.current };
+    setText("");
+    setAttachments([]);
+    if (input.current) {
+      input.current.value = "";
+      autosize(input.current);
+    }
+    if (await tutor.send(sent.text.trim(), sent.attachments, sent.id))
       request.current = null;
-      if (input.current) {
-        input.current.value = "";
-        autosize(input.current);
-      }
+    else {
+      setText(sent.text);
+      setAttachments(sent.attachments);
     }
   }
   function selection(event: React.MouseEvent) {
-    const selection = window.getSelection(),
-      snippet = selection?.toString();
-    if (!selection || !snippet?.trim()) return;
+    const selected = window.getSelection(),
+      snippet = selected?.toString();
+    if (!selected || !snippet?.trim()) return;
     const element =
-      selection.anchorNode?.parentElement?.closest<HTMLElement>(
+      selected.anchorNode?.parentElement?.closest<HTMLElement>(
         "[data-message-id]",
       );
     const focus =
-      selection.focusNode?.parentElement?.closest<HTMLElement>(
+      selected.focusNode?.parentElement?.closest<HTMLElement>(
         "[data-message-id]",
       );
     if (!element || focus !== element) return;
-    const message = tutor.snapshot?.conversation.find(
+    const message = messages.find(
       (m) => String(m.id) === element.dataset.messageId,
     );
-    if (!message || !message.content.includes(snippet)) return;
+    if (!message || !message.text.includes(snippet)) return;
     attach(
       {
-        kind: "convo",
+        kind: "conversation",
         label: "conversation",
-        snippet,
+        text: snippet,
         source: { message_id: message.id },
       },
       event.clientX,
       event.clientY,
     );
   }
-  const seen = new Set<string>();
+  const title = (task_id: string) => {
+    const task = snapshot?.ladder.find((t) => t.id === task_id);
+    return task ? task.title : "";
+  };
+  const answering = snapshot?.where?.tutor === "answering";
   return (
     <>
       <div className="convo-scroll">
         <div className="convo-inner" id="convo" onMouseUp={selection}>
-          {tutor.snapshot?.conversation
-            .slice()
-            .sort((a, b) => a.sequence - b.sequence)
-            .map((message) => {
-              if (message.thread_kind === "aside" && message.thread_id) {
-                if (seen.has(message.thread_id)) return null;
-                seen.add(message.thread_id);
-                return (
-                  <AsideThread
-                    key={"aside-" + message.thread_id}
-                    id={message.thread_id}
-                    expanded={expanded === message.thread_id}
-                  />
-                );
-              }
-              const grades =
-                message.role === "learner"
-                  ? tutor.snapshot?.lifecycle.filter(
-                      (event) =>
-                        event.event_type === "answer_evaluated" &&
-                        payload(event).turn_id === message.turn_id,
-                    ) || []
-                  : [];
-              return (
-                <Fragment key={message.id}>
-                  <div
-                    className={"turn " + message.role}
-                    data-message-id={message.id}
-                  >
-                    <MessageBody message={message} />
+          {messages.map((message, i) => {
+            const ticks =
+              message.role === "learner"
+                ? snapshot?.story.filter(
+                    (l) =>
+                      l.kind === "ticked" &&
+                      l.task_id === message.task_id &&
+                      l.turn === message.turn,
+                  ) || []
+                : [];
+            return (
+              <Fragment key={message.id}>
+                {messages[i - 1]?.task_id !== message.task_id && (
+                  <div className="task-divider">
+                    <span>{title(message.task_id)}</span>
                   </div>
-                  {grades.map((event) => {
-                    const data = payload(event);
-                    return (
-                      <div className="feedback" key={event.id}>
-                        <div className="fb-top">
-                          <span className={"verdict " + String(data.verdict)}>
-                            {String(data.verdict)}
-                          </span>
-                          <span className="cat">
-                            {String(data.category || "")}
-                          </span>
-                          <span className="agent">JUDGE</span>
-                        </div>
-                        <div className="fb-body">
-                          {String(
-                            data.text ||
-                              tutor.snapshot?.axis_wording[event.axis || ""] ||
-                              "",
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </Fragment>
-              );
-            })}
-          {tutor.snapshot?.aside_threads
-            .filter((t) => !seen.has(t.id))
-            .map((t) => (
-              <AsideThread key={t.id} id={t.id} expanded={expanded === t.id} />
-            ))}
-          {[...(tutor.snapshot?.tool_calls || []), ...tutor.tools]
-            .filter((t) =>
-              ["read_code_slice", "read_workspace"].includes(t.capability),
-            )
-            .map((t, i) => (
-              <div className="agent-run" key={`${t.turn_id}-${i}`}>
-                <div className="ar-head">
-                  {t.agent}
-                  <span className="dot">·</span>
-                  {t.step}
+                )}
+                <div
+                  className={"turn " + message.role}
+                  data-message-id={message.id}
+                  data-task={message.task_id}
+                  data-turn={message.turn}
+                >
+                  <MessageBody message={message} />
                 </div>
-                <div className="tool">
-                  <span className="tname">{t.capability}</span>
+                {ticks.map((l) => (
+                  <div className="tick-note" key={l.id}>
+                    ☑ {l.text}
+                  </div>
+                ))}
+              </Fragment>
+            );
+          })}
+          {pending.map((l) => (
+            <Fragment key={`${l.task_id}:${l.turn}`}>
+              {l.tools.length > 0 && (
+                <div className="agent-run">
+                  {l.tools.map((doing, i) => (
+                    <div className="tool" key={i}>
+                      <span className="tname">{doing}</span>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            ))}
-          {Object.values(tutor.tokens)
-            .filter((t) => !t.thread_id || !seen.has(t.thread_id))
-            .map((t) => (
-              <div
-                className={t.thread_id ? "aside-qa tutor" : "turn tutor"}
-                key={t.turn_id + t.thread_id}
-              >
-                <div className="say">{t.text}</div>
-              </div>
-            ))}
+              )}
+              {l.text && (
+                <div className="turn tutor">
+                  <div className="say">{l.text}</div>
+                </div>
+              )}
+            </Fragment>
+          ))}
           <div ref={end} />
         </div>
       </div>
       <div className="chatbar-wrap">
-        <div className="composer" id="composer" data-mode={mode}>
-          <div className="ref-tray" id="refTray">
-            {refs.map((ref, i) => (
-              <RefChip
-                key={i}
-                value={ref}
-                remove={() => setRefs(refs.filter((_, index) => i !== index))}
-              />
-            ))}
-          </div>
-          <textarea
-            ref={input}
-            className="chat-input"
-            rows={1}
-            placeholder={mode === "answer" ? "Answer…" : "Side question…"}
-            value={text}
-            onChange={(e) => {
-              setText(e.target.value);
-              request.current = null;
-              autosize(e.target);
-            }}
-            onKeyDown={(e) => {
-              if (
-                e.key === "Enter" &&
-                !e.shiftKey &&
-                !e.nativeEvent.isComposing
-              ) {
-                e.preventDefault();
-                void send();
-              }
-            }}
-          />
-          <div className="composer-bar">
-            <div
-              className="mode-switch"
-              id="modeSwitch"
-              role="tablist"
-              aria-label="Message mode"
-            >
-              {(["answer", "aside"] as const).map((value) => (
-                <button
-                  key={value}
-                  className={"ms-opt" + (mode === value ? " on" : "")}
-                  role="tab"
-                  aria-selected={mode === value}
-                  onClick={() => {
-                    setMode(value);
-                    input.current?.focus();
-                  }}
-                >
-                  {value === "answer" ? "Answer" : "Side question"}
-                </button>
+        <div className="composer" id="composer">
+          {attachments.length > 0 && (
+            <div className="ref-tray" id="refTray">
+              {attachments.map((attachment, i) => (
+                <RefChip
+                  key={i}
+                  value={attachment}
+                  remove={() =>
+                    setAttachments(attachments.filter((_, index) => i !== index))
+                  }
+                />
               ))}
             </div>
-            <button
-              className="chat-send"
-              id="chatSend"
-              title="Send"
-              disabled={
-                tutor.busy || (!text.trim() && !refs.length) || !tutor.driver
-              }
-              onClick={() => void send()}
-            >
-              <Icon name="send" size={16} />
-            </button>
+          )}
+          <div className="composer-row">
+            <textarea
+              ref={input}
+              className="chat-input"
+              rows={1}
+              placeholder="Answer…"
+              value={text}
+              onChange={(e) => {
+                setText(e.target.value);
+                request.current = null;
+                autosize(e.target);
+              }}
+              onKeyDown={(e) => {
+                if (
+                  e.key === "Enter" &&
+                  !e.shiftKey &&
+                  !e.nativeEvent.isComposing
+                ) {
+                  e.preventDefault();
+                  void send();
+                }
+              }}
+            />
+            {answering || tutor.busy ? (
+              <button
+                className="chat-send stop"
+                id="chatSend"
+                aria-label="Stop"
+                onClick={() => void tutor.stop()}
+              >
+                <span className="sq" />
+              </button>
+            ) : (
+              <button
+                className="chat-send"
+                id="chatSend"
+                aria-label="Send"
+                disabled={(!text.trim() && !attachments.length) || !snapshot?.where}
+                onClick={() => void send()}
+              >
+                <Icon name="send" size={16} />
+              </button>
+            )}
           </div>
         </div>
       </div>

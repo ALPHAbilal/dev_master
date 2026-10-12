@@ -1,0 +1,586 @@
+<title>T3 Agent Walkthrough</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Light only, by the user's choice. Layout: a step bar on top; left column = what the learner sees, right column = what happens behind the turn. */
+:root {
+  --bg: #eef0f3;
+  --surface: #ffffff;
+  --ink: #1b2129;
+  --muted: #5a6472;
+  --line: #d6dbe2;
+  --code: #4a5361;      --code-bg: #e9ecf0;
+  --orch: #2a4fc9;      --orch-bg: #e6ecfb;
+  --eval: #9a5a00;      --eval-bg: #f9eedd;
+  --tutor: #1c7449;     --tutor-bg: #e2f2e9;
+  --mark: #fff0a8;
+  --open: #a34f00;      --open-bg: #fff6e8;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1320px; margin: 0 auto; padding-inline: clamp(16px, 3vw, 32px); padding-block: 24px 48px; display: grid; gap: 20px; }
+header { display: grid; gap: 6px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+h1 { font-size: clamp(22px, 3vw, 30px); line-height: 1.2; margin: 0; font-weight: 600; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 72ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.tag { font-family: var(--font-mono); font-size: 11.5px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
+.tag.code { color: var(--code); background: var(--code-bg); }
+.tag.orchestrator { color: var(--orch); background: var(--orch-bg); }
+.tag.evaluator { color: var(--eval); background: var(--eval-bg); }
+.tag.tutor { color: var(--tutor); background: var(--tutor-bg); }
+.tag.learner { color: var(--ink); background: var(--surface); border: 1px solid var(--line); }
+.stepbar { display: grid; gap: 10px; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.nav { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 14px; font-weight: 500; }
+.nav:disabled { opacity: 0.4; cursor: default; }
+.nav:focus-visible, .chip:focus-visible { outline: 2px solid var(--orch); outline-offset: 2px; }
+.where { font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; list-style: none; margin: 0; padding-left: 0; }
+.chip { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 13px; white-space: nowrap; }
+.chip[aria-current="step"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.chip .n { font-family: var(--font-mono); margin-right: 6px; opacity: 0.7; }
+.cols { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px; align-items: start; }
+@media (max-width: 920px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 14px; min-width: 0; }
+.panel h2 { font-size: 13px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0; font-weight: 500; }
+.panel h3 { font-size: 14px; margin: 0; font-weight: 600; }
+.chat { display: grid; gap: 10px; max-height: 460px; overflow-y: auto; padding-right: 4px; }
+.msg { border-radius: 8px; padding: 10px 12px; display: grid; gap: 4px; min-width: 0; }
+.msg .who { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); }
+.msg.learner { background: var(--bg); justify-self: end; max-width: 92%; }
+.msg.tutor { background: var(--tutor-bg); max-width: 92%; }
+.msg.old { opacity: 0.55; }
+.msg p { margin: 0; overflow-wrap: anywhere; }
+code { font-family: var(--font-mono); font-size: 0.92em; background: var(--code-bg); padding: 0 4px; border-radius: 3px; }
+.sheet { display: grid; gap: 8px; font-size: 14px; }
+.group { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+.concept { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; font-weight: 500; }
+.status { font-family: var(--font-mono); font-size: 12px; font-weight: 500; padding: 0 6px; border-radius: 4px; }
+.status.yes { color: var(--tutor); background: var(--tutor-bg); }
+.status.no { color: var(--muted); background: var(--code-bg); }
+.box { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 1px 4px; border-radius: 4px; }
+.box.child { margin-left: 18px; }
+.box.fresh { background: var(--mark); }
+.box .when { font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.diff { margin-left: 40px; font-size: 13px; color: var(--muted); }
+.diff.fresh { background: var(--mark); border-radius: 4px; padding: 0 4px; }
+.story { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
+.story li { padding: 2px 6px; border-radius: 4px; }
+.story li.fresh { background: var(--mark); }
+.story li.indent1 { margin-left: 18px; }
+.story li.indent2 { margin-left: 36px; }
+.state { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13.5px; }
+.state div { display: grid; }
+.state .k { font-family: var(--font-mono); font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.state .v { font-weight: 500; font-variant-numeric: tabular-nums; }
+.stages { list-style: none; margin: 0; padding: 0; display: grid; }
+.stage { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; position: relative; padding-bottom: 14px; }
+.stage::before { content: ""; position: absolute; left: 13px; top: 26px; bottom: 0; width: 2px; background: var(--line); }
+.stage:last-child::before { display: none; }
+.dot { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-mono); font-size: 12px; font-weight: 500; }
+.stage.code .dot { background: var(--code-bg); color: var(--code); }
+.stage.orchestrator .dot { background: var(--orch-bg); color: var(--orch); }
+.stage.evaluator .dot { background: var(--eval-bg); color: var(--eval); }
+.stage.tutor .dot { background: var(--tutor-bg); color: var(--tutor); }
+.body { display: grid; gap: 6px; min-width: 0; }
+.head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.head .t { font-weight: 600; font-size: 14.5px; }
+.rows { display: grid; gap: 3px; margin: 0; }
+.rows div { display: grid; grid-template-columns: minmax(110px, 160px) minmax(0, 1fr); gap: 10px; font-size: 13.5px; }
+@media (max-width: 520px) { .rows div { grid-template-columns: minmax(0, 1fr); gap: 0; } }
+.rows dt { color: var(--muted); }
+.rows dd { margin: 0; overflow-wrap: anywhere; }
+.path { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
+.path .q { border: 1px solid var(--orch); color: var(--orch); border-radius: 4px; padding: 1px 7px; }
+.path .a { font-weight: 600; }
+.path .leaf { background: var(--orch); color: var(--surface); border-radius: 4px; padding: 1px 8px; font-family: var(--font-mono); font-size: 12.5px; }
+.path .arrow { color: var(--muted); }
+pre { margin: 0; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.45; background: var(--code-bg); color: var(--ink); border-radius: 6px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+pre .chg { background: var(--mark); display: inline-block; min-width: 100%; }
+.note { font-size: 13.5px; border: 1px dashed var(--line); border-radius: 6px; padding: 8px 10px; color: var(--muted); }
+.reply { background: var(--tutor-bg); border-radius: 6px; padding: 8px 10px; font-size: 13.5px; }
+.sheetcap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; align-items: baseline; }
+.sheetcap span { font-size: 12.5px; color: var(--muted); }
+.openlist { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
+@media (prefers-reduced-motion: no-preference) { .stage { animation: rise 0.25s ease both; } }
+@keyframes rise { from { transform: translateY(4px); } to { transform: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Hypothetical scenario · task T3 · LEGO design, draft 0.19</div>
+    <h1>T3 agent walkthrough</h1>
+    <p class="lede">Task T3: as a guest, the chatbot always answers "Une erreur s'est produite". Step through the turns: the left side is what the learner sees, the right side is everything that happens behind that turn, in order. Three agents (orchestrator, evaluator, tutor); code writes everything else.</p>
+    <div class="legend" aria-label="Who acts">
+      <span class="tag learner">learner</span>
+      <span class="tag code">code</span>
+      <span class="tag orchestrator">orchestrator</span>
+      <span class="tag evaluator">evaluator</span>
+      <span class="tag tutor">tutor</span>
+    </div>
+  </header>
+
+  <section class="stepbar" aria-label="Turns">
+    <div class="controls">
+      <button class="nav" id="prev" type="button">◀ Previous</button>
+      <button class="nav" id="next" type="button">Next ▶</button>
+      <span class="where" id="where" aria-live="polite"></span>
+    </div>
+    <ol class="chips" id="chips"></ol>
+  </section>
+
+  <div class="cols">
+    <section class="panel" aria-label="What the learner sees">
+      <h2>What the learner sees</h2>
+      <div class="chat" id="chat"></div>
+      <h3>Task sheet of task T3</h3>
+      <div class="sheet" id="sheetview"></div>
+      <h3>Story map</h3>
+      <ul class="story" id="story"></ul>
+    </section>
+
+    <section class="panel" aria-label="Behind the scenes">
+      <h2>Behind this turn</h2>
+      <div class="state" id="state"></div>
+      <ol class="stages" id="stages"></ol>
+      <div id="extra" style="display:grid;gap:10px"></div>
+      <div class="sheetcap"><h3>What the tutor receives this turn</h3><span>the system prompt is rebuilt every turn · the history keeps everything said and done · old thinking is not sent back</span></div>
+      <pre id="tutorview"></pre>
+      <div class="sheetcap"><h3>Task sheet (JSON)</h3><span>written by code only · highlighted = changed this turn · read by the tutor (always) and the orchestrator (every turn)</span></div>
+      <pre id="sheet"></pre>
+    </section>
+  </div>
+
+  <footer class="panel" aria-label="Open points">
+    <h2>Open points this scenario still runs into</h2>
+    <ol class="openlist">
+      <li><b>A box explained inside an issue waits a turn.</b> The learner explains box 3 inside issue I1 on turn 7; it is ticked on turn 8, when the orchestrator points the evaluator back to turn 7.</li>
+      <li><b>The job box rests on what the learner pastes.</b> No code runs on the server, so on turn 9 the proof that the fix works is the learner's own report and pasted output. Is that enough?</li>
+      <li><b>The kind flips from turn to turn</b> (7, 7, 3, 3, 2, 2, 3, 5, 9), and the tutor's piece flips with it.</li>
+    </ol>
+  </footer>
+</div>
+
+<script>
+const NAMES = {
+  C17: "C17 · a broad except hides the real error",
+  C15: "C15 · loop variables outlive the loop",
+  C13: "C13 · OpenAI tool calling"
+};
+const JOB = { id: "box 1", text: "the fix works: a guest gets a real answer" };
+const BOXES = {
+  C17: [{ id: "box 2", text: "finds the real error behind the generic message" }],
+  C15: [{ id: "box 3", text: "explains why label is unbound for a guest" }],
+  C13: [{ id: "box 4", text: "explains what the label decides in the request" }]
+};
+const ORDER = ["C17", "C15", "C13"];
+const D4 = { turn: 4, what_went_wrong: "expected label to have a value after a loop that never ran", learner_words: "None? In JS it would be undefined." };
+const c = (checked, times, difficulties = []) => ({ checked, times_it_came_up: times, difficulties, had_it_then_missed: [] });
+const ALL0 = { C17: c(false, 0), C15: c(false, 0), C13: c(false, 0) };
+
+const STEPS = [
+{ short: "Task opens", card: "A · open task", stack: "T3", noProgress: 0,
+  learner: null,
+  tutor: "Here's your task: as a guest, the chatbot always answers \"Une erreur s'est produite\". The goal: guests get a real answer. Your task sheet shows what you'll prove along the way. Where would you start?",
+  stages: [
+    { a: "code", t: "Opens the task", rows: [
+      ["reads", "the ladder: the next task is T3 · guests always get the generic error"],
+      ["does", "stack = T3 · a fresh task sheet: the job box (box 1), then C17, C15 and C13, each with its box; nothing ticked, nothing checked"],
+      ["story line", "• Started T3"] ] },
+    { a: "tutor", t: "Introduces the task", rows: [
+      ["instructions", "tutor.base · introduce_task · keep_goal_in_view"],
+      ["facts", "task_goal · task_sheet"],
+      ["no orchestrator", "there is no learner message yet, so there is nothing to judge"] ], reply: true }
+  ],
+  concepts: ALL0, ticks: [], changed: ["job", "C17", "C15", "C13"],
+  story: [["• Started T3 · guests always get the generic error", 0]] },
+
+{ short: "Reproduced", card: "B · on the task", stack: "T3", noProgress: 0,
+  learner: "Reproduced it. Same message every time as a guest. Where does this message even come from?",
+  tutor: "Good, you can see it yourself. Now search the code for the exact text of that message. Which file and line does it come from?",
+  stages: [
+    { a: "code", t: "Picks the card", rows: [
+      ["reads the graph", "the stack holds only the task → card B · on the task"],
+      ["orchestrator's plate", "orchestrator.base · orchestrator.on_task · task_goal · task_sheet · next_box = box 2 · tools, with evaluate for unticked boxes"] ] },
+    { a: "orchestrator", t: "Walks its question tree", rows: [
+      ["no evaluator call", "no box asks for reproducing the bug: it is a step, not a proof"] ],
+      path: [{ q: "Question 1 · what does the message show?", a: "progress" }, { leaf: "ON_TRACK · kind 7 · debugging" }],
+      json: { shows: "progress", kind: 7, progress: [{ did: "reproduced the bug as a guest", turn: 1 }] } },
+    { a: "code", t: "Applies, then snaps the tutor's pieces", rows: [
+      ["does", "records the progress · turns with no progress: 0"],
+      ["snaps for the tutor", "tutor.base · keep_goal_in_view · guide_debugging (kind 7)"] ] },
+    { a: "tutor", t: "Replies", rows: [["gets", "its conversation · the snapped pieces · the task sheet"]], reply: true }
+  ],
+  concepts: ALL0, ticks: [], changed: [],
+  story: [["✓ Did reproduced the bug as a guest", 0]] },
+
+{ short: "Finds the except", card: "B · on the task", stack: "T3", noProgress: 0,
+  learner: "Line 824. It's inside `except Exception as e:` on line 821. So something crashes and this except swallows it?",
+  tutor: "Exactly: that except hides whatever crashed. How could you see the real error it swallows? Try it in your editor.",
+  stages: [
+    { a: "code", t: "Picks the card", rows: [["reads the graph", "on the task → card B"]] },
+    { a: "orchestrator", t: "Walks its question tree", rows: [
+      ["no evaluator call", "box 2 needs the real error itself; the learner found the except, not the error"] ],
+      path: [{ q: "Question 1 · what does the message show?", a: "progress" }, { leaf: "ON_TRACK · kind 7 · debugging" }],
+      json: { shows: "progress", kind: 7, progress: [{ did: "found the except on line 821 that hides the crash", turn: 2 }] } },
+    { a: "code", t: "Applies, then snaps", rows: [
+      ["does", "records the progress"],
+      ["snaps for the tutor", "tutor.base · keep_goal_in_view · guide_debugging"] ] },
+    { a: "tutor", t: "Replies", reply: true }
+  ],
+  concepts: ALL0, ticks: [], changed: [],
+  story: [["✓ Did found the except on line 821 that hides the crash", 0]] },
+
+{ short: "The real error", card: "B, then C", stack: "T3 ▸ I1", noProgress: 0,
+  learner: "UnboundLocalError on `label`! But label is right there in the loop on line 684?! How can it not exist?",
+  tutor: "That's the real error behind the message. Before app.py, try this in your editor:\n`def last(items):`\n`    for x in items: pass`\n`    return x`\nWhat do you predict `last([])` returns?",
+  stages: [
+    { a: "code", t: "Picks the card", rows: [["reads the graph", "on the task → card B"]] },
+    { a: "orchestrator", t: "Asks for a verdict", rows: [["tool call", "evaluate(box 2, turn 3)"]] },
+    { a: "evaluator", t: "Judges one box", rows: [
+      ["gets", "evaluator.task_box · box 2: finds the real error behind the generic message · the answer key of T3 · turn 3, word for word"] ],
+      json: { target: "box 2", verdict: "met", learner_words: "UnboundLocalError on `label`!" } },
+    { a: "code", t: "Checks, ticks, checks the concept", rows: [
+      ["checks", "the learner's words are really in turn 3 ✓"],
+      ["does", "ticks box 2 · turn 3"],
+      ["task sheet", "box 2 was C17's only box → C17 checked"] ] },
+    { a: "orchestrator", t: "Walks its question tree",
+      path: [{ q: "Question 1 · what does the message show?", a: "a problem" }, { q: "Question 2 · what problem?", a: "something missing" }, { leaf: "GAP" }],
+      json: { shows: "problem", problem: { type: "missing",
+        gaps: [{ title: "a loop variable only exists if the loop ran", kind: 3, blocks: true,
+                 closes_when: "explains why label is unbound for a guest", concept: "C15",
+                 misconception: "expects label to exist because it is written in the loop" }],
+        return_note: "you have the traceback; line 722 reads label" } } },
+    { a: "code", t: "Opens an issue", rows: [
+      ["does", "opens issue I1 · a loop variable only exists if the loop ran (linked to C15) · task T3 keeps its return note · one level deeper"],
+      ["task sheet", "C15 came up (the gap names it)"],
+      ["the turn ends in", "card C · in an issue"],
+      ["snaps for the tutor", "tutor.base · teach_one_concept · experiment_first (kind 3) · facts: current_focus, closes_when, misconception_to_watch · files: the task sheet, concept file C15"] ] },
+    { a: "tutor", t: "Replies from card C", reply: true }
+  ],
+  concepts: { C17: c(true, 1), C15: c(false, 1), C13: c(false, 0) }, ticks: [["box 2", 3]], changed: ["C17", "C15"],
+  story: [["☑ box 2 · finds the real error behind the generic message", 0], ["⚠ Found a gap", 0], ["↳ Went to learn first · a loop variable only exists if the loop ran", 1]] },
+
+{ short: "A wrong idea", card: "C · in issue I1", stack: "T3 ▸ I1", noProgress: 1,
+  learner: "None? In JS it would be undefined.",
+  tutor: "Good guess from JavaScript. Run it and see. What does Python actually say?",
+  stages: [
+    { a: "code", t: "Picks the card", rows: [
+      ["reads the graph", "the stack holds T3 ▸ I1 → card C · in an issue"],
+      ["orchestrator's plate", "adds current_focus (issue I1) · closes_when · return_to · evaluate (this issue only)"] ] },
+    { a: "orchestrator", t: "Walks its question tree", rows: [["no evaluator call", "a prediction, not an explanation"]],
+      path: [{ q: "Question 0 · still an issue?", a: "yes" }, { q: "Question 1 · what does the message show?", a: "a problem" }, { q: "Question 2 · what problem?", a: "a wrong idea" }, { leaf: "WRONG_IDEA" }],
+      json: { still_an_issue: true, shows: "problem", problem: { type: "wrong_idea",
+        what_went_wrong: D4.what_went_wrong, learner_words: D4.learner_words, concept: "C15" } } },
+    { a: "code", t: "Writes the difficulty, at once", rows: [
+      ["checks", "the learner's words are really in turn 4 ✓"],
+      ["task sheet", "C15 gets its first difficulty (turn 4)"],
+      ["stuck counter", "a wrong idea is no progress → turns with no progress: 1 (stuck level 1 starts at 2)"],
+      ["snaps for the tutor", "the same pieces: teach_one_concept · experiment_first · misconception_to_watch = the wrong idea"] ] },
+    { a: "tutor", t: "Replies", reply: true }
+  ],
+  concepts: { C17: c(true, 1), C15: c(false, 2, [D4]), C13: c(false, 0) }, ticks: [], changed: ["C15"],
+  story: [["~ Almost · expected label to have a value after a loop that never ran", 1]],
+  note: "No recorder: the difficulty is in the task sheet in the same turn, so the tutor and the orchestrator see it right away." },
+
+{ short: "A deeper question", card: "C · in issue I1", stack: "T3 ▸ I1 ▸ I2", noProgress: 0,
+  learner: "It crashes: UnboundLocalError, same as the app! But why would the loop on line 684 run 0 times for a guest?",
+  tutor: "Let's trace it. Line 684 loops over a list. Where does that list come from for a guest? Follow it back.",
+  stages: [
+    { a: "code", t: "Picks the card", rows: [["reads the graph", "T3 ▸ I1 → card C"]] },
+    { a: "orchestrator", t: "Walks its question tree", rows: [["no evaluator call", "they saw the error, but haven't explained why label is unbound"]],
+      path: [{ q: "Question 0 · still an issue?", a: "yes" }, { q: "Question 1 · what does the message show?", a: "a problem" }, { q: "Question 2 · what problem?", a: "something missing" }, { leaf: "GAP" }],
+      json: { still_an_issue: true, shows: "problem", problem: { type: "missing",
+        gaps: [{ title: "why the loop on line 684 runs 0 times for a guest", kind: 2, blocks: true,
+                 closes_when: "points to where a guest's list comes back empty", concept: null }],
+        return_note: "you get last([]) now; connect it to label" },
+        progress: [{ did: "ran last([]) and saw the same error", turn: 5 }] } },
+    { a: "code", t: "Opens a deeper issue", rows: [
+      ["does", "records the progress (turns with no progress back to 0) · opens issue I2 · why the loop runs 0 times for a guest (no bank concept) · I1 keeps its return note · one level deeper"],
+      ["task sheet", "C15 came up (the focus, issue I1, is linked to it)"],
+      ["snaps for the tutor", "tutor.base · guided_trace (kind 2)"] ] },
+    { a: "tutor", t: "Replies", reply: true }
+  ],
+  concepts: { C17: c(true, 1), C15: c(false, 3, [D4]), C13: c(false, 0) }, ticks: [], changed: ["C15"],
+  story: [["✓ Did ran last([]) and saw the same error", 1], ["↳ Needed first · why the loop on line 684 runs 0 times for a guest", 2]] },
+
+{ short: "Inner issue solved", card: "C, then D, then C", stack: "T3 ▸ I1", noProgress: 0,
+  learner: "Lines 469–470: `if not base or not user_id: return []`. A guest has no user_id, so it returns an empty list.",
+  tutor: "Right: for a guest the loop gets []. Now connect it: after a loop over [], what is label?",
+  stages: [
+    { a: "code", t: "Picks the card", rows: [["reads the graph", "T3 ▸ I1 ▸ I2 → card C"]] },
+    { a: "orchestrator", t: "Asks for a verdict", rows: [["tool call", "evaluate(I2, turn 6)"]] },
+    { a: "evaluator", t: "Judges one issue", rows: [
+      ["gets", "evaluator.closes_when · issue I2's closing condition: points to where a guest's list comes back empty · no answer key · turn 6"] ],
+      json: { target: "I2", verdict: "met", learner_words: "A guest has no user_id, so it returns an empty list." } },
+    { a: "orchestrator", t: "Walks its question tree",
+      path: [{ q: "Question 0 · still an issue?", a: "no · the evaluator said met" }, { leaf: "BACK" }],
+      json: { still_an_issue: false } },
+    { a: "code", t: "Goes back one step", rows: [
+      ["does", "card D · ★ Cleared issue I2 · back one step: T3 ▸ I1"],
+      ["snaps for the tutor", "bridge_back (this turn only) + I1's pieces: teach_one_concept · experiment_first"] ] },
+    { a: "tutor", t: "Replies", reply: true }
+  ],
+  concepts: { C17: c(true, 1), C15: c(false, 3, [D4]), C13: c(false, 0) }, ticks: [], changed: [],
+  story: [["★ Cleared · why the loop on line 684 runs 0 times for a guest", 2], ["↩ Came back to I1 · picking up: you get last([]) now; connect it to label", 1]],
+  note: "Issue I2 had no bank concept, so the task sheet doesn't change." },
+
+{ short: "Issue solved", card: "C, then D, then B", stack: "T3", noProgress: 0,
+  learner: "Nothing. It never gets assigned, exactly like x in last([]). Then line 722 reads label and crashes, and the except on line 821 hides it.",
+  tutor: "That's it. Back to the task: you have the traceback, and you know why label is unbound. What should line 722 use instead?",
+  stages: [
+    { a: "code", t: "Picks the card", rows: [["reads the graph", "T3 ▸ I1 → card C"]] },
+    { a: "orchestrator", t: "Asks for a verdict", rows: [["tool call", "evaluate(I1, turn 7)"]] },
+    { a: "evaluator", t: "Judges one issue", rows: [
+      ["gets", "issue I1's closing condition: explains why label is unbound for a guest · turn 7"] ],
+      json: { target: "I1", verdict: "met", learner_words: "It never gets assigned, exactly like x in last([])." } },
+    { a: "orchestrator", t: "Walks its question tree",
+      path: [{ q: "Question 0 · still an issue?", a: "no · met" }, { leaf: "BACK" }],
+      json: { still_an_issue: false } },
+    { a: "code", t: "Goes back one step", rows: [
+      ["does", "card D · ★ Cleared issue I1 · back one step: T3"],
+      ["task sheet", "C15 came up (the focus was issue I1)"],
+      ["snaps for the tutor", "bridge_back + the piece T3 had before the detour: keep_goal_in_view · guide_debugging"] ] },
+    { a: "tutor", t: "Replies", reply: true }
+  ],
+  concepts: { C17: c(true, 1), C15: c(false, 4, [D4]), C13: c(false, 0) }, ticks: [], changed: ["C15"],
+  story: [["★ Cleared · a loop variable only exists if the loop ran", 1], ["↩ Came back to T3 · picking up: you have the traceback; line 722 reads label", 0]],
+  note: "C15 is not checked yet: only its box, box 3, can check it, and boxes are judged on the task. On the next turn the orchestrator points the evaluator back to turn 7." },
+
+{ short: "Names the fix", card: "B · on the task", stack: "T3", noProgress: 0,
+  learner: "`question_label`! Line 610 unpacks it from `user_query_operations`, and `QUESTION_LABELS` is {'recruiter', 'candidate', 'both'}. So line 722 should use question_label instead of label.",
+  tutor: "Yes. Make that change in your editor, then try it as a guest. What happens now?",
+  stages: [
+    { a: "code", t: "Picks the card", rows: [["reads the graph", "on the task → card B"]] },
+    { a: "orchestrator", t: "Asks for a verdict on box 3", rows: [["tool call", "evaluate(box 3, turn 7)"]] },
+    { a: "evaluator", t: "Judges box 3", rows: [["gets", "box 3: explains why label is unbound for a guest · the answer key · turn 7"]],
+      json: { target: "box 3", verdict: "met", learner_words: "It never gets assigned, exactly like x in last([]). Then line 722 reads label and crashes" } },
+    { a: "code", t: "Ticks box 3, checks C15", rows: [["does", "ticks box 3 · turn 8 (said on turn 7) · it was C15's only box → C15 checked"]] },
+    { a: "orchestrator", t: "Asks for a verdict on box 4", rows: [["tool call", "evaluate(box 4, turn 8)"]] },
+    { a: "evaluator", t: "Judges box 4", rows: [["gets", "box 4: explains what the label decides in the request · the answer key · turn 8"]],
+      json: { target: "box 4", verdict: "not_met", learner_words: "" } },
+    { a: "orchestrator", t: "Walks its question tree",
+      path: [{ q: "Question 1 · what does the message show?", a: "progress" }, { leaf: "ON_TRACK · kind 5 · writing code" }],
+      json: { shows: "progress", kind: 5, progress: [{ did: "named the fix: question_label on line 722", turn: 8 }] } },
+    { a: "code", t: "Applies, then snaps", rows: [
+      ["task sheet", "C15 and C13 came up (their boxes were judged)"],
+      ["snaps for the tutor", "tutor.base · keep_goal_in_view · guide_fix (kind 5)"] ] },
+    { a: "tutor", t: "Replies", reply: true }
+  ],
+  concepts: { C17: c(true, 1), C15: c(true, 5, [D4]), C13: c(false, 1) }, ticks: [["box 3", 8]], changed: ["C15", "C13"],
+  story: [["☑ box 3 · explains why label is unbound for a guest", 0], ["✓ Did named the fix: question_label on line 722", 0]] },
+
+{ short: "The job + a side question", card: "B · on the task", stack: "T3", noProgress: 0,
+  learner: "It works as a guest now: it answered \"Voici nos offres de stage…\". Wait, how does the app's test talk to the chatbot without an OpenAI key?",
+  tutor: "Short answer: the test swaps the real OpenAI client for a fake one, so it needs no key. I saved it for later. One box left: on line 722, what does the label decide in the request?",
+  stages: [
+    { a: "code", t: "Picks the card", rows: [["reads the graph", "on the task → card B"]] },
+    { a: "orchestrator", t: "Asks for a verdict on the job box", rows: [["tool call", "evaluate(box 1, turn 9)"]] },
+    { a: "evaluator", t: "Judges the job box", rows: [["gets", "box 1: the fix works: a guest gets a real answer · the answer key · turn 9"]],
+      json: { target: "box 1", verdict: "met", learner_words: "It works as a guest now: it answered \"Voici nos offres de stage…\"" } },
+    { a: "code", t: "Ticks the job box", rows: [["does", "ticks box 1 · turn 9 · the job is done; the ideas are not all checked yet"]] },
+    { a: "orchestrator", t: "Walks its question tree",
+      path: [{ q: "Question 1 · what does the message show?", a: "the learner turns away" }, { q: "Question 3 · go there now?", a: "no, just wondering" }, { leaf: "SIDE_QUESTION" }],
+      json: { shows: "turns_away", turns_away: { go_now: false, question: "how does the app's test talk to the chatbot without an OpenAI key?" },
+              progress: [{ did: "fixed line 722; guests get a real answer", turn: 9 }] } },
+    { a: "code", t: "Saves the question", rows: [
+      ["does", "records the progress · saves issue I3 · how the test fakes OpenAI, for later (it stays open)"],
+      ["snaps for the tutor", "answer_side_question (this turn only) · keep_goal_in_view"] ] },
+    { a: "tutor", t: "Replies", reply: true }
+  ],
+  concepts: { C17: c(true, 1), C15: c(true, 5, [D4]), C13: c(false, 1) }, ticks: [["box 1", 9]], changed: ["job"],
+  story: [["☑ box 1 · the fix works: a guest gets a real answer", 0], ["○ Saved for later · how the test fakes OpenAI", 0]],
+  note: "One message carried the proof of the job, progress and a side question. Code ticked the job box from the evaluator's verdict; the orchestrator's one leaf, SIDE_QUESTION, carried the progress." },
+
+{ short: "Done", card: "B, then E", stack: "T3", noProgress: 0,
+  learner: "Whether the model gets the pricing tool. `tools` is the list of functions OpenAI is allowed to call, and candidates don't get the pricing one.",
+  tutor: "Done: guests get a real answer, and you can explain every step, from the hidden error to the empty loop to what the label decides. I wrote the path you took into your journey.",
+  stages: [
+    { a: "code", t: "Picks the card", rows: [["reads the graph", "on the task → card B"]] },
+    { a: "orchestrator", t: "Asks for a verdict on box 4", rows: [["tool call", "evaluate(box 4, turns 8 and 10)"]] },
+    { a: "evaluator", t: "Judges box 4", rows: [["gets", "box 4 · the answer key · turns 8 and 10, word for word"]],
+      json: { target: "box 4", verdict: "met", learner_words: "`tools` is the list of functions OpenAI is allowed to call" } },
+    { a: "code", t: "Ticks the last box", rows: [
+      ["does", "ticks box 4 · turn 10 · it was C13's only box → C13 checked"],
+      ["then", "the job box ☑ and every concept checked → the task is done"] ] },
+    { a: "orchestrator", t: "Walks its question tree", rows: [["note", "its leaf no longer matters: code closes the task"]],
+      path: [{ q: "Question 1 · what does the message show?", a: "progress" }, { leaf: "ON_TRACK · kind 9 · showing mastery" }],
+      json: { shows: "progress", kind: 9, progress: [{ did: "explained what the label decides: the tools OpenAI may call", turn: 10 }] } },
+    { a: "code", t: "Closes the task", rows: [
+      ["does", "card E · ★ Done · archives the task sheet"],
+      ["discoveries", "issue I3 (a saved side question with no bank concept) becomes a raw entry in the concept bank: D1 · a test can swap the real OpenAI client for a fake one, labeled discovered"],
+      ["snaps for the tutor", "close_task · write_journey"],
+      ["next", "task T4 opens with fresh agents and a fresh task sheet"] ] },
+    { a: "tutor", t: "Closes, writes the journey", reply: true }
+  ],
+  concepts: { C17: c(true, 1), C15: c(true, 5, [D4]), C13: c(true, 2) }, ticks: [["box 4", 10]], changed: ["C13"],
+  story: [["☑ box 4 · explains what the label decides in the request", 0], ["★ Done · guests get a real answer", 0]] }
+];
+
+const INSTR = [
+  ["introduce_task · keep_goal_in_view", "task goal: guests get a real answer"],
+  ["keep_goal_in_view · guide_debugging", "task goal: guests get a real answer", "recent progress: reproduced the bug as a guest"],
+  ["keep_goal_in_view · guide_debugging", "task goal: guests get a real answer", "recent progress: found the except on line 821"],
+  ["teach_one_concept · experiment_first", "current focus: issue I1 · a loop variable only exists if the loop ran", "closes when: they explain why label is unbound for a guest", "wrong idea to watch: expects label to exist because it is written in the loop", "files you may read: concept C15"],
+  ["teach_one_concept · experiment_first", "current focus: issue I1 · a loop variable only exists if the loop ran", "closes when: they explain why label is unbound for a guest", "wrong idea to watch: expected label to have a value after a loop that never ran", "files you may read: concept C15"],
+  ["guided_trace", "current focus: issue I2 · why the loop on line 684 runs 0 times for a guest", "closes when: they point to where a guest's list comes back empty", "files you may read: app.py"],
+  ["bridge_back (this turn only) · teach_one_concept · experiment_first", "current focus: issue I1 · a loop variable only exists if the loop ran", "return to: you get last([]) now; connect it to label", "closes when: they explain why label is unbound for a guest"],
+  ["bridge_back (this turn only) · keep_goal_in_view · guide_debugging", "current focus: task T3", "return to: you have the traceback; line 722 reads label"],
+  ["keep_goal_in_view · guide_fix", "current focus: task T3", "recent progress: named the fix"],
+  ["answer_side_question (this turn only) · keep_goal_in_view", "side question: how does the app's test talk to the chatbot without an OpenAI key?", "next box: box 4 · explains what the label decides"],
+  ["close_task", "journey so far: the story lines of this task", "tool you may use: write_journey"]
+];
+const TOOLS = {
+  3: [{ call: 'read_concept("C15")', result: "C15 · loop variables outlive the loop · claim: a loop variable keeps its last value; if the loop never runs, it is never set · example: last([])" }],
+  5: [{ call: 'read_file("app.py", around=684)', result: "lines 680–690 of app.py: the loop that sets label, over the questions found for this user" }],
+  10: [{ call: "write_journey(…)", result: "saved: the journey of task T3" }]
+};
+STEPS.forEach((st, i) => { st.instructions = INSTR[i]; st.tutorTools = TOOLS[i] || []; });
+
+const $ = (id) => document.getElementById(id);
+const named = (s) => String(s).replace(/\bC(\d{2})\b/g, (m, n) => "concept " + Number(n)).replace(/\bD1\b/g, "discovered concept 1");
+const esc = (s) => named(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const rich = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\n/g, "<br>");
+let current = 0;
+
+function ticksSoFar() {
+  const t = {};
+  STEPS.slice(0, current + 1).forEach((s, i) => s.ticks.forEach(([box, turn]) => { t[box] = { turn, fresh: i === current }; }));
+  return t;
+}
+
+function renderChips() {
+  $("chips").innerHTML = STEPS.map((s, i) =>
+    `<li><button type="button" class="chip" data-i="${i}"${i === current ? ' aria-current="step"' : ""}><span class="n">${i}</span>${esc(s.short)}</button></li>`).join("");
+  $("chips").querySelectorAll(".chip").forEach((b) => b.addEventListener("click", () => go(+b.dataset.i)));
+  const active = $("chips").querySelector('[aria-current="step"]');
+  if (active) active.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
+function boxRow(b, t, child) {
+  const when = t ? `turn ${t.turn}` : "not yet";
+  return `<div class="box${child ? " child" : ""}${t && t.fresh ? " fresh" : ""}"><span aria-hidden="true">${t ? "☑" : "☐"}</span><span>${esc(b.id)} · ${esc(b.text)}</span><span class="when">${when}</span></div>`;
+}
+
+function renderLearner() {
+  const s = STEPS[current];
+  const parts = [];
+  STEPS.slice(0, current + 1).forEach((st, i) => {
+    const old = i < current ? " old" : "";
+    if (st.learner) parts.push(`<div class="msg learner${old}"><span class="who">learner · turn ${i}</span><p>${rich(st.learner)}</p></div>`);
+    parts.push(`<div class="msg tutor${old}"><span class="who">tutor · turn ${i}</span><p>${rich(st.tutor)}</p></div>`);
+  });
+  $("chat").innerHTML = parts.join("");
+  $("chat").scrollTop = $("chat").scrollHeight;
+
+  const t = ticksSoFar();
+  let html = `<div class="group">The job is done</div>` + boxRow(JOB, t[JOB.id], false);
+  html += `<div class="group">The ideas are understood</div>`;
+  ORDER.forEach((k) => {
+    const cs = s.concepts[k];
+    html += `<div class="concept"><span>${esc(NAMES[k])}</span><span class="status ${cs.checked ? "yes" : "no"}">${cs.checked ? "checked" : "not yet"}</span></div>`;
+    BOXES[k].forEach((b) => { html += boxRow(b, t[b.id], true); });
+    cs.difficulties.forEach((d) => {
+      const fresh = d.turn === current ? " fresh" : "";
+      html += `<div class="diff${fresh}">difficulty · turn ${d.turn} · ${esc(d.what_went_wrong)}</div>`;
+    });
+  });
+  $("sheetview").innerHTML = html;
+
+  const lines = [];
+  STEPS.slice(0, current + 1).forEach((st, i) => st.story.forEach(([text, depth]) => lines.push({ text, depth, fresh: i === current })));
+  $("story").innerHTML = lines.map((l) => `<li class="${l.fresh ? "fresh " : ""}indent${l.depth}">${esc(l.text)}</li>`).join("") +
+    `<li style="color:var(--muted)">◉ You are here</li>`;
+}
+
+function renderStage(st, n) {
+  const extraRows = [];
+  if (st.a === "tutor") {
+    extraRows.push(["receives", "its system prompt, rebuilt this turn, and the whole task's history (see \"What the tutor receives this turn\" below)"]);
+    STEPS[current].tutorTools.forEach((t) => extraRows.push(["tool call this turn", `${t.call} → ${t.result}`]));
+  }
+  const rows = (st.rows || []).concat(extraRows).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${rich(v)}</dd></div>`).join("");
+  const path = st.path ? `<div class="path">${st.path.map((p, i) => {
+      const arrow = i ? '<span class="arrow" aria-hidden="true">→</span>' : "";
+      return p.leaf ? `${arrow}<span class="leaf">${esc(p.leaf)}</span>` : `${arrow}<span class="q">${esc(p.q)}</span><span class="arrow" aria-hidden="true">→</span><span class="a">${esc(p.a)}</span>`;
+    }).join("")}</div>` : "";
+  const json = st.json ? `<pre>${esc(JSON.stringify(st.json, null, 2))}</pre>` : "";
+  const reply = st.reply ? `<div class="reply">${rich(STEPS[current].tutor)}</div>` : "";
+  return `<li class="stage ${st.a}"><span class="dot">${n}</span><div class="body"><div class="head"><span class="tag ${st.a}">${st.a}</span><span class="t">${esc(st.t)}</span></div>${rows ? `<dl class="rows">${rows}</dl>` : ""}${path}${json}${reply}</div></li>`;
+}
+
+function renderSheetJson(s) {
+  const t = ticksSoFar();
+  const indent = (text, n) => text.split("\n").map((l) => " ".repeat(n) + l).join("\n");
+  const job = { box: `${JOB.id} · ${JOB.text}`, ticked_at_turn: t[JOB.id] ? t[JOB.id].turn : null };
+  const jobText = indent(`"the_job_is_done": ${JSON.stringify(job, null, 2)},`, 2);
+  const blocks = ORDER.map((k, i) => {
+    const cs = s.concepts[k];
+    const obj = { concept: NAMES[k],
+      boxes: BOXES[k].map((b) => ({ box: `${b.id} · ${b.text}`, ticked_at_turn: t[b.id] ? t[b.id].turn : null })),
+      checked: cs.checked, times_it_came_up: cs.times_it_came_up, difficulties: cs.difficulties, had_it_then_missed: cs.had_it_then_missed };
+    const text = indent(JSON.stringify(obj, null, 2), 4) + (i < ORDER.length - 1 ? "," : "");
+    return s.changed.includes(k) ? `<span class="chg">${esc(text)}</span>` : esc(text);
+  });
+  const jobHtml = s.changed.includes("job") ? `<span class="chg">${esc(jobText)}</span>` : esc(jobText);
+  $("sheet").innerHTML = esc('{\n  "task": "T3 · Guests always get the generic error",\n') + jobHtml + esc('\n  "concepts": [\n') + blocks.join("\n") + esc("\n  ]\n}");
+}
+
+function cut(text, n) {
+  const one = String(text).replace(/\n/g, " ");
+  return one.length > n ? one.slice(0, n - 1) + "…" : one;
+}
+
+function renderTutorView(s) {
+  const lines = ["SYSTEM  (rebuilt this turn)", "  tutor.base: who you are, how you teach",
+                 "  instructions for this turn: " + s.instructions[0]];
+  s.instructions.slice(1).forEach((l) => lines.push("    " + l));
+  lines.push("    task sheet: { … see below }", "", "MESSAGES  (everything that happened, in order)");
+  const history = [];
+  STEPS.slice(0, current).forEach((st, i) => {
+    if (st.learner) history.push(`  learner · turn ${i}   "${cut(st.learner, 64)}"`);
+    st.tutorTools.forEach((t) => {
+      history.push(`  tutor   · turn ${i}   tool call: ${t.call}`);
+      history.push(`  tool result         "${cut(t.result, 64)}"`);
+    });
+    history.push(`  tutor   · turn ${i}   "${cut(st.tutor, 64)}"`);
+  });
+  if (s.learner) history.push(`  learner · turn ${current}   "${cut(s.learner, 64)}"   ◄ now`);
+  if (!history.length) history.push("  (empty: the task just opened; the tutor speaks first)");
+  lines.push(...history, "", "not sent back: old instructions · old thinking");
+  $("tutorview").textContent = named(lines.join("\n"));
+}
+
+function renderBackground() {
+  const s = STEPS[current];
+  const state = [["turn", current], ["card", s.card], ["stack", s.stack], ["turns with no progress", s.noProgress], ["stuck level", s.noProgress >= 2 ? s.noProgress - 1 : 0]];
+  $("state").innerHTML = state.map(([k, v]) => `<div><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>`).join("");
+  $("stages").innerHTML = s.stages.map((st, i) => renderStage(st, i + 1)).join("");
+  $("extra").innerHTML = s.note ? `<div class="note">${rich(s.note)}</div>` : "";
+  renderTutorView(s);
+  renderSheetJson(s);
+}
+
+function go(i) {
+  current = Math.max(0, Math.min(STEPS.length - 1, i));
+  $("prev").disabled = current === 0;
+  $("next").disabled = current === STEPS.length - 1;
+  $("where").textContent = `turn ${current} of ${STEPS.length - 1} · ${STEPS[current].short}`;
+  renderChips(); renderLearner(); renderBackground();
+}
+
+$("prev").addEventListener("click", () => go(current - 1));
+$("next").addEventListener("click", () => go(current + 1));
+document.addEventListener("keydown", (e) => {
+  if (e.target && /input|textarea/i.test(e.target.tagName)) return;
+  if (e.key === "ArrowRight") go(current + 1);
+  if (e.key === "ArrowLeft") go(current - 1);
+});
+go(0);
+</script>

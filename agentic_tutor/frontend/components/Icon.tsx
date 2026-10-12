@@ -8,6 +8,8 @@ export default function Icon({
   const paths: Record<string, string> = {
     right: "M9 6l6 6-6 6",
     left: "M15 6l-6 6 6 6",
+    collapse: "M11 17l-5-5 5-5M18 17l-5-5 5-5",
+    expand: "M13 17l5-5-5-5M6 17l5-5-5-5",
     plus: "M12 5v14M5 12h14",
     send: "M12 20V5M6 11l6-6 6 6",
     arrow: "M5 12h14M13 6l6 6-6 6",

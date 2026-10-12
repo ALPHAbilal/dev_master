@@ -1,8 +1,19 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { Ref } from "@/lib/api/types";
+import type { Attachment } from "@/lib/api/types";
 import Icon from "./Icon";
-export function RefChip({ value, remove }: { value: Ref; remove?(): void }) {
+const ICONS: Record<Attachment["kind"], string> = {
+  repository_code: "code",
+  editor_code: "file",
+  conversation: "convo",
+};
+export function RefChip({
+  value,
+  remove,
+}: {
+  value: Attachment;
+  remove?(): void;
+}) {
   const [open, setOpen] = useState(false),
     [position, setPosition] = useState({ left: 8, top: 8 });
   const anchor = useRef<HTMLSpanElement>(null),
@@ -63,7 +74,7 @@ export function RefChip({ value, remove }: { value: Ref; remove?(): void }) {
         }}
       >
         <span className="rc-ic">
-          <Icon name={value.kind} />
+          <Icon name={ICONS[value.kind]} />
         </span>
         <span className="rc-lb">{value.label}</span>
         {remove && (
@@ -82,16 +93,16 @@ export function RefChip({ value, remove }: { value: Ref; remove?(): void }) {
       {open && (
         <div className="ref-pop" ref={pop} style={position}>
           <div className="rp-src">
-            <Icon name={value.kind} />
+            <Icon name={ICONS[value.kind]} />
             <span>{value.label}</span>
           </div>
-          <pre>{value.snippet}</pre>
+          <pre>{value.text}</pre>
         </div>
       )}
     </>
   );
 }
-export function RefList({ refs }: { refs: Ref[] }) {
+export function RefList({ refs }: { refs: Attachment[] }) {
   return refs.length ? (
     <div className="msg-refs">
       {refs.map((ref, i) => (

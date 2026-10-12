@@ -1,199 +1,162 @@
-// Current Python storage uses integer IDs; the target control plane uses strings.
-// Preserve the wire value, especially for strict reference validation.
-import type { StationSource } from '../scanner';
-export type Id = string | number;
-export type Ref = { label: string; snippet: string } & (
-  | { kind: "code"; source: { file: string; lo: number; hi: number } }
-  | { kind: "test"; source: { editor_id: string; text: string } }
-  | { kind: "convo"; source: { message_id: Id } }
-);
-export interface DriverState {
-  status: "awaiting_learner" | "parked" | "done";
-  journey_id: Id;
-  projection_revision: number;
-  turn_id: string | null;
-  unit_id: Id | null;
-  axis: string | null;
-  question: string | null;
-  step: string | null;
-  highlight: boolean;
-  resume_question: string | null;
-  reason: string;
-}
-export interface Codebase {
+// The wire contract between the learner's screen and the backend.
+// Page 1 of the backend spec: new_completly_desighn/FRONTEND.md §7.
+export type Id = string;
+
+// One learner + one imported repository.
+export interface Workspace {
   id: Id;
   name: string;
-  session_id: string | null;
-  unit_count: number;
+  preparing: "running" | "ready" | "failed";
+  tasks_done: number;
+  tasks_total: number;
 }
-export interface Unit extends StationSource {
+
+// Everything the main screen shows, with one revision number.
+export interface Snapshot {
+  revision: number;
+  workspace: Workspace;
+  ladder: LadderTask[];
+  where: Where | null;
+  story: StoryLine[]; // every task, in order
+  conversation: Message[]; // every task, in order
+}
+
+// One task of the ladder, with everything the sidebar shows under it.
+export interface LadderTask {
   id: Id;
-  slug: string;
-  title: string;
-  ordinal: number;
-  depth: number;
-  parent_id: Id | null;
-  anchor_kind: string;
-  state: string;
+  number: number; // task T3
+  title: string; // guests always get the generic error
+  goal: string;
+  tier: string; // the task crafter's tier, such as "debug"
+  files: string[];
+  status: "done" | "current" | "later";
+  sheet: TaskSheet;
+  issues: LadderIssue[]; // in the order they opened
 }
+
+export interface LadderIssue {
+  id: Id;
+  number: number; // issue I1
+  title: string;
+  parent_issue_id: Id | null; // null = right under the task
+  status: "open" | "saved" | "cleared" | "already_knew";
+}
+
+// Where the learner is now.
+export interface Where {
+  task_id: Id;
+  issue_id: Id | null; // null = on the task itself
+  depth: number;
+  you_are_here: string; // the current focus: the issue's or the task's title
+  tutor: "waiting_for_you" | "answering";
+}
+
+// The learner's view of the task sheet. Its private fields stay on the server.
+export interface TaskSheet {
+  the_job_is_done: Box;
+  concepts: SheetConcept[];
+}
+export interface SheetConcept {
+  number: number; // concept 15
+  name: string; // loop variables outlive the loop
+  checked: boolean;
+  boxes: Box[];
+}
+export interface Box {
+  number: number; // box 3
+  text: string | null; // a concept's box: null until ticked
+  ticked_at_turn: number | null;
+}
+
+export interface StoryLine {
+  id: Id;
+  task_id: Id;
+  issue_id: Id | null; // the issue in focus when it happened
+  turn: number; // a click opens the conversation at this turn
+  depth: number;
+  kind: StoryKind;
+  text: string;
+  picking_up: string | null; // only for came_back
+}
+export type StoryKind =
+  | "started"
+  | "did"
+  | "ticked"
+  | "almost"
+  | "found_a_gap"
+  | "went_to_learn_first"
+  | "needed_first"
+  | "saved_for_later"
+  | "cleared"
+  | "already_knew"
+  | "came_back"
+  | "done";
+
 export interface Message {
   id: Id;
-  role: string;
-  message_kind: string;
-  content: string;
-  turn_id: string | null;
-  sequence: number;
-  status: string;
-  axis: string | null;
-  thread_kind: "main" | "aside";
-  thread_id: string | null;
-  refs: Ref[];
+  task_id: Id;
+  turn: number;
+  role: "learner" | "tutor";
+  text: string;
+  attachments: Attachment[];
 }
-export interface Lifecycle {
-  id: Id;
-  unit_id: Id;
-  event_type: string;
-  axis?: string | null;
-  payload_json?: string;
-  payload?: Record<string, unknown>;
-}
-export interface SemanticNode {
-  id: Id;
-  unit_id: Id;
-  kind: string;
-  text?: string;
-  label?: string;
-  status: string;
-  axis?: string;
-  [key: string]: unknown;
-}
-export interface Snapshot {
-  snapshot_version: 2;
-  journey: {
-    id: Id;
-    root_unit_id: Id;
-    state: string;
-    projection_revision: number;
-  };
-  units: Unit[];
-  axes: { unit_id: Id; axis: string; verdict: string; ordinal: number }[];
-  semantic_nodes: SemanticNode[];
-  semantic_edges: Record<string, unknown>[];
-  lifecycle: Lifecycle[];
-  conversation: Message[];
-  aside_threads: {
-    id: string;
-    journey_id: Id;
-    unit_id: Id;
-    origin_message_id: Id | null;
-    title: string;
-  }[];
-  aside_turns: {
-    id: string;
-    thread_id: string;
-    status: string;
-    learner_message_id: Id;
-    reply_message_id: Id | null;
-  }[];
-  tool_calls: ToolEvent[];
-  axis_wording: Record<string, string>;
-}
-export interface SnapshotUpdate {
-  journey_id: Id;
-  changed: boolean;
-  revision: number;
-  snapshot: Snapshot | null;
-}
-export interface Answer {
-  turn_id: string;
-  unit_id: Id;
-  axis: string;
-  question: string;
-  answer: string;
-  refs?: Ref[];
-}
-export interface Aside {
-  request_id: string;
-  unit_id: Id;
-  question: string;
-  refs?: Ref[];
-  thread_id?: string;
-  origin_message_id?: Id;
-}
-export interface AsideAck {
-  operation: "aside";
-  journey_id: Id;
-  thread_id: string;
-  request_id: string;
-  status: "pending" | "complete";
-  learner_message_id: Id;
-  reply_message_id: Id | null;
-  projection_revision: number;
-}
-export interface Init {
-  target: string;
-  document_id: string;
-  display_name: string;
-  language: string;
-}
-export interface WorkspaceWrite {
-  changed: boolean;
-  workspace_revision: number;
-  revision_hash: string;
-}
-export interface ToolEvent {
-  turn_id: string;
-  capability: string;
-  agent?: string;
-  step?: string;
-  [key: string]: unknown;
-}
+
+// The agents get label + text; source only helps the screen.
+export type Attachment = { label: string; text: string } & (
+  | {
+      kind: "repository_code";
+      source: { file: string; first_line: number; last_line: number };
+    }
+  | { kind: "editor_code"; source: { editor_file: string } }
+  | { kind: "conversation"; source: { message_id: Id } }
+);
+
 export interface StreamEvents {
-  revision: { revision: number };
-  tool: ToolEvent;
-  token: { thread_id?: string; turn_id: string; text: string };
+  revision: { revision: number }; // fetch the snapshot again
+  tutor: { task_id: Id; turn: number; text: string }; // the reply, piece by piece
+  tool: { task_id: Id; turn: number; doing: string }; // "reading app.py, lines 600 to 640"
 }
-export interface ScanEvents {
-  thinking: { text: string };
-  unit: StationSource & { slug: string };
-  done: { journey_id: Id };
+
+export type PreparingStep = "copying" | "concepts" | "tasks" | "ordering";
+export interface PreparingEvents {
+  step: { name: PreparingStep; state: "running" | "done"; count: number | null };
+  concept: { number: number; name: string };
+  task: { id: Id; number: number; title: string };
+  ready: { tasks_total: number };
+  failed: { step: PreparingStep; error: string };
 }
+
 export type Handlers<T> = { [K in keyof T]?: (event: T[K]) => void } & {
   error?: (error: Error) => void;
 };
+
 export interface Identity {
   user_id: string | null;
   getToken(): Promise<string | null>;
 }
+
+export interface SnapshotUpdate {
+  changed: boolean;
+  revision: number;
+  snapshot: Snapshot | null;
+}
+
 export interface Api {
-  codebases(): Promise<Codebase[]>;
-  register(body: {
-    name: string;
-    source: string;
-  }): Promise<{ codebase_id: Id; name: string }>;
-  importRepo(body: {
+  workspaces(): Promise<Workspace[]>;
+  importRepository(body: {
     name: string;
     git_url: string;
-  }): Promise<{ codebase_id: Id; name: string }>;
-  open(id: Id): Promise<{ session_id: string }>;
-  init(body: Init): Promise<{
-    document_id: string;
-    display_name: string;
-    workspace_revision: number;
-  }>;
-  map(): Promise<DriverState>;
-  resume(): Promise<DriverState>;
-  park(
-    id: Id,
-    unit_id: Id,
-  ): Promise<{ status: string; journey_id: Id; projection_revision: number }>;
-  snapshot(id: Id, since?: number | null): Promise<SnapshotUpdate>;
-  answer(id: Id, body: Answer): Promise<DriverState>;
-  aside(id: Id, body: Aside): Promise<AsideAck>;
-  workspace(body: {
-    expected_revision: number;
-    content: string;
-  }): Promise<WorkspaceWrite>;
-  stream(id: Id, handlers: Handlers<StreamEvents>): () => void;
-  scan(handlers: Handlers<ScanEvents>): () => void;
+  }): Promise<{ workspace_id: Id }>;
+  preparing(workspace: Id, handlers: Handlers<PreparingEvents>): () => void;
+  task(workspace: Id, task: Id): Promise<LadderTask>;
+  start(workspace: Id): Promise<{ revision: number }>;
+  snapshot(workspace: Id, since?: number | null): Promise<SnapshotUpdate>;
+  send(
+    workspace: Id,
+    body: { client_message_id: string; text: string; attachments: Attachment[] },
+  ): Promise<{ turn: number }>;
+  stream(workspace: Id, handlers: Handlers<StreamEvents>): () => void;
+  stop(workspace: Id): Promise<void>; // the tutor stops its reply where it is
+  files(workspace: Id): Promise<string[]>;
+  file(workspace: Id, path: string): Promise<{ path: string; text: string }>;
 }

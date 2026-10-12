@@ -1,0 +1,171 @@
+/* The Quiet style, shared by both screens.
+ * Minimalist: flat and still. No marks, no numbers, no colored edges, no glow, pulse or sweep.
+ * State is the text's tone: dark is proven or happening now, grey is done, pale is not open yet.
+ * Sizes and spacing are measured on claude.ai; the fonts and colors stay ours.
+ * Colors are the literal values both token systems share. */
+
+/* ─── the main sidebar · rows 32px tall and 1px apart, 14px text on 21px lines ─── */
+.scan-screen .left { width: 287px; }
+.scan-screen .left.collapsed { width: 52px; }
+:is(.tutor-screen, .scan-screen) .left-inner { width: 287px; }
+:is(.tutor-screen, .scan-screen) .left-head { height: 48px; padding: 8px 8px 8px; }
+:is(.tutor-screen, .scan-screen) .side-nav { padding: 0 8px; }
+:is(.tutor-screen, .scan-screen) .nav-row { height: 32px; margin-bottom: 1px; padding: 0 10px; border-radius: 8px; }
+:is(.tutor-screen, .scan-screen) .nav-row .lb { font-size: 14px; line-height: 21px; font-weight: 400; }
+:is(.tutor-screen, .scan-screen) .side-label {
+  display: flex; align-items: center; height: 24px; margin: 12px 8px 5px; padding: 4px 0 4px 6px;
+  font-size: 13px; line-height: 16px; font-weight: 400; color: #a8a6a0;
+}
+:is(.tutor-screen, .scan-screen) .tree { padding: 0 8px 10px; }
+:is(.tutor-screen, .scan-screen) .cb-row { height: 32px; margin-bottom: 1px; padding: 0 10px; border-radius: 8px; }
+:is(.tutor-screen, .scan-screen) .cb-name { font-size: 14px; line-height: 21px; }
+:is(.tutor-screen, .scan-screen) .cb.is-preparing .cb-name { color: #c3c1ba; }
+:is(.tutor-screen, .scan-screen) .unit.task-row {
+  height: 32px; margin-bottom: 1px; padding: 0 10px 0 38px; border: 1px solid transparent; border-radius: 8px; cursor: pointer;
+}
+:is(.tutor-screen, .scan-screen) .unit.task-row::before { left: 19px; }
+:is(.tutor-screen, .scan-screen) .unit.task-row .u-name {
+  font-family: "Segoe UI", Tahoma, sans-serif; font-size: 14px; line-height: 21px; font-weight: 400; color: #4a4d53;
+}
+:is(.tutor-screen, .scan-screen) .unit.task-row.is-done .u-name { color: #7a7d84; }
+:is(.tutor-screen, .scan-screen) .unit.task-row.is-later .u-name { color: #c3c1ba; }
+:is(.tutor-screen, .scan-screen) .unit.task-row.now .u-name { color: #1e2024; font-weight: 600; }
+:is(.tutor-screen, .scan-screen) .unit.task-row.on { background: rgba(79, 114, 144, 0.15); border-color: #4f7290; }
+:is(.tutor-screen, .scan-screen) .unit.task-row.on .u-name { color: #1e2024; }
+
+/* the main action and the codebase rows, laid out like claude.ai's: a 20px icon column, then
+   text 38px from the row's edge; the category title has air above it */
+:is(.tutor-screen, .scan-screen) :is(.nav-row, .cb-row) { display: flex; align-items: center; gap: 8px; }
+:is(.tutor-screen, .scan-screen) :is(.nav-row, .cb-row) .ic {
+  width: 20px; height: 20px; flex-shrink: 0; display: grid; place-items: center; color: #7a7d84;
+}
+:is(.tutor-screen, .scan-screen) .nav-row .lb { color: #1e2024; }
+:is(.tutor-screen, .scan-screen) .nav-row.on { background: #e3e1db; }
+:is(.tutor-screen, .scan-screen) .side-label { margin-top: 24px; }
+:is(.tutor-screen, .scan-screen) .cb-name {
+  flex: 1; min-width: 0; font-family: "Segoe UI", Tahoma, sans-serif; font-weight: 400; color: #4a4d53;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+:is(.tutor-screen, .scan-screen) .cb-row.active .cb-name { color: #1e2024; font-weight: 600; }
+:is(.tutor-screen, .scan-screen) .cb-row.active .ic { color: #4a4d53; }
+
+/* ─── the second sidebar: everything under one task ─────────────────────────── */
+.tutor-screen .task-panel { position: relative; overflow: hidden; min-width: 0; background: #f4f4f2; border-left: 1px solid #e3e1db; }
+.tutor-screen .task-panel:not(.open) { border-color: transparent; }
+.tutor-screen .tp-inner { width: 287px; height: 100%; display: flex; flex-direction: column; padding-top: 12px; }
+.tutor-screen .task-panel:not(.open) .tp-inner { visibility: hidden; }
+.tutor-screen .tp-title {
+  display: block; width: calc(100% - 16px); margin: 0 8px; padding: 6px 10px 0; border: 0; border-radius: 8px;
+  background: none; font: inherit; text-align: left; cursor: pointer;
+  font-size: 15px; line-height: 22px; font-weight: 600; color: #1e2024;
+}
+.tutor-screen .tp-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 16px; scrollbar-width: thin; }
+.tutor-screen .tp-group { margin-top: 10px; }
+.tutor-screen .tp-group-head {
+  display: flex; align-items: center; width: 100%; height: 24px; margin-bottom: 5px; padding: 4px 6px; border: 0; border-radius: 8px;
+  background: none; font: inherit; font-size: 13px; line-height: 16px; font-weight: 400; color: #a8a6a0; text-align: left; cursor: pointer;
+}
+.tutor-screen .tp-group-head:hover { background: #ebeae6; }
+.tutor-screen .tp-group-head > span:first-child { flex: 1; }
+.tutor-screen .tp-chevron { display: grid; place-items: center; color: #a8a6a0; transform: rotate(90deg); }
+.tutor-screen .tp-group.open .tp-chevron { transform: rotate(-90deg); }
+/* the reference layout's tree: a grey guide line with a curved connector into each item */
+.tutor-screen .tp-children { position: relative; margin-left: 16px; }
+.tutor-screen .tp-child { position: relative; padding-left: 14px; }
+.tutor-screen .tp-child::before {
+  content: ""; position: absolute; left: 0; top: 0; width: 10px; height: 16px;
+  border-left: 1px solid #d8d6cf; border-bottom: 1px solid #d8d6cf; border-bottom-left-radius: 7px;
+}
+.tutor-screen .tp-child:not(:last-child)::after { content: ""; position: absolute; left: 0; top: 16px; bottom: 0; border-left: 1px solid #d8d6cf; }
+.tutor-screen .tp-item {
+  display: flex; width: 100%; min-height: 32px; margin: 0 0 1px; padding: 5.5px 10px;
+  border: 1px solid transparent; border-radius: 8px; background: none;
+  font: inherit; font-size: 14px; line-height: 21px; color: #4a4d53; text-align: left;
+}
+.tutor-screen button.tp-item { cursor: pointer; }
+.tutor-screen button.tp-item:hover { background: #ebeae6; }
+.tutor-screen .tp-item.on { color: #1e2024; }
+.tutor-screen .t-text { min-width: 0; overflow-wrap: anywhere; }
+.tutor-screen .t-issue.focus { color: #1e2024; font-weight: 600; }
+.tutor-screen .t-issue:is(.is-cleared, .is-already_knew) { color: #a8a6a0; }
+.tutor-screen .t-issue.on { background: rgba(79, 114, 144, 0.15); border-color: #4f7290; color: #1e2024; }
+/* a task not open yet: everything pale and still */
+.tutor-screen .tp-inner.locked { pointer-events: none; }
+.tutor-screen .tp-inner.locked :is(.tp-title, .tp-item, .tp-group-head) { color: #c3c1ba; }
+.tutor-screen .tp-inner.locked .t-hidden { background: #ecebe7; }
+.tutor-screen .tp-inner.locked .tp-chevron { visibility: hidden; }
+
+/* labels: the task's tier, and its files, which open in the Codebase panel */
+:is(.tutor-screen, .scan-screen) .tp-labels { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 18px 2px; }
+:is(.tutor-screen, .scan-screen) .tp-label {
+  display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border: 0; border-radius: 6px;
+  background: #ebeae6; font: inherit; font-size: 13px; line-height: 17px; color: #4a4d53;
+}
+:is(.tutor-screen, .scan-screen) .tp-label.file { font-family: "Cascadia Code", "JetBrains Mono", "SF Mono", Consolas, monospace; font-size: 12px; }
+.tutor-screen button.tp-label { cursor: pointer; }
+.tutor-screen button.tp-label:hover { background: #e3e1db; color: #1e2024; }
+.tutor-screen .tp-inner.locked .tp-label { color: #c3c1ba; }
+
+/* a box not proven yet: a blank bar, so its text never gives the answer away */
+:is(.tutor-screen, .scan-screen) .t-hidden {
+  display: inline-block; height: 8px; margin-top: 6.5px; border-radius: 5px; background: #e3e1db; vertical-align: top;
+}
+
+/* ─── the map ───────────────────────────────────────────────────────────────── */
+.tutor-screen .unit-story .story-line {
+  display: inline; margin-left: -6px; padding: 1px 6px; border: 0; border-radius: 5px;
+  background: none; font: inherit; color: inherit; text-align: left; white-space: pre-wrap; cursor: pointer;
+}
+.tutor-screen .unit-story .story-line:hover { background: #ebeae6; }
+.tutor-screen .unit-story .hl-here { padding: 0; background: none; animation: none; }
+
+/* ─── the conversation · reply 15/22, your message 15/20, composer 48px ─────── */
+.tutor-screen .turn .say { font-size: 15px; line-height: 22px; }
+.tutor-screen .turn.learner .say { padding: 12px 16px; border-radius: 12px; line-height: 20px; }
+.tutor-screen .turn { border-radius: 12px; }
+.tutor-screen .turn.target { background: #ebeae6; }
+.tutor-screen .task-divider {
+  display: flex; align-items: center; gap: 12px; margin: 6px 0;
+  font-size: 13px; line-height: 17px; color: #a8a6a0;
+}
+.tutor-screen .task-divider::before,
+.tutor-screen .task-divider::after { content: ""; flex: 1; height: 1px; background: #e3e1db; }
+.tutor-screen .tick-note { align-self: flex-end; margin-top: -10px; font-size: 13px; line-height: 17px; color: #7a7d84; }
+.tutor-screen .composer { gap: 6px; min-height: 48px; padding: 8px 8px 8px 14px; border-radius: 14px; }
+.tutor-screen .composer:focus-within { border-color: #c3c1ba; box-shadow: none; }
+.tutor-screen .composer-row { display: flex; align-items: flex-end; gap: 8px; }
+.tutor-screen .chat-input { flex: 1; min-width: 0; min-height: 21px; padding: 5.5px 0; font-size: 15px; line-height: 21px; }
+.tutor-screen .chat-send { width: 32px; height: 32px; transition: none; }
+.tutor-screen .chat-send.stop .sq { width: 10px; height: 10px; border-radius: 2px; background: #ffffff; }
+.tutor-screen .reopen.show { animation: none; }
+
+/* ─── the import page ─────────────────────────────────────────────────────────── */
+.scan-screen .import-card { padding: 16px; }
+.scan-screen .import-field input { font-size: 14px; }
+.scan-screen .import-go { height: 40px; font-size: 14px; font-weight: 600; }
+.scan-screen .title-row .fn { font-size: 15px; line-height: 22px; }
+.scan-screen .box-label { padding: 14px 16px 6px; font-size: 13px; line-height: 16px; font-weight: 400; letter-spacing: 0; text-transform: none; color: #a8a6a0; }
+.scan-screen .log-list { gap: 1px; padding: 2px 8px 14px; }
+.scan-screen .step { padding: 5.5px 8px; font-size: 14px; line-height: 21px; color: #c3c1ba; }
+.scan-screen .step.done { color: #7a7d84; }
+.scan-screen .step.running { color: #1e2024; font-weight: 600; }
+.scan-screen .step.concept { padding-left: 20px; color: #7a7d84; }
+.scan-screen .task-list { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 8px 14px; display: flex; flex-direction: column; gap: 1px; }
+.scan-screen .task-line {
+  display: block; width: 100%; min-height: 32px; padding: 5.5px 10px; border: 0; border-radius: 8px; background: none;
+  font: inherit; font-size: 14px; line-height: 21px; color: #4a4d53; text-align: left; cursor: pointer;
+}
+.scan-screen .task-line:hover { background: #ebeae6; }
+.scan-screen .task-line.ghost { cursor: default; }
+.scan-screen .task-line.ghost:hover { background: none; }
+.scan-screen .gen-row { height: 64px; }
+.scan-screen .req-go { padding: 9px 16px; font-size: 14px; }
+.scan-screen .req-go:active { transform: none; }
+.scan-screen .detail-body { padding: 20px 24px; }
+.scan-screen .task-card .tc-title { padding: 0 2px; font-size: 15px; line-height: 22px; font-weight: 600; color: #1e2024; }
+.scan-screen .task-card .tp-labels { padding: 8px 0 4px; }
+.scan-screen .task-card .tc-sec { margin: 16px 0 5px; font-size: 13px; line-height: 16px; color: #a8a6a0; }
+.scan-screen .task-card .tc-item { margin: 0; padding: 5.5px 0; font-size: 14px; line-height: 21px; color: #4a4d53; }
+.scan-screen .task-card .tc-item.on { color: #1e2024; }
+.scan-screen .task-card .tc-item.sub { padding-left: 18px; }
+.scan-screen .task-card.locked :is(.tc-title, .tc-item, .tp-label) { color: #c3c1ba; }

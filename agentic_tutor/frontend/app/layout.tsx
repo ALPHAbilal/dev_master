@@ -3,10 +3,11 @@ import { AuthProvider } from "@/lib/auth";
 import { SessionProvider } from "@/lib/session";
 import "./tutor.css";
 import "./scan_stage.css";
+import "./sidebar.css";
 import "./globals.css";
 export const metadata: Metadata = {
   title: "Tutor — platform",
-  description: "Learn your codebase, one unit at a time.",
+  description: "Learn your codebase, one task at a time.",
 };
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (

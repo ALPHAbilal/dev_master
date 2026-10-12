@@ -1,0 +1,284 @@
+<title>Sidebar variations</title>
+<style>
+/* Layout: a comparison board. Columns are three minimalist takes, rows are the same five states,
+   so each state reads across. The frames are the product itself: its light palette, fixed, static. */
+:root {
+  --page: #e6e4de;
+  --page-fg: #1e2024;
+  --page-muted: #6c6f77;
+  --page-line: #d2cfc7;
+  --page-card: #efede8;
+  --pick: #385876;
+  --ui: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --mono: "Cascadia Code", "JetBrains Mono", "SF Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page: #17181b; --page-fg: #e8e6e1; --page-muted: #9a9ca3; --page-line: #2d2f34; --page-card: #202226; --pick: #9db8cf;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --page: #17181b; --page-fg: #e8e6e1; --page-muted: #9a9ca3; --page-line: #2d2f34; --page-card: #202226; --pick: #9db8cf;
+  color-scheme: dark;
+}
+body { background: var(--page); color: var(--page-fg); font-family: var(--ui); }
+main { max-width: 1260px; margin: 0 auto; padding-block: 36px 72px; padding-inline: 16px; display: flex; flex-direction: column; gap: 22px; }
+h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.01em; text-wrap: balance; }
+.lead { margin: 6px 0 0; max-width: 64ch; color: var(--page-muted); font-size: 14px; line-height: 1.55; }
+.gone { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; color: var(--page-muted); }
+.gone s { padding: 3px 9px; border-radius: 999px; background: var(--page-card); border: 1px solid var(--page-line); font-family: var(--mono); font-size: 11px; text-decoration-color: var(--page-muted); }
+.scroller { overflow-x: auto; padding-bottom: 8px; }
+.board { display: grid; grid-template-columns: 120px repeat(3, 344px); gap: 18px 22px; align-items: start; min-width: 1220px; }
+.colhead { display: flex; flex-direction: column; gap: 4px; padding: 0 2px 2px; }
+.colhead b { font-size: 15px; font-weight: 600; }
+.colhead b span { color: var(--pick); }
+.colhead p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--page-muted); }
+.measured { display: flex; flex-direction: column; gap: 6px; max-width: 760px; }
+.measured h2 { margin: 12px 0 0; font-size: 17px; font-weight: 600; }
+.measured p { margin: 0; font-size: 13px; color: var(--page-muted); }
+.measured table { border-collapse: collapse; font-size: 13px; min-width: 520px; }
+.measured th { text-align: left; font-weight: 600; padding: 7px 18px 7px 0; white-space: nowrap; vertical-align: top; }
+.measured td { padding: 7px 0; color: var(--page-muted); border-top: 1px solid var(--page-line); font-variant-numeric: tabular-nums; }
+.measured th { border-top: 1px solid var(--page-line); }
+.rowhead { padding-top: 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--page-muted); line-height: 1.4; }
+
+/* ── the product's own palette and type, fixed: the frames are mockups of a light-only screen ── */
+.frame {
+  --bg: #f4f4f2; --surface: #ebeae6; --soft: #e9e8e4; --line: #d8d6cf; --track: #e3e1db; --ink: #1e2024;
+  --ink2: #4a4d53; --muted: #7a7d84; --faint: #a8a6a0; --pale: #c3c1ba; --accent: #4f7290;
+  --accent-soft: rgba(79, 114, 144, 0.15); --white: #ffffff;
+  --check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='4' stroke-linecap='round' stroke-linejoin='round' d='M20 6L9 17l-5-5'/%3E%3C/svg%3E");
+  color-scheme: light; background: var(--bg); color: var(--ink); border-radius: 12px; overflow: hidden;
+  font-family: var(--ui); font-size: 14px; line-height: 21px; box-shadow: 0 0 0 1px var(--page-line);
+}
+:where(.frame *) { box-sizing: border-box; }
+:where(.frame) :where(button) { font: inherit; color: inherit; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; }
+.frame button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* main sidebar · measured on claude.ai: rows 32px tall and 1px apart, 14px text on 21px lines,
+   text 38px in from the row's edge; section label 13px on 16px in a 24px row */
+.f-side { width: 287px; padding: 8px 8px 12px; }
+.sb-top { display: flex; align-items: center; justify-content: flex-end; height: 32px; padding: 0 6px; color: var(--muted); }
+.sb-add { display: flex; align-items: center; width: 100%; height: 32px; margin-bottom: 1px; padding: 0 10px; border-radius: 8px; font-size: 14px; line-height: 21px; color: var(--ink2); }
+.sb-add:hover { background: var(--surface); }
+.sb-label { display: flex; align-items: center; height: 24px; margin: 12px 0 5px; padding: 4px 0 4px 6px; font-size: 13px; line-height: 16px; color: var(--faint); }
+.sb-repo { display: flex; align-items: center; height: 32px; margin-bottom: 1px; padding: 0 10px; font: 600 14px/21px var(--mono); color: var(--ink); }
+.rows { position: relative; }
+.row { position: relative; display: block; width: 100%; height: 32px; margin-bottom: 1px; padding: 5.5px 10px 5.5px 38px; border: 1px solid transparent; border-radius: 8px; font-size: 14px; line-height: 21px; color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row:hover { background: var(--surface); }
+.row.done { color: var(--muted); }
+.row.current { color: var(--ink); font-weight: 600; }
+.row.later { color: var(--pale); cursor: default; }
+.row.later:hover { background: none; }
+
+/* rail + task panel */
+.f-panel { width: 339px; display: flex; }
+.rail { width: 52px; flex-shrink: 0; display: flex; justify-content: center; padding-top: 14px; color: var(--muted); border-right: 1px solid var(--track); }
+.pn { width: 287px; padding: 12px 8px 16px; }
+.pn-title { padding: 6px 10px 0; font-size: 15px; font-weight: 600; line-height: 22px; color: var(--ink); text-wrap: balance; }
+.file { margin: 2px 10px 8px; font: 13px/17px var(--mono); color: var(--muted); border-radius: 4px; }
+.file:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.grp { margin-top: 10px; }
+.grp-head { display: flex; align-items: center; width: 100%; height: 24px; margin-bottom: 5px; padding: 4px 6px; border-radius: 8px; font-size: 13px; line-height: 16px; color: var(--faint); }
+.grp-head:hover { background: var(--surface); }
+.chev { margin-left: auto; display: grid; place-items: center; color: var(--faint); }
+.grp:not(.open) .chev { transform: rotate(180deg); }
+.grp:not(.open) > .kids { display: none; }
+.kids { position: relative; margin-left: 16px; }
+.kid { position: relative; padding-left: 14px; }
+.item { display: flex; gap: 8px; align-items: flex-start; width: 100%; min-height: 32px; margin: 0 0 1px; padding: 5.5px 10px; border: 1px solid transparent; border-radius: 8px; font-size: 14px; line-height: 21px; color: var(--ink2); }
+button.item:hover { background: var(--surface); }
+button.item:disabled { cursor: default; }
+button.item:disabled:hover { background: none; }
+.item .t { min-width: 0; overflow-wrap: anywhere; }
+.item.on { color: var(--ink); }
+.issue.focus { color: var(--ink); font-weight: 600; }
+.issue.cleared { color: var(--faint); }
+.blank { display: inline-block; height: 8px; margin-top: 6.5px; border-radius: 5px; background: var(--track); }
+.locked { pointer-events: none; }
+.locked .pn-title, .locked .file, .locked .t, .locked .grp-head { color: var(--pale); }
+.locked .blank { background: #ecebe7; }
+.locked .chev { visibility: hidden; }
+
+/* conversation, while the tutor answers */
+.f-chat { width: 339px; min-height: 250px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.bubble { align-self: flex-end; max-width: 88%; padding: 12px 16px; border-radius: 12px; background: var(--track); font-size: 15px; line-height: 20px; color: var(--ink2); }
+.stream { font-size: 15px; line-height: 22px; color: var(--ink); }
+.composer { margin-top: auto; display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 8px 8px 8px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); }
+.composer .ph { flex: 1; font-size: 15px; line-height: 21px; color: var(--faint); }
+.send { width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--white); }
+
+/* ── Quiet: the reference's tree lines, no marks; state is only text tone ────────────── */
+.quiet .rows::before { content: ""; position: absolute; left: 19px; top: 0; bottom: 0; width: 1px; background: var(--line); }
+.quiet .kid::before, .check .kid::before { content: ""; position: absolute; left: 0; top: 0; width: 10px; height: 16px; border-left: 1px solid var(--line); border-bottom: 1px solid var(--line); border-bottom-left-radius: 7px; }
+.quiet .kid:not(:last-child)::after, .check .kid:not(:last-child)::after { content: ""; position: absolute; left: 0; top: 16px; bottom: 0; border-left: 1px solid var(--line); }
+.quiet .item.sel, .check .item.sel, .quiet .row.sel, .check .row.sel { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+.quiet .stop { width: 9px; height: 9px; border-radius: 2px; background: var(--white); }
+
+/* ── Checkbox: the same, plus one small still square for what gets proven ─────────── */
+.check .rows::before { content: ""; position: absolute; left: 19px; top: 0; bottom: 0; width: 1px; background: var(--line); }
+.check .mk { flex-shrink: 0; width: 12px; height: 12px; margin-top: 4.5px; border-radius: 3px; border: 1.5px solid var(--pale); }
+.check .mk.on { border-color: var(--ink2); background: var(--ink2) var(--check) center / 8px no-repeat; }
+.check .locked .mk { border-color: #dddbd5; }
+.check .send.off { background: var(--track); color: var(--faint); }
+
+/* ── Bare: no lines, no marks, no accent; indentation and tone only ───────────────── */
+.bare .row { padding-left: 24px; }
+.bare .kids { margin-left: 14px; }
+.bare .kid { padding-left: 0; }
+.bare .item.sel, .bare .row.sel { background: var(--soft); }
+.bare .send { background: none; color: var(--pale); border: 1px solid var(--track); }
+.bare .send.ready { background: var(--ink2); color: var(--white); border-color: var(--ink2); }
+</style>
+
+<main>
+  <header>
+    <h1>Sidebar variations</h1>
+    <p class="lead">Three minimalist takes: flat and still, no colored edges, no glow, pulse or sweep. Same layout, same colors, with the font sizes and spacing measured on claude.ai. Read each row across.</p>
+  </header>
+  <div class="gone">Off the screen in all three:
+    <s>This task opens after the ones before it.</s><s>· saved</s><s>· cleared</s><s>1/4</s><s>The tutor is answering…</s><s>modify · app.py</s>
+  </div>
+  <div class="scroller">
+    <div class="board" id="board"></div>
+  </div>
+  <section class="measured">
+    <h2>Measured on claude.ai</h2>
+    <p>Sizes and spacing only; the fonts stay ours.</p>
+    <div class="scroller"><table>
+      <tr><th>sidebar</th><td>287px wide: an 8px edge, then 271px rows</td></tr>
+      <tr><th>row</th><td>32px tall, 1px apart, 8px corners; text 14px on 21px lines, 38px in from the row's edge</td></tr>
+      <tr><th>section label</th><td>13px on 16px lines, in a 24px row, 5px above the first row</td></tr>
+      <tr><th>panel title</th><td>15px on 22px, semibold: the size of bold text in a reply</td></tr>
+      <tr><th>reply text</th><td>15px on 22px; 11.25px between paragraphs; list items 3.75px apart</td></tr>
+      <tr><th>your message</th><td>15px on 20px; padding 12px by 16px; 12px corners</td></tr>
+      <tr><th>code block</th><td>14px on 22.75px; 14px padding; 12px corners</td></tr>
+      <tr><th>composer</th><td>48px tall, 8px padding, 14px corners; text 15px on 21px</td></tr>
+      <tr><th>small text</th><td>13px on 17px</td></tr>
+      <tr><th>header buttons</th><td>28px tall, 7px corners; text 14px on 20px</td></tr>
+    </table></div>
+  </section>
+</main>
+
+<script>
+const LADDER = [
+  { title: "trace one question through the chatbot", status: "done" },
+  { title: "unknown labels need a fallback", status: "done" },
+  { title: "guests always get the generic error", status: "current" },
+  { title: "recruiters can filter offers by city", status: "later" },
+  { title: "log every question a guest asks", status: "later" },
+  { title: "conversations survive a restart", status: "later" },
+];
+const T3 = { title: "guests always get the generic error", file: "app.py" };
+const STATES = {
+  progress: { ...T3,
+    job: { text: "the fix works: a guest gets a real answer", on: false },
+    concepts: [
+      { name: "a broad except hides the real error", boxes: [{ text: "finds the real error behind the generic message", on: true }] },
+      { name: "loop variables outlive the loop", boxes: [{ on: false, w: 82 }] },
+      { name: "OpenAI tool calling", boxes: [{ on: false, w: 64 }] },
+    ],
+    issues: [
+      { title: "a loop variable only exists if the loop ran", status: "open", sel: true, kids: [
+        { title: "why the loop on line 684 runs 0 times for a guest", status: "focus" } ] },
+    ] },
+  end: { ...T3,
+    job: { text: "the fix works: a guest gets a real answer", on: true },
+    concepts: [
+      { name: "a broad except hides the real error", boxes: [{ text: "finds the real error behind the generic message", on: true }] },
+      { name: "loop variables outlive the loop", boxes: [{ text: "explains why label is unbound for a guest", on: true }] },
+      { name: "OpenAI tool calling", boxes: [{ on: false, w: 64 }] },
+    ],
+    issues: [
+      { title: "a loop variable only exists if the loop ran", status: "cleared", kids: [
+        { title: "why the loop on line 684 runs 0 times for a guest", status: "cleared" } ] },
+      { title: "how the test fakes OpenAI", status: "saved" },
+    ] },
+  later: { title: "recruiters can filter offers by city", file: "app.py", locked: true,
+    job: { text: "a recruiter who names a city sees only that city's offers", on: false },
+    concepts: [
+      { name: "list comprehensions with a condition", boxes: [{ on: false, w: 74 }] },
+      { name: "OpenAI tool calling", boxes: [{ on: false, w: 58 }] },
+    ],
+    issues: [] },
+};
+const VARIATIONS = [
+  { key: "quiet", name: "Quiet", line: "The reference's tree lines and nothing else. Dark text is what is proven or happening now; grey is done; pale is not open yet." },
+  { key: "check", name: "Checkbox", line: "The same, plus one small square that stays still: filled once a box is proven." },
+  { key: "bare", name: "Bare", line: "No lines, no marks, no accent. Indentation and text tone carry everything." },
+];
+const ROWS = [
+  ["Main sidebar", (v) => sidebar(v)],
+  ["A task in progress", (v) => panel(v, STATES.progress)],
+  ["A task near its end", (v) => panel(v, STATES.end)],
+  ["A task not open yet", (v) => panel(v, STATES.later)],
+  ["While the tutor answers", (v) => chat(v)],
+];
+
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const svg = (d, size = 15) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+const COLLAPSE = "M11 17l-5-5 5-5M18 17l-5-5 5-5", EXPAND = "M13 17l5-5-5-5M6 17l5-5-5-5", UP = "M6 15l6-6 6 6", SEND = "M12 20V5M6 11l6-6 6 6";
+
+const mark = (v, on) => (v === "check" ? `<span class="mk${on ? " on" : ""}"></span>` : "");
+function box(v, b) {
+  const body = b.text ? `<span class="t">${esc(b.text)}</span>` : `<span class="blank" style="width:${b.w}px"></span>`;
+  return `<div class="kid"><button class="item box${b.on ? " on" : ""}"${b.on ? "" : " disabled"}>${mark(v, b.on)}${body}</button></div>`;
+}
+function concept(v, c) {
+  const checked = c.boxes.every((b) => b.on);
+  return `<div class="kid"><div class="item${checked ? " on" : ""}">${mark(v, checked)}<span class="t">${esc(c.name)}</span></div>
+    <div class="kids">${c.boxes.map((b) => box(v, b)).join("")}</div></div>`;
+}
+function issue(v, i) {
+  return `<div class="kid"><button class="item issue ${i.status}${i.sel ? " sel" : ""}"><span class="t">${esc(i.title)}</span></button>
+    ${i.kids ? `<div class="kids">${i.kids.map((k) => issue(v, k)).join("")}</div>` : ""}</div>`;
+}
+const group = (title, inner) =>
+  `<div class="grp open"><button class="grp-head" aria-expanded="true">${title}<span class="chev">${svg(UP, 13)}</span></button><div class="kids">${inner}</div></div>`;
+function panel(v, s) {
+  const body = group("The job", box(v, s.job))
+    + group("Concepts", s.concepts.map((c) => concept(v, c)).join(""))
+    + (s.issues.length ? group("Issues", s.issues.map((i) => issue(v, i)).join("")) : "");
+  return `<div class="frame f-panel ${v}"><div class="rail">${svg(EXPAND, 16)}</div>
+    <div class="pn${s.locked ? " locked" : ""}"><div class="pn-title">${esc(s.title)}</div>
+    <button class="file" title="Open in Codebase">${esc(s.file)}</button><div class="body">${body}</div></div></div>`;
+}
+function sidebar(v) {
+  const rows = LADDER.map((t) => `<button class="row ${t.status}"${t.status === "later" ? ' tabindex="-1"' : ""}>${esc(t.title)}</button>`).join("");
+  return `<div class="frame f-side ${v}"><div class="sb-top">${svg(COLLAPSE)}</div>
+    <button class="sb-add">Add new codebase</button><div class="sb-label">Codebases</div>
+    <div class="sb-repo">chatbot_final_version</div><div class="rows">${rows}</div></div>`;
+}
+function chat(v) {
+  const send = {
+    quiet: `<span class="send" aria-label="Stop"><span class="stop"></span></span>`,
+    check: `<span class="send off">${svg(SEND, 15)}</span>`,
+    bare: `<span class="send">${svg(SEND, 15)}</span>`,
+  }[v];
+  return `<div class="frame f-chat ${v}">
+    <div class="bubble">Lines 469–470 return [] when there is no user_id.</div>
+    <div class="stream">Right: for a guest the loop gets []. Now connect it</div>
+    <div class="composer"><span class="ph">Answer…</span>${send}</div></div>`;
+}
+
+const board = document.getElementById("board");
+board.insertAdjacentHTML("beforeend", `<div></div>` + VARIATIONS.map((x, i) =>
+  `<div class="colhead"><b><span>Variation ${i + 1}</span> · ${x.name}</b><p>${x.line}</p></div>`).join(""));
+for (const [label, draw] of ROWS)
+  board.insertAdjacentHTML("beforeend", `<div class="rowhead">${label}</div>` + VARIATIONS.map((x) => `<div>${draw(x.key)}</div>`).join(""));
+
+// The groups fold like the real panel; a task row can be picked.
+board.addEventListener("click", (e) => {
+  const head = e.target.closest(".grp-head");
+  if (head) {
+    const g = head.parentElement;
+    g.classList.toggle("open");
+    head.setAttribute("aria-expanded", g.classList.contains("open"));
+    return;
+  }
+  const row = e.target.closest(".row");
+  if (row && !row.classList.contains("later"))
+    row.parentElement.querySelectorAll(".row").forEach((r) => r.classList.toggle("sel", r === row));
+});
+</script>

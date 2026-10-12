@@ -1,376 +1,334 @@
-import demo from "./demo.json";
+// Demo mode: the same contract as live.ts, in memory, playing the T3 scenario.
+import {
+  FILES,
+  HISTORY,
+  T3_START,
+  T3_STEPS,
+  TASKS,
+  WORKSPACE_NAME,
+  type CraftedTask,
+  type Line,
+  type Step,
+} from "./demo";
 import type {
   Api,
-  DriverState,
-  Snapshot,
-  Message,
-  AsideAck,
+  Attachment,
   Handlers,
+  LadderIssue,
+  LadderTask,
+  Message,
+  PreparingEvents,
+  StoryLine,
   StreamEvents,
-  ScanEvents,
-  Unit,
+  TaskSheet,
+  Where,
+  Workspace,
 } from "./types";
-export const demoFiles: Record<string, string> = Object.fromEntries(
-  Object.entries(demo.FILES).map(([path, f]) => [path, f.code.join("\n")]),
-);
-export function createStubApi(): Api {
-  let revision = 1,
-    workspaceRevision = 0,
-    content = "",
-    counter = 100,
-    selected = "demo";
-  const codebases = [
-    {
-      id: "demo",
-      name: "run_prompts.py",
-      session_id: "demo-session",
-      unit_count: 6,
-    },
-  ];
-  const units: Unit[] = demo.CODEBASES[0].units.map((u, i) => ({
-    ...u,
-    id: i + 1,
-    title: u.slug,
-    file: "run_prompts.py",
-    lo:
-      demo.FILES["run_prompts.py"].units.find((v) => v.slug === u.slug)?.lo ||
-      0,
-    hi:
-      demo.FILES["run_prompts.py"].units.find((v) => v.slug === u.slug)?.hi ||
-      0,
-    ordinal: i,
-    depth: 0,
-    parent_id: null,
-    anchor_kind: "code",
-  }));
-  let state: DriverState = {
-    status: "awaiting_learner",
-    journey_id: 1,
-    projection_revision: revision,
-    turn_id: "stub-turn-1",
-    unit_id: 3,
-    axis: "ROBUSTNESS",
-    question:
-      "Now trace one input where a pinned id also appears unpinned. What comes out?",
-    step: "wakeup.probe",
-    highlight: true,
-    resume_question: null,
-    reason: "",
-  };
-  const snapshot: Snapshot = {
-    snapshot_version: 2,
-    journey: {
-      id: 1,
-      root_unit_id: 3,
-      state: "ACTIVE",
-      projection_revision: revision,
-    },
-    units,
-    axes: units.flatMap((unit) =>
-      ["COMPREHEND", "MECHANISM", "ROBUSTNESS"].map((axis, ordinal) => ({
-        unit_id: unit.id,
-        axis,
-        ordinal,
-        verdict: unit.state === "OWNED" ? "SOLID" : "UNGRADED",
-      })),
-    ),
-    semantic_nodes: [],
-    semantic_edges: [],
-    lifecycle: [],
-    conversation: [],
-    aside_threads: [],
-    aside_turns: [],
-    tool_calls: [],
-    axis_wording: {
-      COMPREHEND: "What it does",
-      MECHANISM: "How it works",
-      RATIONALE: "Why it's built this way",
-      ROBUSTNESS: "What can break",
-    },
-  };
-  const streams = new Set<Handlers<StreamEvents>>(),
-    scans = new Set<Handlers<ScanEvents>>();
-  function add(
-    role: string,
-    text: string,
-    thread: string | null = null,
-    refs: Message["refs"] = [],
-  ): Message {
-    const message: Message = {
-      id: ++counter,
-      role,
-      content: text,
-      message_kind: "text",
-      turn_id: state.turn_id,
-      sequence: snapshot.conversation.length + 1,
-      status: "COMPLETE",
-      axis: state.axis,
-      thread_kind: thread ? "aside" : "main",
-      thread_id: thread,
-      refs,
-    };
-    snapshot.conversation.push(message);
-    return message;
-  }
-  // Small fixture from the source demo. All subsequent writes use the real contract.
-  add(
-    "tutor",
-    "Before you write it — what does the caller expect back? Shape and order.",
-  );
-  add(
-    "learner",
-    "A list of question dicts, pinned first, preserving the passed order.",
-  );
-  add("tutor", state.question!);
-  const codeSample = demo.STREAM.find((item) => item.t === "code");
-  if (codeSample && "code" in codeSample)
-    add(
-      "tutor",
-      "Here’s the shape once you dedupe by the value you care about — collapse it if it’s in the way.\n\n```py\n" +
-        codeSample.code +
-        "```",
-    );
-  for (const [slug, value] of Object.entries(demo.UNITS)) {
-    const unit = units.find((u) => u.slug === slug);
-    if (!unit) continue;
-    for (const row of value.story)
-      snapshot.lifecycle.push({
-        id: ++counter,
-        unit_id: unit.id,
-        event_type: String(row[0]),
-        payload: {
-          text: row[2],
-          axis: row[3],
-          depth: row[1],
-          resume_question: row[4],
-        },
-      });
-  }
-  snapshot.lifecycle = snapshot.lifecycle.filter(
-    (e) => e.event_type !== "aside",
-  );
-  const thread = "demo-aside";
-  snapshot.aside_threads.push({
-    id: thread,
-    journey_id: 1,
-    unit_id: 3,
-    origin_message_id: snapshot.conversation[0].id,
-    title: "How does list.append differ from +?",
-  });
-  add(
-    "learner",
-    "Quick one — why out.append(q) and not out = out + [q]?",
-    thread,
-  );
-  add(
-    "tutor",
-    "append mutates the same list in place; + builds a new list each time.",
-    thread,
-  );
-  snapshot.lifecycle.splice(
-    snapshot.lifecycle.findIndex((e) => e.unit_id === 3) + 4,
-    0,
-    {
-      id: ++counter,
-      unit_id: 3,
-      event_type: "aside",
-      payload: {
-        thread_id: thread,
-        title: snapshot.aside_threads[0].title,
-        origin_message_id: snapshot.conversation[0].id,
-      },
-    },
-  );
+
+interface State {
+  workspace: Workspace;
+  status: Record<string, LadderTask["status"]>;
+  ticks: Record<string, Record<number, number>>; // task → box number → turn
+  issues: Record<string, LadderIssue[]>;
+  story: StoryLine[];
+  conversation: Message[];
+  where: Where | null;
+  turns: Record<string, number>; // task → its last turn
+  script: Step[]; // what the current task still has to play
+  revision: number;
+  sent: Map<string, number>; // client_message_id → turn
+  streams: Set<Handlers<StreamEvents>>;
+  stopping: boolean;
+}
+
+const PLACEHOLDER: Step = {
+  learner: null,
+  tutor:
+    "Demo mode: the scripted turns end here, so this reply is a placeholder.",
+  story: [],
+};
+
+export function createStubApi(options: { delay?: number } = {}): Api {
+  const delay = options.delay ?? 12;
+  const sleep = (ms: number) =>
+    ms ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve();
+  let counter = 0;
+  const next = () => String(++counter);
   const copy = <T>(value: T): T => structuredClone(value);
-  function changed() {
-    revision++;
-    state.projection_revision = revision;
-    snapshot.journey.projection_revision = revision;
-    streams.forEach((h) => h.revision?.({ revision }));
+  const crafted = (id: string) => TASKS.find((t) => t.id === id)!;
+  const states = new Map<string, State>();
+
+  function fresh(id: string, name: string, preparing: Workspace["preparing"]) {
+    const state: State = {
+      workspace: { id, name, preparing, tasks_done: 0, tasks_total: TASKS.length },
+      status: Object.fromEntries(TASKS.map((t) => [t.id, "later" as const])),
+      ticks: Object.fromEntries(TASKS.map((t) => [t.id, {}])),
+      issues: Object.fromEntries(TASKS.map((t) => [t.id, []])),
+      story: [],
+      conversation: [],
+      where: null,
+      turns: Object.fromEntries(TASKS.map((t) => [t.id, 0])),
+      script: [],
+      revision: 1,
+      sent: new Map(),
+      streams: new Set(),
+      stopping: false,
+    };
+    states.set(id, state);
+    return state;
   }
-  async function tokens(text: string, thread_id?: string) {
-    streams.forEach((h) =>
-      h.tool?.({
-        turn_id: state.turn_id!,
-        capability: "read_workspace",
-        agent: "TEACHER",
-        step: state.step!,
-      }),
-    );
-    for (const word of text.match(/\S+\s*/g) || []) {
-      await new Promise((r) => setTimeout(r, 12));
-      streams.forEach((h) =>
-        h.token?.({
-          turn_id: state.turn_id!,
-          text: word,
-          ...(thread_id ? { thread_id } : {}),
-        }),
-      );
+  function get(id: string) {
+    const state = states.get(id);
+    if (!state) throw new Error("Workspace not found");
+    return state;
+  }
+  function commit(s: State) {
+    s.revision++;
+    s.streams.forEach((h) => h.revision?.({ revision: s.revision }));
+  }
+  function line(s: State, task_id: string, turn: number, value: Line) {
+    const [kind, text, depth, issue_id, picking_up] = value;
+    s.story.push({
+      id: next(),
+      task_id,
+      issue_id,
+      turn,
+      depth,
+      kind,
+      text,
+      picking_up: picking_up ?? null,
+    });
+  }
+  function say(
+    s: State,
+    task_id: string,
+    turn: number,
+    role: Message["role"],
+    text: string,
+    attachments: Attachment[] = [],
+  ) {
+    s.conversation.push({ id: next(), task_id, turn, role, text, attachments });
+  }
+  // Card A: a fresh task sheet, the story's first line, the tutor speaks first.
+  function open(s: State, task: CraftedTask, step?: Step) {
+    s.status[task.id] = "current";
+    s.turns[task.id] = 0;
+    s.where = {
+      task_id: task.id,
+      issue_id: null,
+      depth: 0,
+      you_are_here: task.title,
+      tutor: "waiting_for_you",
+    };
+    const opening = step ?? {
+      learner: null,
+      tutor: task.opening,
+      story: [["started", task.title, 0, null] as Line],
+    };
+    say(s, task.id, 0, "tutor", opening.tutor);
+    apply(s, task.id, 0, opening);
+  }
+  // Code applies a turn's effects: ticks, issues, story lines, the focus.
+  function apply(s: State, task_id: string, turn: number, step: Step) {
+    for (const box of step.ticks ?? []) s.ticks[task_id][box] = turn;
+    if (step.open_issue) s.issues[task_id].push({ ...step.open_issue });
+    if (step.issue_status) {
+      const issue = s.issues[task_id].find((i) => i.id === step.issue_status![0]);
+      if (issue) issue.status = step.issue_status[1];
+    }
+    for (const value of step.story) line(s, task_id, turn, value);
+    if (step.where) s.where = { task_id, ...step.where, tutor: "waiting_for_you" };
+    if (step.close_task) {
+      s.status[task_id] = "done";
+      s.workspace.tasks_done = Object.values(s.status).filter((v) => v === "done").length;
+      s.where = null;
     }
   }
-  const acks = new Map<string, AsideAck>();
+  // Replays finished turns without streaming them.
+  function replay(s: State, task: CraftedTask, steps: Step[]) {
+    open(s, task, steps[0]);
+    steps.slice(1).forEach((step, i) => {
+      const turn = i + 1;
+      s.turns[task.id] = turn;
+      if (step.learner) say(s, task.id, turn, "learner", step.learner);
+      say(s, task.id, turn, "tutor", step.tutor);
+      apply(s, task.id, turn, step);
+    });
+  }
+  function sheet(s: State, task: CraftedTask): TaskSheet {
+    const ticks = s.ticks[task.id];
+    const box = (b: { number: number; text: string }, always: boolean) => ({
+      number: b.number,
+      // A concept's box shows its text only once it is ticked (FRONTEND.md, decision 1).
+      text: always || ticks[b.number] != null ? b.text : null,
+      ticked_at_turn: ticks[b.number] ?? null,
+    });
+    return {
+      the_job_is_done: box(task.job, true),
+      concepts: task.concepts.map((c) => ({
+        number: c.number,
+        name: c.name,
+        checked: c.boxes.every((b) => ticks[b.number] != null),
+        boxes: c.boxes.map((b) => box(b, false)),
+      })),
+    };
+  }
+  function ladder(s: State): LadderTask[] {
+    return TASKS.map((t) => ({
+      id: t.id,
+      number: t.number,
+      title: t.title,
+      goal: t.goal,
+      tier: t.tier,
+      files: [...t.files],
+      status: s.status[t.id],
+      sheet: sheet(s, t),
+      issues: copy(s.issues[t.id]),
+    }));
+  }
+
+  {
+    const demo = fresh("demo", WORKSPACE_NAME, "ready");
+    for (const past of HISTORY) replay(demo, crafted(past.task_id), past.steps);
+    replay(demo, crafted("T3"), T3_STEPS.slice(0, T3_START));
+    demo.script = T3_STEPS.slice(T3_START);
+  }
+
   return {
-    codebases: async () => copy(codebases),
-    register: async (body) => {
-      const id = `codebase-${++counter}`;
-      codebases.push({
-        id,
-        name: body.name,
-        session_id: `${id}-session`,
-        unit_count: units.length,
-      });
-      return { codebase_id: id, name: body.name };
+    workspaces: async () => [...states.values()].map((s) => copy(s.workspace)),
+    importRepository: async (body) => {
+      if (!/^https:\/\/\S+$/.test(body.git_url))
+        throw new Error("Use an https:// repository URL.");
+      const state = fresh(`workspace-${next()}`, body.name, "running");
+      return { workspace_id: state.workspace.id };
     },
-    importRepo: async (body) => {
-      const id = `codebase-${++counter}`;
-      codebases.push({
-        id,
-        name: body.name,
-        session_id: `${id}-session`,
-        unit_count: units.length,
-      });
-      return { codebase_id: id, name: body.name };
-    },
-    open: async (id) => {
-      const cb = codebases.find((c) => c.id === id);
-      if (!cb) throw new Error("Codebase not found");
-      selected = cb.id;
-      return { session_id: cb.session_id };
-    },
-    init: async (body) => {
-      workspaceRevision = 0;
-      return {
-        document_id: body.document_id,
-        display_name: body.display_name,
-        workspace_revision: workspaceRevision,
-      };
-    },
-    map: async () => {
-      for (const text of [
-        "Reading " +
-          (codebases.find((c) => c.id === selected)?.name || "codebase"),
-        "Tracing dependencies",
-        "Ordering the ladder",
-      ]) {
-        scans.forEach((h) => h.thinking?.({ text }));
-        await new Promise((r) => setTimeout(r, 260));
-      }
-      for (const u of units) {
-        scans.forEach((h) =>
-          h.unit?.({ slug: u.slug, file: u.file, lo: u.lo, hi: u.hi }),
-        );
-        await new Promise((r) => setTimeout(r, 170));
-      }
-      changed();
-      scans.forEach((h) => h.done?.({ journey_id: state.journey_id }));
-      return copy(state);
-    },
-    resume: async () => {
-      state.status = "awaiting_learner";
-      snapshot.journey.state = "ACTIVE";
-      changed();
-      return copy(state);
-    },
-    park: async () => {
-      state.status = "parked";
-      snapshot.journey.state = "PARKED";
-      changed();
-      return {
-        status: "parked",
-        journey_id: state.journey_id,
-        projection_revision: revision,
-      };
-    },
-    snapshot: async (id, since) => ({
-      journey_id: id,
-      changed: since !== revision,
-      revision,
-      snapshot: since === revision ? null : copy(snapshot),
-    }),
-    answer: async (_id, body) => {
-      if (body.turn_id !== state.turn_id)
-        throw new Error("This question has changed. Refresh before answering.");
-      add("learner", body.answer, null, body.refs);
-      const reply =
-        "Stub response: trace the output for two questions with the same id.";
-      await tokens(reply);
-      state.turn_id = `stub-turn-${++counter}`;
-      state.question = reply;
-      add("tutor", reply);
-      changed();
-      return copy(state);
-    },
-    aside: async (_id, body) => {
-      if (acks.has(body.request_id)) return copy(acks.get(body.request_id)!);
-      const thread_id = body.thread_id || `aside-${++counter}`;
-      if (!body.thread_id) {
-        snapshot.aside_threads.push({
-          id: thread_id,
-          journey_id: state.journey_id,
-          unit_id: body.unit_id,
-          origin_message_id: body.origin_message_id ?? null,
-          title: body.question || "Side question",
-        });
-        snapshot.lifecycle.push({
-          id: ++counter,
-          unit_id: body.unit_id,
-          event_type: "aside",
-          payload: {
-            thread_id,
-            title: body.question || "Side question",
-            origin_message_id: body.origin_message_id,
-          },
-        });
-      }
-      const learner = add("learner", body.question, thread_id, body.refs);
-      const reply =
-        "Stub response: this side question leaves your lesson question unchanged.";
-      await tokens(reply, thread_id);
-      const tutor = add("tutor", reply, thread_id);
-      changed();
-      const ack: AsideAck = {
-        operation: "aside",
-        journey_id: state.journey_id,
-        thread_id,
-        request_id: body.request_id,
-        status: "complete",
-        learner_message_id: learner.id,
-        reply_message_id: tutor.id,
-        projection_revision: revision,
-      };
-      snapshot.aside_turns.push({
-        id: body.request_id,
-        thread_id,
-        status: "COMPLETE",
-        learner_message_id: learner.id,
-        reply_message_id: tutor.id,
-      });
-      acks.set(body.request_id, ack);
-      return copy(ack);
-    },
-    workspace: async (body) => {
-      if (body.expected_revision !== workspaceRevision)
-        throw new Error("Workspace changed. Reload before submitting.");
-      const changed = body.content !== content;
-      content = body.content;
-      if (changed) workspaceRevision++;
-      return {
-        changed,
-        workspace_revision: workspaceRevision,
-        revision_hash: `stub-${workspaceRevision}`,
-      };
-    },
-    stream: (_id, handlers) => {
-      streams.add(handlers);
+    preparing: (workspace, handlers: Handlers<PreparingEvents>) => {
+      const s = get(workspace);
+      let stopped = false;
+      const pause = () => sleep(delay * 20);
+      void (async () => {
+        if (s.workspace.preparing !== "ready") {
+          const concepts = [
+            ...new Map(
+              TASKS.flatMap((t) => t.concepts).map((c) => [c.number, c]),
+            ).values(),
+          ];
+          const steps: [PreparingEvents["step"]["name"], number | null][] = [
+            ["copying", null],
+            ["concepts", concepts.length],
+            ["tasks", TASKS.length],
+            ["ordering", null],
+          ];
+          for (const [name, count] of steps) {
+            if (stopped) return;
+            handlers.step?.({ name, state: "running", count: null });
+            await pause();
+            if (name === "concepts")
+              for (const c of concepts) {
+                if (stopped) return;
+                handlers.concept?.({ number: c.number, name: c.name });
+                await pause();
+              }
+            if (name === "tasks")
+              for (const t of TASKS) {
+                if (stopped) return;
+                handlers.task?.({ id: t.id, number: t.number, title: t.title });
+                await pause();
+              }
+            handlers.step?.({ name, state: "done", count });
+          }
+          s.workspace.preparing = "ready";
+          commit(s);
+        }
+        if (!stopped) handlers.ready?.({ tasks_total: TASKS.length });
+      })();
       return () => {
-        streams.delete(handlers);
+        stopped = true;
       };
     },
-    scan: (handlers) => {
-      scans.add(handlers);
-      return () => {
-        scans.delete(handlers);
+    task: async (workspace, task) => {
+      const found = ladder(get(workspace)).find((t) => t.id === task);
+      if (!found) throw new Error("Task not found");
+      return found;
+    },
+    start: async (workspace) => {
+      const s = get(workspace);
+      if (!Object.values(s.status).some((v) => v !== "later")) {
+        open(s, TASKS[0]);
+        commit(s);
+      }
+      return { revision: s.revision };
+    },
+    snapshot: async (workspace, since) => {
+      const s = get(workspace);
+      if (since === s.revision)
+        return { changed: false, revision: s.revision, snapshot: null };
+      return {
+        changed: true,
+        revision: s.revision,
+        snapshot: {
+          revision: s.revision,
+          workspace: copy(s.workspace),
+          ladder: ladder(s),
+          where: copy(s.where),
+          story: copy(s.story),
+          conversation: copy(s.conversation),
+        },
       };
+    },
+    send: async (workspace, body) => {
+      const s = get(workspace);
+      const seen = s.sent.get(body.client_message_id);
+      if (seen != null) return { turn: seen };
+      const where = s.where;
+      if (!where) throw new Error("Every task is done.");
+      if (where.tutor === "answering")
+        throw new Error("The tutor is still answering.");
+      const task_id = where.task_id,
+        turn = ++s.turns[task_id];
+      s.sent.set(body.client_message_id, turn);
+      say(s, task_id, turn, "learner", body.text, copy(body.attachments));
+      where.tutor = "answering";
+      s.stopping = false;
+      commit(s);
+      const step = s.script.shift() ?? PLACEHOLDER;
+      for (const doing of step.tools ?? []) {
+        s.streams.forEach((h) => h.tool?.({ task_id, turn, doing }));
+        await sleep(delay * 15);
+      }
+      let said = "";
+      for (const word of step.tutor.match(/\S+\s*/g) || []) {
+        if (s.stopping) break;
+        await sleep(delay);
+        said += word;
+        s.streams.forEach((h) => h.tutor?.({ task_id, turn, text: word }));
+      }
+      s.stopping = false;
+      say(s, task_id, turn, "tutor", said.trimEnd());
+      apply(s, task_id, turn, step);
+      if (step.close_task) {
+        const following = TASKS.find((t) => s.status[t.id] === "later");
+        if (following) open(s, following);
+      }
+      if (s.where) s.where.tutor = "waiting_for_you";
+      commit(s);
+      return { turn };
+    },
+    stop: async (workspace) => {
+      const s = get(workspace);
+      if (s.where?.tutor === "answering") s.stopping = true;
+    },
+    stream: (workspace, handlers) => {
+      const s = get(workspace);
+      s.streams.add(handlers);
+      return () => {
+        s.streams.delete(handlers);
+      };
+    },
+    files: async () => Object.keys(FILES),
+    file: async (_workspace, path) => {
+      if (FILES[path] == null) throw new Error("File not found");
+      return { path, text: FILES[path] };
     },
   };
 }

@@ -1,6 +1,6 @@
 # Tutor frontend
 
-Next.js App Router + React + TypeScript. The original HTML files remain untouched. `/` is the tutor; `/scan` is the import and scan screen.
+Next.js App Router + React + TypeScript. `/` is the tutor; `/scan` is the import page. The old HTML prototypes now live in `dev_master/new_completly_desighn/archive/agentic_tutor/frontend/`.
 
 Use Node 22.12+ (Vercel: Node 22.x). From this directory:
 
@@ -16,7 +16,7 @@ Copy `.env.example` to `.env.local`:
 
 | Variable | Value |
 | --- | --- |
-| `TRANSPORT` | `stub` (default) or `live`; restart/rebuild after changing |
+| `NEXT_PUBLIC_TRANSPORT` | `stub` (default) or `live`; restart/rebuild after changing |
 | `NEXT_PUBLIC_API_BASE` | Separate backend origin, e.g. `http://localhost:8000` |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public anonymous/publishable key; never a service-role key |
@@ -25,17 +25,16 @@ Without Supabase configuration, `useAuth()` returns a stub identity. With config
 
 Set the Vercel project root to `agentic_tutor/frontend`, use the Next.js preset, and configure the variables above. The backend stays on its own persistent host. No backend handlers or secrets are deployed with this frontend. Dependencies are locked by `package-lock.json`.
 
-`lib/api/types.ts` is the wire contract; `live.ts` and `stub.ts` implement the same interface. Components consume `useTutor()` and do not fetch. The stub is in memory and resets on a full reload. CSS is copied from the demos and scoped per screen to preserve both token systems. The extraction script is only a migration aid.
+`lib/api/types.ts` is the wire contract; `live.ts` and `stub.ts` implement the same interface. Components consume `useTutor()` and do not fetch. The stub is in memory and resets on a full reload. CSS is copied from the demos and scoped per screen to preserve both token systems; `app/sidebar.css` holds what both screens share.
 
-## Backend wiring gaps verified in the repository
+## The contract
 
-- Existing `app.py` does not yet expose `/codebases`, codebase open, or either stream. The client implements the requested target URLs; it does not substitute invented routes. Snapshots also poll every four seconds while SSE is unavailable. The existing server has no authenticated control-plane/session routing; it must verify the Bearer token and select the opened user's session.
-- `user_id` is carried as `X-User-Id`, not an extra JSON property: `AsideBody` forbids extra fields. The server must derive identity from the verified token rather than trust this header. Enable CORS for the Vercel origin and these headers.
-- Native browser `EventSource` cannot send `Authorization`. The standards-compatible `eventsource` client supplies a fetch hook for Bearer headers and token refresh. Tokens never appear in URLs.
-- Current journey, unit, and conversation IDs are integers. Types accept string or number and preserve the received wire type. Code references capture complete lines, including indentation, because `references.py` requires exact file/line equality.
-- The API has no source-file read/upload contract. Folder selection reads source locally for the explorer; registration sends only the specified `{name, source}`. A browser cannot give the remote backend access to a local folder. The backend must already resolve the chosen source. Remote-only codebases cannot display unseen source until a file-read/upload contract is supplied.
-- Mapping has no unit-count request field. Generate starts one map operation; the stepper controls how many streamed units are revealed at once. Later batches reveal the remaining returned units without rerunning mapping or inventing a count field.
-- The existing `/session/resume` restores **parked** sessions only. Codebase open returns only `session_id`, with no journey ID or active DriverState. This browser caches its last live routing state for reloads, but opening an already-active session in a fresh browser still needs a backend contract for returning that state. The client does not remap an existing session to work around this gap.
-- `/workspace` has one document and an optimistic revision. Submit initializes that document through `/session`, then writes the returned revision. Editor tabs remain local; the API does not provide a multi-file write or workspace read endpoint.
+`lib/api/types.ts` is the wire contract, described in `new_completly_desighn/FRONTEND.md` §7–§8. It is page 1 of the backend spec: the backend serves exactly these routes.
+
+- One snapshot per workspace, with a revision number. The stream sends `revision` when it changes, plus `tutor` (the reply, piece by piece) and `tool` (what the tutor is reading).
+- Two sidebars on the left, following the reference design's layout. The first lists the repositories and their tasks, one short row each. A click on a task folds it into its rail and opens the second: the task's goal, tier, files, the job box, its concepts with their boxes, and its issues. A concept's box shows its text only once it is ticked; the server sends `null` until then, and the screen shows a blank bar.
+- Brand rule: the screen never numbers things (no task, box, concept or issue numbers); the order of a list says it.
+- The answer key, the orchestrator's answers, the stuck level and the tutor's instructions never reach this screen.
+- Demo mode (`stub.ts` + `demo.ts`) plays task T3 of the design's scenario from turn 6; each message plays the next turn, and the last one closes task T3 and opens task T4. Importing any `https://` URL simulates the four preparing steps.
 
 On this Windows machine, Application Control blocks Next's native SWC binary. The scripts use webpack so Next can use its supported WASM fallback without changing system security settings.

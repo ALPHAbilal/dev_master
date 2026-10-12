@@ -140,8 +140,6 @@ textarea { border: none; outline: none; }
 .unit-story .b  { font-weight:700; }
 .unit-story i   { font-style:italic; }
 /* clickable side-question anchor in the map → jumps to its thread in the conversation */
-.unit-story .story-aside { cursor:pointer; border-radius:5px; padding:1px 6px; transition:background 120ms; }
-.unit-story .story-aside:hover { background:var(--accent-soft); }
 /* the line the learner is working on now: a soft accent sheen sliding across it */
 .unit-story .hl-here { border-radius:5px; padding:2px 6px; background:linear-gradient(100deg,transparent 8%,var(--accent-soft) 30%,transparent 62%); background-size:220% 100%; animation:hereSweep 2.8s linear infinite; }
 @keyframes hereSweep { 0%{background-position:130% 0;} 100%{background-position:-30% 0;} }
@@ -179,16 +177,6 @@ textarea { border: none; outline: none; }
 .agent-run .stamp .arrow { color:var(--text-disabled); margin-right:6px; }
 .agent-run .stamp .skind { color:var(--text-secondary); }
 
-/* JUDGE feedback — neutral, no accent, no side rule; a dot marks the verdict */
-.feedback { align-self:flex-start; max-width:92%; display:flex; flex-direction:column; gap:7px; padding:11px 14px; border-radius:var(--radius-sm); background:var(--bg-surface); }
-.feedback .fb-top { display:flex; align-items:center; gap:9px; }
-.verdict { font-size:9.5px; font-weight:700; letter-spacing:0.08em; padding:3px 9px; border-radius:9999px; background:var(--bg-elevated); color:var(--text-secondary); }
-.verdict::before { content:""; display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:6px; vertical-align:middle; background:var(--text-muted); }
-.verdict.SOLID::before { background:var(--text-primary); }
-.verdict.MISSING::before { background:transparent; box-shadow:inset 0 0 0 1.5px var(--text-muted); }
-.feedback .cat { font-size:11.5px; color:var(--text-muted); font-family:var(--font-code); }
-.feedback .fb-body { font-size:14px; color:var(--text-secondary); line-height:1.6; }
-.feedback .agent { margin-left:auto; font-size:9px; color:var(--text-disabled); font-family:var(--font-code); }
 
 /* ── AI teaching artifacts in the conversation ──────────────────────────────
  * The one structured block the tutor emits inside the chat: generated code
@@ -233,36 +221,6 @@ textarea { border: none; outline: none; }
 @media (prefers-reduced-motion:reduce){
   .ai-code .code-head, .ai-code .code-body, .ai-code .code-inner { transition:none; } }
 
-/* ── side question ("aside") ────────────────────────────────────────────────
- * An off-the-record mini-thread the learner spins up from the main conversation
- * (via "@…" or by highlighting code). It is NOT graded / not part of the main
- * transcript — marked by a dashed rule + muted eyebrow — and it collapses/expands
- * exactly like the code cell (grid-rows 1fr↔0fr) so it can be folded and revisited. */
-.aside { align-self:stretch; max-width:100%; }
-.aside-eyebrow { font-family:var(--font-code); font-size:10px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); display:flex; align-items:center; gap:7px; margin-bottom:6px; }
-.aside-cell { border:1px dashed var(--bg-hover); border-radius:var(--radius-sm); background:var(--bg-app); overflow:hidden; }
-.aside-head { display:flex; align-items:center; gap:10px; width:100%; text-align:left; cursor:pointer; padding:10px 14px; color:var(--text-primary); transition:background var(--transition-fast); }
-.aside-head:hover { background:var(--bg-surface); }
-.aside-head .ah-title { font-size:13px; font-weight:600; }
-.aside-head .ah-caret { margin-left:auto; font-size:13px; color:var(--text-muted); width:1em; text-align:center; }
-.aside-body { display:grid; grid-template-rows:1fr; transition:grid-template-rows 240ms ease; }
-.aside-inner { overflow:hidden; min-height:0; }
-.aside.collapsed .aside-body { grid-template-rows:0fr; }
-.aside-pad { padding:2px 14px 13px; display:flex; flex-direction:column; gap:10px; }
-.aside-quote { font-family:var(--font-code); font-size:12px; color:var(--text-secondary); background:var(--bg-deepest); border-left:2px solid var(--bg-hover); border-radius:0 6px 6px 0; padding:6px 10px; white-space:pre; overflow-x:auto; }
-.aside-quote .qf { display:block; font-size:9.5px; letter-spacing:0.06em; color:var(--text-disabled); text-transform:uppercase; margin-bottom:3px; }
-/* same left/right split as the main conversation: learner right (bubble), tutor left (plain) */
-.aside-qa { display:flex; flex-direction:column; max-width:88%; }
-.aside-qa.learner { align-self:flex-end; align-items:flex-end; }
-.aside-qa.tutor { align-self:flex-start; align-items:flex-start; }
-.aside-qa .say { font-size:13.5px; line-height:1.55; color:var(--text-secondary); }
-.aside-qa.tutor .say { color:var(--text-primary); }
-.aside-qa.learner .say { background:var(--bg-elevated); border-radius:14px 14px 4px 14px; padding:8px 12px; color:var(--text-primary); }
-.aside-qa .say code { font-family:var(--font-code); font-size:12.5px; background:var(--bg-surface); color:var(--text-primary); padding:1px 5px; border-radius:4px; }
-.aside-ask { display:flex; align-items:flex-end; gap:8px; background:var(--bg-surface); border-radius:10px; padding:8px 8px 8px 12px; }
-.aside-ask textarea { flex:1; background:transparent; color:var(--text-primary); font-family:var(--font-ui); font-size:13px; line-height:1.5; resize:none; min-height:20px; max-height:120px; }
-.aside-ask .send { width:28px; height:28px; border-radius:50%; background:var(--accent); color:var(--on-accent); display:grid; place-items:center; flex-shrink:0; }
-.aside-ask .send:hover { background:#6a90b0; }
 .convo-inner.focused .turn:not(.ev), .convo-inner.focused .feedback:not(.ev), .convo-inner.focused .agent-run:not(.ev) { opacity:0.22; }
 /* composer (conversation mode) — modern agent pattern: auto-grow textarea on top,
  * a control row beneath (mode switch left, send right). Column stack; the two rows
@@ -271,19 +229,12 @@ textarea { border: none; outline: none; }
 .composer { width:100%; max-width:720px; background:var(--bg-deepest); border:1px solid var(--bg-elevated); border-radius:18px;
   padding:10px 10px 8px; display:flex; flex-direction:column; gap:6px; transition:border-color 160ms ease, box-shadow 160ms ease; }
 .composer:focus-within { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
-.composer[data-mode="aside"] { border-color:var(--accent-dim); box-shadow:0 0 0 3px var(--accent-soft); }
 .chat-input { width:100%; background:transparent; border:0; outline:none; resize:none;
   color:var(--text-primary); font-family:var(--font-ui); font-size:14px; line-height:1.55;
   min-height:24px; max-height:180px; overflow-y:auto; padding:4px 8px 0; }
 .chat-input::placeholder { color:var(--text-disabled); }
 .chat-input::-webkit-scrollbar-button { display:none; width:0; height:0; }  /* kill scrollbar up/down arrows */
 .composer-bar { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-/* Answer ⇄ Side-question segmented switch */
-.mode-switch { display:inline-flex; gap:2px; background:var(--bg-surface); border-radius:10px; padding:3px; }
-.ms-opt { font-size:11.5px; font-weight:600; color:var(--text-muted); padding:5px 12px; border-radius:7px; transition:var(--transition-fast); }
-.ms-opt:hover { color:var(--text-secondary); }
-.ms-opt.on { color:var(--on-accent); background:var(--accent); }
-.composer[data-mode="aside"] .ms-opt.on { background:var(--accent-dim); }
 .chat-send { width:34px; height:34px; border-radius:50%; background:var(--accent); color:var(--on-accent); display:grid; place-items:center; flex-shrink:0; transition:var(--transition-fast); }
 .chat-send:hover { background:#6a90b0; }
 .chat-send:disabled { background:var(--bg-elevated); color:var(--text-disabled); cursor:default; }
@@ -332,11 +283,6 @@ textarea { border: none; outline: none; }
 .rview.on { display:block; }
 .codebase { font-family:var(--font-code); font-size:12.5px; line-height:1.7; padding:8px 0 12px; }
 .code-line { display:flex; align-items:center; padding-right:12px; }
-.code-line.hl { background:rgba(79,114,144,0.13); }
-.code-line.hl2 { background:rgba(0,0,0,0.04); }
-.code-line.dimfile { opacity:0.5; }
-.code-line .utag { margin-left:auto; flex-shrink:0; font-family:var(--font-ui); font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-muted); padding-left:10px; }
-.code-line.hl .utag { color:var(--accent); }
 /* VSCode-style layout: a collapsible file-tree column on the LEFT, the clicked
  * file's source on the RIGHT. Each folder collapses from its own caret; the
  * whole tree collapses from the Explorer header. */
@@ -376,19 +322,11 @@ textarea { border: none; outline: none; }
 .ex-name { display:inline-block; white-space:nowrap; }
 .ex-name.scrolling { animation:exMarquee var(--dur,3s) linear infinite alternate; }
 @keyframes exMarquee { from{transform:translateX(0);} to{transform:translateX(var(--shift,0));} }
-.ex-count { flex-shrink:0; margin-left:6px; font-size:10px; color:var(--text-disabled); background:var(--bg-app); border-radius:9999px; padding:1px 7px; }
 .cb-code { flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; }
 .cb-toolbar { flex-shrink:0; display:flex; align-items:center; justify-content:flex-end; padding:7px 14px; border-bottom:1px solid var(--bg-app); }
 .cb-scroll { flex:1; min-height:0; overflow:auto; }
 /* focus toggle — off: every unit range highlighted (overlaps read normally);
  * on: only the current unit's range is highlighted, everything else plain. */
-.ftoggle { display:inline-flex; align-items:center; gap:8px; font-size:11.5px; color:var(--text-muted); transition:color var(--transition-fast); }
-.ftoggle:hover { color:var(--text-secondary); }
-.ftoggle[aria-checked="true"] { color:var(--text-primary); }
-.ftoggle-track { position:relative; width:30px; height:17px; border-radius:999px; background:var(--bg-elevated); transition:background 160ms; flex-shrink:0; }
-.ftoggle-knob { position:absolute; top:2px; left:2px; width:13px; height:13px; border-radius:50%; background:var(--bg-deepest); box-shadow:0 1px 2px rgba(0,0,0,0.22); transition:transform 160ms cubic-bezier(0.4,0,0.2,1); }
-.ftoggle[aria-checked="true"] .ftoggle-track { background:var(--accent); }
-.ftoggle[aria-checked="true"] .ftoggle-knob { transform:translateX(13px); }
 .ln { width:44px; flex-shrink:0; text-align:right; padding-right:14px; color:var(--text-disabled); user-select:none; }
 .code { color:var(--text-secondary); white-space:pre; }
 .file-sep { font-family:var(--font-ui); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); padding:4px 16px 6px; }

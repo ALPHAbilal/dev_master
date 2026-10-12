@@ -1,198 +1,114 @@
 import { Fragment } from "react";
 import { useTutor } from "@/lib/session";
-import type { Lifecycle, Unit } from "@/lib/api/types";
-export function payload(event: Lifecycle): Record<string, unknown> {
-  if (event.payload) return event.payload;
-  try {
-    return JSON.parse(event.payload_json || "{}");
-  } catch {
-    return {};
-  }
-}
-export default function Map({
-  unit,
-  openAside,
-}: {
-  unit?: Unit;
-  openAside(id: string): void;
-}) {
-  const { snapshot, driver } = useTutor();
-  const descendants = new Set([String(unit?.id)]);
-  // Walk only descendants of the selected unit; preserve lifecycle order.
+import type { Id, LadderIssue, LadderTask, StoryKind, StoryLine } from "@/lib/api/types";
+// Every kind of story line: its mark, its words, and their colors.
+const LABELS: Record<StoryKind, [string, string, string, string]> = {
+  started: ["• ", "Started  ", "dm", "fg"],
+  did: ["✓ ", "Did  ", "o b", "fg"],
+  ticked: ["☑ ", "", "o b", "fg"],
+  almost: ["~ ", "Almost  ", "od b", "fg"],
+  found_a_gap: ["⚠ ", "Found a gap  ", "g b", "fg"],
+  went_to_learn_first: ["↳ ", "Went to learn first — ", "g", "cy b"],
+  needed_first: ["↳ ", "Needed first — ", "g", "cy b"],
+  saved_for_later: ["○ ", "Saved for later  ", "dm", "dm"],
+  cleared: ["★ ", "Cleared — ", "o", "cy"],
+  already_knew: ["✕ ", "Already knew it — ", "o", "cy"],
+  came_back: ["↩ ", "Came back to ", "o b", "cy b"],
+  done: ["★ ", "Done — ", "o b", "cy b"],
+};
+// An issue and every issue opened inside it.
+function subtree(issues: LadderIssue[], root: Id): Set<Id> {
+  const ids = new Set([root]);
   let grew = true;
   while (grew) {
     grew = false;
-    for (const child of snapshot?.units || [])
+    for (const issue of issues)
       if (
-        child.parent_id != null &&
-        descendants.has(String(child.parent_id)) &&
-        !descendants.has(String(child.id))
+        issue.parent_issue_id != null &&
+        ids.has(issue.parent_issue_id) &&
+        !ids.has(issue.id)
       ) {
-        descendants.add(String(child.id));
+        ids.add(issue.id);
         grew = true;
       }
   }
-  const events =
-    snapshot?.lifecycle.filter((e) => descendants.has(String(e.unit_id))) || [];
-  const wording = snapshot?.axis_wording || {};
-  function line(event: Lifecycle) {
-    const p = payload(event),
-      depth = Number(
-        p.depth ??
-          Math.max(
-            0,
-            (snapshot?.units.find((u) => String(u.id) === String(event.unit_id))
-              ?.depth || 0) - (unit?.depth || 0),
-          ),
-      ),
-      rail = <span className="fa">{"│  ".repeat(depth)}</span>;
-    const text = String(p.text ?? p.title ?? p.reason ?? unit?.title ?? ""),
-      axis = String(p.axis ?? event.axis ?? "");
-    const at =
-      axis && wording[axis] ? (
-        <span className="dm">{"  ‹" + wording[axis] + "›"}</span>
-      ) : null;
-    const kind =
-      (
-        {
-          teaching_presented: "learned",
-          unit_distilled: "sealed",
-          parent_resumed: "return",
-          detour_started: "dive",
-          gap_opened: "gap",
-          journey_parked: "locked",
-          journey_completed: "sealed",
-        } as Record<string, string>
-      )[event.event_type] || event.event_type;
-    if (kind === "aside")
-      return (
-        <>
-          {rail}
-          <button
-            className="story-aside"
-            onClick={() => openAside(String(p.thread_id))}
-          >
-            <span className="dm">@ aside </span>
-            <span className="cy">{String(p.title || "Side question")}</span>
-          </button>
-        </>
-      );
-    const labels: Record<string, [string, string, string]> = {
-      learned: ["• ", "Learned   ", "dm"],
-      proved: ["✓ ", "Proved    ", "o b"],
-      shaky: ["~ ", "Almost    ", "od b"],
-      gap: ["⚠ ", "Found a gap  ", "g b"],
-      mechanism: ["⚙ ", "Reasoning off  ", "g b"],
-      resolved: ["✓ ", "Cleared up — ", "gr b"],
-      note: ["○ ", "Noted for later  ", "dm"],
-      dive: [
-        "↳ ",
-        depth > 0 ? "Needed first — " : "Went to learn first — ",
-        "g",
-      ],
-      sealed: ["★ ", "Sealed — you own ", "o"],
-      return: ["↩ ", "Came back to ", "o b"],
-      here: ["◉ ", "You are here — ", "o b"],
-      why: ["↪ ", "", "dm i"],
-      locked: ["", "", "dm"],
-    };
-    if (kind === "answer_evaluated") {
-      const verdict = String(p.verdict);
-      const l =
-        labels[
-          verdict === "SOLID" ? "proved" : verdict === "SHAKY" ? "shaky" : "gap"
-        ];
-      return (
-        <>
-          {rail}
-          <span className={l[2]}>{l[0] + l[1]}</span>
-          <span className="fg">{wording[axis] || axis}</span>
-        </>
-      );
-    }
-    const label = labels[kind];
-    if (!label) return null;
+  return ids;
+}
+export default function Map({
+  task,
+  issue,
+  openTurn,
+}: {
+  task?: LadderTask;
+  issue?: LadderIssue | null;
+  openTurn(task_id: Id, turn: number): void;
+}) {
+  const { snapshot } = useTutor();
+  const where = snapshot?.where;
+  const inside = issue ? subtree(task?.issues || [], issue.id) : null;
+  const lines =
+    snapshot?.story.filter(
+      (l) =>
+        l.task_id === task?.id &&
+        (!inside || (l.issue_id != null && inside.has(l.issue_id))),
+    ) || [];
+  const base = inside && lines.length ? Math.min(...lines.map((l) => l.depth)) : 0;
+  const rail = (depth: number) => (
+    <span className="fa">{"│  ".repeat(Math.max(0, depth - base))}</span>
+  );
+  function line(l: StoryLine) {
+    const [mark, words, markClass, textClass] = LABELS[l.kind];
     return (
-      <span className={kind === "here" ? "hl-here" : undefined}>
-        {rail}
-        <span className={label[2]}>{label[0] + label[1]}</span>
-        {kind === "resolved" ? (
-          <s className="dm">{text}</s>
-        ) : (
-          <span
-            className={
-              ["return", "dive"].includes(kind)
-                ? "cy b"
-                : kind === "sealed"
-                  ? "cy"
-                  : ["note", "locked", "why"].includes(kind)
-                    ? "dm"
-                    : "fg"
-            }
-          >
-            {text}
-          </span>
-        )}
-        {at}
-        {kind === "dive" && p.axis ? (
-          <span className="dm">{"   (" + p.axis + ")"}</span>
+      <>
+        {rail(l.depth)}
+        <button
+          className="story-line"
+          title="Open this turn in the conversation"
+          onClick={() => openTurn(l.task_id, l.turn)}
+        >
+          <span className={markClass}>{mark + words}</span>
+          <span className={textClass}>{l.text}</span>
+        </button>
+        {l.kind === "came_back" && l.picking_up ? (
+          <>
+            {"\n"}
+            {rail(l.depth)}
+            <span className="dm">{`   picking up: “${l.picking_up}”`}</span>
+          </>
         ) : null}
-        {kind === "return" && p.resume_question ? (
-          <span className="dm">
-            {"\n" +
-              "│  ".repeat(depth) +
-              "   picking up: “" +
-              p.resume_question +
-              "”"}
-          </span>
-        ) : null}
-      </span>
+      </>
     );
   }
-  const lines = events
-    .map((event) => ({ id: event.id, rendered: line(event) }))
-    .filter((e) => e.rendered);
+  const here =
+    where &&
+    task &&
+    where.task_id === task.id &&
+    (!inside || (where.issue_id != null && inside.has(where.issue_id)));
   return (
     <div className="map-scroll">
       <div className="route-wrap">
         <pre className="unit-story" id="story">
           {!snapshot ? (
             <span className="dm">Open a codebase to begin.</span>
+          ) : !task || task.status === "later" ? (
+            <span className="dm">This task has not started yet.</span>
           ) : (
             <>
-              {lines.map((e) => (
-                <Fragment key={e.id}>
-                  {e.rendered}
+              {lines.map((l) => (
+                <Fragment key={l.id}>
+                  {line(l)}
                   {"\n"}
                 </Fragment>
               ))}
-              {snapshot.semantic_nodes
-                .filter((n) => String(n.unit_id) === String(unit?.id))
-                .map((n) => (
-                  <Fragment key={"node-" + n.id}>
-                    <span
-                      className={
-                        n.status === "disproved"
-                          ? "gr"
-                          : n.kind === "mechanism" || n.kind === "misconception"
-                            ? "g"
-                            : "fg"
-                      }
-                    >
-                      {n.status === "disproved" ? "✓ Cleared up — " : "• "}
-                      {String(n.summary || n.title || n.text || n.label || "")}
-                    </span>
-                    {"\n"}
-                  </Fragment>
-                ))}
-              {!events.some((e) => e.event_type === "here") &&
-                driver &&
-                driver.unit_id === unit?.id && (
+              {here && (
+                <>
+                  {rail(where.depth)}
                   <span className="hl-here">
-                    <span className="o b">◉ You are here</span> —{" "}
-                    {driver.question || driver.reason}
+                    <span className="o b">◉ You are here — </span>
+                    <span className="fg">{where.you_are_here}</span>
                   </span>
-                )}
+                </>
+              )}
             </>
           )}
         </pre>

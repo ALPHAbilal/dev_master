@@ -2,22 +2,23 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { useTutor } from "@/lib/session";
 import { editKey } from "@/lib/editor";
-import demo from "@/lib/api/demo.json";
-import type { Ref } from "@/lib/api/types";
+import { SCRATCH } from "@/lib/api/demo";
+import type { Attachment } from "@/lib/api/types";
 export default function Editor({
   attach,
+  add,
 }: {
-  attach(ref: Ref, x: number, y: number): void;
+  attach(attachment: Attachment, x: number, y: number): void;
+  add(attachment: Attachment): void;
 }) {
   const tutor = useTutor();
   const [files, setFiles] = useState(() =>
     tutor.isStub
-      ? demo.EDITOR_FILES.map((f, i) => ({ ...f, id: `editor-${i}` }))
+      ? [{ id: "editor-0", name: SCRATCH.name, content: SCRATCH.text }]
       : [{ id: "editor-0", name: "untitled_1.py", content: "" }],
   );
   const [active, setActive] = useState("editor-0"),
-    [renaming, setRenaming] = useState<string | null>(null),
-    [saved, setSaved] = useState(false);
+    [renaming, setRenaming] = useState<string | null>(null);
   const area = useRef<HTMLTextAreaElement>(null),
     gutter = useRef<HTMLDivElement>(null),
     tabs = useRef<HTMLDivElement>(null),
@@ -27,7 +28,6 @@ export default function Editor({
     setFiles((old) =>
       old.map((f) => (f.id === file.id ? { ...f, content } : f)),
     );
-    setSaved(false);
   }
   useLayoutEffect(() => {
     const selection = pendingSelection.current;
@@ -37,7 +37,6 @@ export default function Editor({
     }
   }, [file.content]);
   useLayoutEffect(() => {
-    setSaved(false);
     if (area.current) area.current.scrollTop = 0;
     if (gutter.current) gutter.current.scrollTop = 0;
     tabs.current
@@ -180,10 +179,10 @@ export default function Editor({
             if (snippet.trim())
               attach(
                 {
-                  kind: "test",
+                  kind: "editor_code",
                   label: file.name,
-                  snippet,
-                  source: { editor_id: file.id, text: file.content },
+                  text: snippet,
+                  source: { editor_file: file.name },
                 },
                 e.clientX,
                 e.clientY,
@@ -194,12 +193,18 @@ export default function Editor({
       <div className="run-row">
         <button
           className="btn primary"
-          disabled={tutor.busy}
-          onClick={async () => {
-            if (await tutor.submit(file.content, file.name)) setSaved(true);
-          }}
+          disabled={!file.content.trim()}
+          title="Attach this whole file to your next message"
+          onClick={() =>
+            add({
+              kind: "editor_code",
+              label: file.name,
+              text: file.content,
+              source: { editor_file: file.name },
+            })
+          }
         >
-          {saved ? "Submitted" : "Submit"}
+          Attach file
         </button>
       </div>
     </div>

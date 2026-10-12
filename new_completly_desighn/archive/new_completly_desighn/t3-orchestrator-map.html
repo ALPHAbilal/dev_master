@@ -1,0 +1,824 @@
+<title>T3 Orchestrator Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
+<style>
+/* Layout: sticky step bar; the session record; then the map (three territories: learner record, this task, concept bank) beside an inspector for the selected node; under them, what the orchestrator did at this step. Light-only, matching the T3 Tutor Loop page. */
+:root{
+  color-scheme:light;
+  --bg:#F6F8FB;
+  --surface:#FFFFFF;
+  --surface-2:#EEF2F7;
+  --ink:#1B2430;
+  --ink-2:#4C5869;
+  --ink-3:#7A8597;
+  --line:#DDE3EB;
+  --line-strong:#B8C2CF;
+  --grid-dot:#D3DAE4;
+  --accent:#2F5FD0;
+  --accent-soft:#E6EDFC;
+  --trail:rgba(47,95,208,.18);
+  --orch:#7350CC;
+  --orch-soft:#F1ECFC;
+  --ok:#2E8443;
+  --ok-soft:#E5F5E9;
+  --warn:#AA6400;
+  --warn-soft:#FCF1DE;
+  --bad:#BC375F;
+  --bad-soft:#FCE8EE;
+  --on-strong:#FFFFFF;
+  --shadow:0 1px 2px rgba(27,36,48,.05),0 6px 18px rgba(27,36,48,.06);
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-cond:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.page{max-width:1500px;margin:0 auto;padding-inline:clamp(16px,3vw,36px);padding-block:28px 56px;display:grid;gap:16px}
+code{font-family:var(--font-mono);font-size:.87em;background:var(--surface-2);padding:1px 5px;border-radius:4px}
+.lbl{font:600 11px/1.6 var(--font-cond);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.defs{position:absolute;width:0;height:0;overflow:hidden}
+
+/* ---------- header ---------- */
+.top{display:grid;gap:10px}
+.eyebrow{margin:0;font:600 12px/1.3 var(--font-cond);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+h1{margin:0;font:700 clamp(26px,3.6vw,38px)/1.1 var(--font-body);letter-spacing:-.02em;text-wrap:balance}
+.lede{margin:0;max-width:84ch;color:var(--ink-2)}
+.lede b{color:var(--ink);font-weight:600}
+
+/* ---------- step bar ---------- */
+.stepbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:12px 14px;display:grid;gap:9px}
+.sb-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.btn{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;min-width:36px;height:32px;padding:0 10px;font:600 14px var(--font-mono);cursor:pointer}
+.btn:hover{border-color:var(--line-strong)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.text{font:600 13px var(--font-body)}
+.dots{display:flex;gap:4px;flex-wrap:wrap}
+.dot{appearance:none;width:28px;height:28px;border-radius:14px;border:1.5px solid var(--line-strong);background:var(--surface);font:600 12px var(--font-mono);color:var(--ink-2);cursor:pointer;padding:0}
+.dot.past{border-color:var(--accent);color:var(--accent)}
+.dot.on{background:var(--accent);border-color:var(--accent);color:var(--on-strong)}
+.btn:focus-visible,.dot:focus-visible,.chg-row:focus-visible,.m-node:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sb-title{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sb-title .n{font:600 13px var(--font-mono);color:var(--ink-3)}
+.sb-title b{font-size:16px;font-weight:600}
+.pill{display:inline-flex;align-items:center;border-radius:999px;padding:0 9px;font:600 11px/1.85 var(--font-mono);letter-spacing:.02em;border:1px solid}
+.pill.neutral{color:var(--ink-2);border-color:var(--line-strong);background:var(--surface)}
+.pill.ok{color:var(--ok);border-color:var(--ok);background:var(--ok-soft)}
+.pill.warn{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
+.pill.bad{color:var(--bad);border-color:var(--bad);background:var(--bad-soft)}
+.pill.accent{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+.decision{font:600 12px var(--font-mono);color:var(--orch)}
+.said{margin:0;font-size:13.5px;color:var(--ink-2);overflow-wrap:anywhere}
+.said .lbl{margin-right:6px}
+.pasted{margin:0;font:12px/1.5 var(--font-mono);color:var(--ink-2);overflow-wrap:anywhere}
+.pasted .lbl{margin-right:6px;font-family:var(--font-cond)}
+
+/* ---------- session record ---------- */
+.session{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.session .lbl{margin-right:2px}
+.kv{display:inline-flex;gap:6px;align-items:baseline;font:12.5px/1.5 var(--font-mono);color:var(--ink);min-width:0;overflow-wrap:anywhere}
+.kv span:first-child{color:var(--orch)}
+
+/* ---------- map + inspector ---------- */
+.work{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+.mapwrap{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px;min-width:0}
+.figure{overflow-x:auto}
+#map{display:block;width:100%;height:auto;min-width:720px}
+.inspector{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:grid;gap:12px;min-width:0;}
+.ins-head{display:grid;gap:4px}
+.ins-id{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ins-id b{font:600 16px var(--font-mono)}
+.ins-title{margin:0;font:600 15px/1.35 var(--font-body);text-wrap:balance}
+.origin{font:600 10.5px/1.6 var(--font-cond);letter-spacing:.1em;text-transform:uppercase;border-radius:5px;padding:0 6px}
+.origin.discovered{color:var(--orch);background:var(--orch-soft)}
+.origin.crafted,.origin.bank{color:var(--ink-2);background:var(--surface-2)}
+.origin.record{color:var(--ok);background:var(--ok-soft)}
+.stword{font:600 10.5px/1.6 var(--font-cond);letter-spacing:.08em;text-transform:uppercase;border-radius:999px;padding:0 8px;color:var(--on-strong);background:var(--ink-3)}
+.stword.ACTIVE{background:var(--accent)}.stword.SUSPENDED{background:var(--warn)}.stword.RESOLVED,.stword.known{background:var(--ok)}
+.stword.missing{background:var(--bad)}.stword.uncertain{background:var(--warn)}
+.fields{margin:0;display:grid;grid-template-columns:104px minmax(0,1fr);gap:5px 10px;font-size:13px}
+.fields dt{font:600 10.5px/1.9 var(--font-cond);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.fields dd{margin:0;color:var(--ink);overflow-wrap:anywhere}
+.fields dd.none{color:var(--ink-3);font-style:italic}
+.ins-sec{display:grid;gap:5px}
+.ins-list{margin:0;padding:0;list-style:none;display:grid;gap:4px;font-size:12.5px;color:var(--ink-2)}
+.ins-list li{display:grid;grid-template-columns:42px minmax(0,1fr);gap:8px}
+.ins-list .id{font:600 12px var(--font-mono);color:var(--ink)}
+.ins-list li.now{color:var(--ink)}
+.ins-list li.now .id{color:var(--orch)}
+.ins-list .src{color:var(--ink-3)}
+.pointer{display:grid;gap:6px;border-top:1px solid var(--line);padding-top:10px}
+.pointer input{width:100%;font:12px var(--font-mono);color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+
+/* ---------- what the orchestrator did ---------- */
+.did{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:grid;gap:10px}
+.did h2{margin:0;font:600 17px var(--font-body)}
+.drow{display:grid;grid-template-columns:120px minmax(0,1fr);gap:10px;align-items:start}
+.chips{display:flex;flex-wrap:wrap;gap:5px;min-width:0}
+.chip{display:inline-flex;align-items:center;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:6px;padding:0 7px;font:500 12px/1.75 var(--font-mono);white-space:nowrap}
+.chip.node{background:var(--orch-soft);border-color:transparent;color:var(--orch)}
+.chip.p1{border-style:dashed;border-color:var(--warn);background:var(--warn-soft);color:var(--warn)}
+.changes{margin:0;padding:0;list-style:none;display:grid;gap:3px}
+.chg-row{display:grid;grid-template-columns:44px minmax(0,1fr);gap:8px;padding:3px 6px;border-radius:6px;cursor:pointer;font-size:13.5px}
+.chg-row:hover{background:var(--orch-soft)}
+.chg-row .id{font:600 12.5px/1.6 var(--font-mono);color:var(--orch)}
+.why{margin:0;color:var(--ink-2);font-size:13.5px}
+.hint{margin:0;font-size:12px;color:var(--ink-3)}
+
+/* ---------- legend ---------- */
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:12px;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{flex:none;display:inline-block;width:20px;height:11px;border-radius:3px;border:1.5px solid var(--line-strong);background:var(--surface)}
+.sw.active{background:var(--accent-soft);border-color:var(--accent)}
+.sw.paused{background:var(--warn-soft);border-color:var(--warn);border-style:dashed}
+.sw.resolved,.sw.known{background:var(--ok-soft);border-color:var(--ok)}
+.sw.saved{border-style:dashed;border-color:var(--ink-3)}
+.sw.needed{border-style:dashed}
+.sw.uncertain{background:var(--warn-soft);border-color:var(--warn)}
+.sw.missing{background:var(--bad-soft);border-color:var(--bad)}
+.sw.read{border:1.5px dotted var(--orch);background:transparent}
+.sw.trail{height:8px;border:0;border-radius:4px;background:var(--trail)}
+.sw.e-detour{height:0;border:0;border-top:1.6px solid var(--ink-3);border-radius:0}
+.sw.e-dash{height:0;border:0;border-top:1.6px dashed var(--ink-3);border-radius:0}
+.sw.e-match{height:0;border:0;border-top:1.8px dashed var(--orch);border-radius:0}
+.badge-sw{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:8px;background:var(--orch);color:var(--on-strong);font:600 9.5px var(--font-mono)}
+.foot{margin:0;font-size:12.5px;color:var(--ink-3)}
+
+/* ---------- SVG map ---------- */
+.m-bg{fill:url(#plot)}
+.plot-dot{fill:var(--grid-dot)}
+.m-region{fill:var(--surface);fill-opacity:.82;stroke:var(--line);stroke-width:1}
+.m-rtitle{font:600 11px var(--font-cond);letter-spacing:.16em;fill:var(--ink-2)}
+.m-rsub{font:400 10px var(--font-body);fill:var(--ink-3)}
+.m-trail{fill:none;stroke:var(--trail);stroke-width:12;stroke-linecap:round}
+.m-edge{fill:none;stroke:var(--ink-3);stroke-width:1.6}
+.m-edge.dash{stroke-dasharray:5 4}
+.m-edge.req{stroke:var(--line-strong);stroke-width:1.3}
+.m-edge.match{stroke:var(--orch);stroke-width:1.8;stroke-dasharray:4 3}
+.m-elabel{font:600 8px var(--font-cond);letter-spacing:.1em;fill:var(--ink-3)}
+.m-elabel.match{fill:var(--orch)}
+.arrowhead{fill:var(--ink-3)}
+.m-node{cursor:pointer;outline:none}
+.m-box{fill:var(--surface);stroke:var(--line-strong);stroke-width:1.4}
+.st-ACTIVE .m-box{fill:var(--accent-soft);stroke:var(--accent);stroke-width:2}
+.st-SUSPENDED .m-box{fill:var(--warn-soft);stroke:var(--warn);stroke-dasharray:6 4}
+.st-RESOLVED .m-box,.st-known .m-box{fill:var(--ok-soft);stroke:var(--ok)}
+.st-OPEN .m-box{stroke:var(--ink-3);stroke-dasharray:5 4}
+.st-needed .m-box{stroke-dasharray:3 3}
+.st-uncertain .m-box{fill:var(--warn-soft);stroke:var(--warn)}
+.st-missing .m-box{fill:var(--bad-soft);stroke:var(--bad)}
+.m-node:hover .m-box{stroke-width:2.4}
+.m-sel{fill:none;stroke:var(--ink);stroke-width:2;opacity:0}
+.sel .m-sel{opacity:1}
+.hl .m-sel{opacity:.55}
+.m-read{fill:none;stroke:var(--orch);stroke-width:1.5;stroke-dasharray:1.5 3.5;stroke-linecap:round}
+.m-id{font:600 12.5px var(--font-mono);fill:var(--ink)}
+.m-cat{font:600 8.5px var(--font-cond);letter-spacing:.1em;fill:var(--ink-3)}
+.m-origin{font:600 8px var(--font-cond);letter-spacing:.1em;fill:var(--ink-3)}
+.o-discovered .m-origin{fill:var(--orch)}
+.o-record .m-origin{fill:var(--ok)}
+.m-title{font:500 11.5px var(--font-body);fill:var(--ink)}
+.m-info{font:400 9.5px var(--font-body);fill:var(--ink-2)}
+.m-info.none{fill:var(--orch);font-weight:600}
+.m-ev{font:500 8.5px var(--font-mono);fill:var(--ink-3)}
+.m-tag{fill:var(--ink-3)}
+.m-tag-t{font:600 7.5px var(--font-cond);letter-spacing:.07em;fill:var(--on-strong);text-anchor:middle}
+.tg-ACTIVE{fill:var(--accent)}.tg-SUSPENDED{fill:var(--warn)}.tg-RESOLVED,.tg-known{fill:var(--ok)}
+.tg-missing{fill:var(--bad)}.tg-uncertain{fill:var(--warn)}.tg-OPEN,.tg-needed,.tg-record{fill:var(--ink-3)}
+.m-here{fill:var(--accent)}
+.m-here-t{font:600 8px var(--font-cond);letter-spacing:.1em;fill:var(--on-strong);text-anchor:middle}
+.m-badge{fill:var(--orch)}
+.m-badge-t{font:600 9.5px var(--font-mono);fill:var(--on-strong);text-anchor:middle}
+.m-line{font:400 9.5px var(--font-body);fill:var(--ink)}
+.m-line.dim{fill:var(--ink-3);font-style:italic}
+.flash{animation:flash 1.3s ease-out 1}
+@keyframes flash{0%{opacity:.25}100%{opacity:1}}
+
+@media (max-width:1100px){
+  .work{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:600px){
+  .drow{grid-template-columns:minmax(0,1fr);gap:3px}
+  .fields{grid-template-columns:minmax(0,1fr);gap:0}
+}
+@media (prefers-reduced-motion:reduce){
+  .flash{animation:none}
+}
+</style>
+
+<svg class="defs" width="0" height="0" aria-hidden="true" focusable="false">
+  <defs>
+    <pattern id="plot" patternUnits="userSpaceOnUse" width="16" height="16">
+      <circle cx="1.5" cy="1.5" r="1" class="plot-dot"></circle>
+    </pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="arrowhead"></path>
+    </marker>
+  </defs>
+</svg>
+
+<div class="page">
+  <header class="top">
+    <p class="eyebrow">T3 · fix · chatbot_final_version/app.py</p>
+    <h1>The orchestrator's map</h1>
+    <p class="lede">Everything the orchestrator holds for T3, from the moment the loop opens to the close. A node appears only when the orchestrator creates it. Detours are <b>its own nodes</b>; a crafted concept is linked only when one matches. Click any node to see its full record. To point at something, use its id: step <code>5</code>, node <code>I2</code>, change <code>5.3</code>, evidence <code>E6</code>.</p>
+  </header>
+
+  <div class="stepbar" role="group" aria-label="Step controls">
+    <div class="sb-row">
+      <button class="btn" id="prevBtn" type="button" aria-label="Previous step">←</button>
+      <div class="dots" id="dots"></div>
+      <button class="btn" id="nextBtn" type="button" aria-label="Next step">→</button>
+    </div>
+    <div class="sb-title" aria-live="polite"><span class="n" id="sbNo"></span><b id="sbTitle"></b><span id="sbAssess" class="sb-title"></span></div>
+    <p class="said" id="sbSaid"></p>
+    <p class="pasted" id="sbPasted" hidden></p>
+  </div>
+
+  <div class="session" id="session" aria-label="Session record at this step"></div>
+
+  <div class="work">
+    <div class="mapwrap">
+      <div class="figure"><svg id="map" viewBox="0 0 1000 610" role="img" aria-label="Orchestrator map"></svg></div>
+    </div>
+    <aside class="inspector" id="inspector" aria-live="polite" aria-label="Selected node"></aside>
+  </div>
+
+  <section class="did" aria-labelledby="didH">
+    <h2 id="didH">What the orchestrator did at this step</h2>
+    <div id="did"></div>
+  </section>
+
+  <div class="legend" aria-label="Legend">
+    <span><span class="sw active"></span>Active, the focus</span>
+    <span><span class="sw paused"></span>Paused, will resume</span>
+    <span><span class="sw resolved"></span>Resolved or known</span>
+    <span><span class="sw saved"></span>Saved for later</span>
+    <span><span class="sw needed"></span>No evidence yet</span>
+    <span><span class="sw uncertain"></span>Uncertain</span>
+    <span><span class="sw missing"></span>Missing</span>
+    <span><span class="sw trail"></span>Focus stack</span>
+    <span><span class="sw read"></span>Read at this step</span>
+    <span><span class="badge-sw">2</span>Changed at this step (count)</span>
+    <span><span class="sw e-detour"></span>Detour</span>
+    <span><span class="sw e-dash"></span>Saved · carried</span>
+    <span><span class="sw e-match"></span>Matches a bank concept</span>
+  </div>
+
+  <p class="foot">Built from the 11 steps of <code>t3-tutor-loop.html</code>. One change from that page: runs are pasted by the learner (phase 1 has no server-side code execution), and tools that need code to run are marked. Fields the scenario never sets say so instead of being filled in.</p>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ================= nodes: the orchestrator's records ================= */
+  var NODES = {
+    T3: { kind: "task", cat: "TASK · FIX", origin: "crafted", originText: "CRAFTED · tasks/T3_guest_error",
+      title: ["Guests always get", "“Une erreur s'est produite”"], name: "Guests always get “Une erreur s'est produite”",
+      box: { x: 322, y: 72, w: 300, h: 112 },
+      fields: [["Kind", "task"], ["Tier", "debug (fix)"], ["Goal", "guests get a real answer again"],
+        ["Done-check", "check/test_t3.py, written by the crafter"], ["Answer key", "reference.patch, locked"],
+        ["Needs", "C15 · C17 · C13"], ["Closes when", "the check passes and C15, C17, C13 are known"]] },
+    I1: { kind: "issue", cat: "ISSUE · KNOWLEDGE", origin: "discovered", parent: "T3",
+      title: ["A loop variable only exists", "if the loop ran"], name: "A loop variable only exists if the loop ran",
+      bank: "C15", box: { x: 466, y: 258, w: 242, h: 104 },
+      fields: [["Kind", "issue"], ["Category", "knowledge"], ["Parent", "T3, as a detour. T3 is paused until I1 resolves."],
+        ["Bank concept", "C15. Their words show a gap in how loop variables live, which is C15's claim. Linked, not visited."],
+        ["Watch for", "step 3: expects label to exist because it is written in the loop (their words) · step 4: JS habit, said by the learner"],
+        ["Closes when", "they explain why label is unbound for a guest"],
+        ["Reused", "C04 tuple unpacking appears in the same loop. Known from T1, so no detour."]] },
+    I2: { kind: "issue", cat: "ISSUE · CODEBASE", origin: "discovered", parent: "I1",
+      title: ["Why the loop on line 684", "runs 0 times for a guest"], name: "Why the loop on line 684 runs 0 times for a guest",
+      bank: null, box: { x: 466, y: 430, w: 242, h: 104 },
+      fields: [["Kind", "issue"], ["Category", "codebase"], ["Parent", "I1, as a nested detour. I1 is paused until I2 resolves."],
+        ["Bank concept", null, "none. This is a fact about this codebase, not a concept the crafter made."],
+        ["Code", "app.py · _record_process_links, lines 469–470"], ["Closes when", null, "not set in the scenario"]] },
+    I3: { kind: "issue", cat: "ISSUE · TESTING", origin: "discovered", parent: "T3",
+      title: ["How the test fakes", "OpenAI"], name: "How the test fakes OpenAI",
+      bank: null, box: { x: 244, y: 258, w: 190, h: 104 },
+      fields: [["Kind", "issue"], ["Category", "testing"], ["Parent", "T3, as a side issue. It does not block T3."],
+        ["Bank concept", "none in the crafted bank. At close it links to D1, a discovered concept."],
+        ["Closes when", null, "not set in the scenario"], ["After the task", "stays open and is carried to a later task"]] },
+    C17: { kind: "concept", cat: "CONCEPT", origin: "bank", originText: "BANK · from the crafter", name: "broad except hides failures",
+      box: { x: 756, y: 72, w: 212, h: 78 },
+      fields: [["Kind", "concept"], ["Source", "concept bank (crafter)"], ["Required by", "T3"]] },
+    C13: { kind: "concept", cat: "CONCEPT", origin: "bank", originText: "BANK · from the crafter", name: "OpenAI tool calling",
+      box: { x: 756, y: 162, w: 212, h: 78 },
+      fields: [["Kind", "concept"], ["Source", "concept bank (crafter)"], ["Required by", "T3"]] },
+    C15: { kind: "concept", cat: "CONCEPT", origin: "bank", originText: "BANK · concepts/C15_loop_scope.md", name: "loop variables outlive the loop",
+      box: { x: 756, y: 272, w: 212, h: 78 },
+      fields: [["Kind", "concept · language"], ["Source", "concepts/C15_loop_scope.md (crafter)"], ["Prerequisite", "C04"],
+        ["Common misconception", "the loop variable disappears when the loop ends [crafted]"], ["Required by", "T3"]] },
+    C04: { kind: "concept", cat: "CONCEPT", origin: "record", originText: "RECORD · proved in T1", name: "tuple unpacking",
+      box: { x: 30, y: 72, w: 168, h: 68 },
+      fields: [["Kind", "concept"], ["Source", "learner record, proved in T1"], ["Use in T3", "the loop on line 684: for label, link in …"]] },
+    C05: { kind: "concept", cat: "CONCEPT", origin: "record", originText: "RECORD · proved in T2", name: "dict.get",
+      box: { x: 30, y: 150, w: 168, h: 68 },
+      fields: [["Kind", "concept"], ["Source", "learner record, proved in T2"]] },
+    D1: { kind: "concept", cat: "CONCEPT", origin: "discovered", originText: "DISCOVERED · T3 step 9 · from I3", name: "a test swaps in a fake client",
+      box: { x: 756, y: 400, w: 212, h: 78 },
+      fields: [["Kind", "concept"], ["Source", "discovered in T3 (I3, step 9), written to the bank at close"],
+        ["Claim", "a test can swap the real OpenAI client for a fake one, so it runs with no key"],
+        ["Anchor", null, "the line in check/test_t3.py that swaps the client, located when D1 is written"],
+        ["Learner status", "no evidence yet, because I3 is still open"]] },
+    JOURNEY: { kind: "record", cat: "JOURNEY INDEX", origin: "record", name: "Journey index",
+      box: { x: 30, y: 258, w: 168, h: 120 },
+      fields: [["Kind", "learner record"], ["File", "learner/journey/INDEX.md"], ["Holds", "one line per closed task"]] },
+    CARRIED: { kind: "record", cat: "OPEN ISSUES CARRIED", origin: "record", name: "Open issues carried",
+      box: { x: 30, y: 430, w: 168, h: 74 },
+      fields: [["Kind", "learner record"], ["Holds", "issues saved during a task and not resolved by its close"]] }
+  };
+  var DRAW_ORDER = ["C04", "C05", "JOURNEY", "CARRIED", "T3", "I3", "I1", "I2", "C17", "C13", "C15", "D1"];
+
+  /* ================= the 11 steps ================= */
+  var STEPS = [
+    { t: "Loop opens", a: [["LOOP OPENS", "neutral"]], d: "start T3", m: null,
+      read: ["ladder.md", "learner/graph/knowledge.md"], readNodes: ["T3", "C04", "C05"],
+      set: { T3: "ACTIVE", C15: "needed", C17: "needed", C13: "needed", C04: "known", C05: "known", JOURNEY: "record", CARRIED: "record" },
+      stack: ["T3"], open: [],
+      changes: [["create T3, the root, from tasks/T3_guest_error · active", ["T3"]],
+        ["T3 requires C15, C17, C13 from the bank · none has evidence yet", ["T3", "C15", "C17", "C13"]],
+        ["C04 and C05 are known from the learner record · reuse, never re-teach", ["C04", "C05"]],
+        ["focus → T3", ["T3"]]],
+      why: "A new task always starts a fresh loop with a small kit.",
+      kit: [["base", "introduce_task"], ["read_file", "search_repo"], ["task_goal", "known_concepts"]] },
+    { t: "Reproduce", a: [["ON_TRACK", "neutral"]], d: "CONTINUE",
+      m: "Reproduced it. Same message every time as a guest. Where does this message even come from?",
+      pasted: "run as a guest → \"Une erreur s'est produite. Veuillez contacter le support.\"",
+      read: ["the message", "pasted run output", "session/focus.md"], readNodes: ["T3"],
+      changes: [["T3 + evidence E1 · reproduced the bug as a guest", ["T3"]]],
+      why: "Finding where the message comes from is the task itself. A question is evidence, not proof of a gap.",
+      kit: [["base", "keep_goal_in_view", "guide_debugging"], ["read_file", "search_repo"], ["task_goal", "known_concepts", "current_focus"]] },
+    { t: "Find the message", a: [["ON_TRACK", "neutral"]], d: "CONTINUE",
+      m: "Line 824. It's inside `except Exception as e:` on line 821. So something crashes and this except swallows it?",
+      pasted: "search \"Une erreur s'est produite\" → app.py:824",
+      read: ["the message", "pasted search result"], readNodes: ["T3"],
+      set: { C17: "uncertain" },
+      changes: [["T3 + evidence E2 · found the broad except at line 821", ["T3"]],
+        ["C17 no evidence → uncertain · spotted, not used yet", ["C17"]]],
+      why: "They spotted the except but haven't used that yet, so C17 is only uncertain. Nothing to switch.",
+      kit: [["base", "keep_goal_in_view", "guide_debugging"], ["read_file", "search_repo"], ["task_goal", "known_concepts", "current_focus"]] },
+    { t: "The real error", a: [["GAP_DISCOVERED · knowledge", "bad"]], d: "START_DETOUR → I1",
+      m: "UnboundLocalError on `label`! But label is right there in the loop on line 684?! How can it not exist?",
+      pasted: "edit app.py:821 · print(repr(e)) · run as a guest → UnboundLocalError: cannot access local variable 'label'",
+      read: ["the message", "pasted run output", "concepts/C15"], readNodes: ["T3", "C15", "C04"],
+      set: { I1: "ACTIVE", T3: "SUSPENDED", C15: "missing", C17: "known" }, stack: ["T3", "I1"],
+      changes: [["create I1 · discovered · knowledge · active · “a loop variable only exists if the loop ran”", ["I1"]],
+        ["I1 links to bank concept C15 (a gap in how loop variables live) · watch for: expects label to exist because it is in the loop (their words)", ["I1", "C15"]],
+        ["I1 closes when: they explain why label is unbound for a guest", ["I1"]],
+        ["T3 active → paused · return note: has the traceback; line 722 reads label", ["T3"]],
+        ["C15 no evidence → missing", ["C15"]],
+        ["C17 uncertain → known · evidence E3, made the hidden error visible", ["C17"]],
+        ["C04 is in the same loop and already known → no detour", ["C04"]],
+        ["focus → I1 · stack T3 › I1", ["I1"]]],
+      why: "They expect `label` to exist because it is written in the loop: a gap in how loop variables live, which matches C15. `for label, link` also uses unpacking, but C04 is known, so no detour there.",
+      kit: [["base", "teach_one_concept", "experiment_first"], ["scratch_pad", "read_concept"], ["current_focus", "return_to", "misconception_to_watch", "closes_when"]] },
+    { t: "Predict", a: [["ON_TRACK · inside the detour", "neutral"]], d: "CONTINUE",
+      m: "None? In JS it would be undefined.",
+      read: ["the message"], readNodes: ["I1"],
+      changes: [["I1 + evidence E4 · predicted None (the JS habit, in their own words)", ["I1"]],
+        ["I1 watch for += JS habit, said by the learner (not assumed)", ["I1"]]],
+      why: "An expected miss. Let the run teach it instead of an explanation.",
+      kit: [["base", "teach_one_concept", "experiment_first"], ["scratch_pad", "read_concept"], ["current_focus", "return_to", "misconception_to_watch", "closes_when"]] },
+    { t: "Run it, then a new question", a: [["DEPENDENCY_MISSING · codebase", "warn"]], d: "START_DETOUR → I2",
+      m: "Same error! So `x` only exists if the loop ran at least once. OK... but why would the loop on line 684 run zero times for a guest?",
+      pasted: "ran last([]) locally → UnboundLocalError: cannot access local variable 'x'",
+      read: ["the message", "pasted run output"], readNodes: ["I1"],
+      set: { I2: "ACTIVE", I1: "SUSPENDED" }, stack: ["T3", "I1", "I2"],
+      changes: [["I1 + evidence E5 · explained x after the loop", ["I1"]],
+        ["create I2 · discovered · codebase · active · nested under I1", ["I2"]],
+        ["I2 matches no bank concept · it is a fact about this codebase", ["I2"]],
+        ["I1 active → paused · return note: gets last([]); must connect it to label", ["I1"]],
+        ["focus → I2 · stack T3 › I1 › I2", ["I2"]]],
+      why: "The idea is clear in the toy. Using it on app.py needs one more fact: what the loop iterates over for a guest.",
+      kit: [["base", "guided_trace"], ["read_file", "search_repo"], ["current_focus", "return_to"]] },
+    { t: "Trace the guest path", a: [["GAP_RESOLVED · I2", "ok"]], d: "RETURN_FROM_DETOUR → I1",
+      m: "Lines 469–470: `if not base or not user_id: return []`. A guest has no user_id, so it returns an empty list.",
+      read: ["the message", "I1's return note"], readNodes: ["I2", "I1"],
+      set: { I2: "RESOLVED", I1: "ACTIVE" }, stack: ["T3", "I1"],
+      changes: [["I2 + evidence E6 · read lines 469–470", ["I2"]],
+        ["I2 active → resolved", ["I2"]],
+        ["focus back → I1, the closest paused goal with nothing blocking it · its return note goes to the tutor", ["I1"]]],
+      why: "Resume the nearest suspended goal and hand the tutor the context I1 saved when it was paused.",
+      kit: [["base", "bridge_back", "teach_one_concept"], ["read_file", "scratch_pad"], ["current_focus", "return_to", "closes_when"]] },
+    { t: "Connect it back", a: [["GAP_RESOLVED · I1", "ok"]], d: "RETURN_FROM_DETOUR → T3",
+      m: "Nothing. It never gets assigned, exactly like x in last([]). Then line 722 reads label and crashes, and the except on line 821 hides it.",
+      read: ["the message", "T3's return note"], readNodes: ["I1", "T3"],
+      set: { I1: "RESOLVED", C15: "known", T3: "ACTIVE" }, stack: ["T3"],
+      changes: [["I1 + evidence E7 · explained why label is unbound for a guest (meets “closes when”)", ["I1"]],
+        ["I1 active → resolved", ["I1"]],
+        ["C15 missing → known · evidence E8, explained it on the real code", ["C15"]],
+        ["focus back → T3 · T3 paused → active", ["T3"]]],
+      why: "The evidence I1 asked for is there: they explained why label is unbound for a guest.",
+      kit: [["base", "keep_goal_in_view", "bridge_back", "guide_fix"], ["read_file", "search_repo", "run_tests"], ["task_goal", "known_concepts", "current_focus"]] },
+    { t: "Find the right variable", a: [["ON_TRACK", "neutral"]], d: "CONTINUE",
+      m: "`question_label`! Line 610 unpacks it from `user_query_operations`. So line 722 should check question_label.",
+      read: ["the message"], readNodes: ["T3"],
+      changes: [["T3 + evidence E9 · found question_label (line 610)", ["T3"]]],
+      why: "Right variable, right reason. The bridge is done, so bridge_back is switched off.",
+      kit: [["base", "keep_goal_in_view", "guide_fix"], ["read_file", "search_repo", "run_tests"], ["task_goal", "known_concepts", "current_focus"]] },
+    { t: "Fix, check, side question", a: [["GOAL MET → VERIFY_LEARNING", "accent"], ["SIDE GAP · not blocking", "neutral"]], d: "VERIFY_LEARNING · probe C13",
+      m: "2 passed! Wait, how does that test even talk to the chatbot without an OpenAI key?",
+      pasted: "edit app.py:722 · label → question_label · ran check/test_t3.py in VS Code → 2 passed",
+      read: ["the message", "pasted test output"], readNodes: ["T3"],
+      set: { I3: "OPEN", C13: "uncertain" }, open: ["I3"],
+      changes: [["T3 + evidence E10 · check/test_t3.py: 2 passed (pasted)", ["T3"]],
+        ["create I3 · discovered · testing · saved, not blocking", ["I3"]],
+        ["I3 matches no bank concept", ["I3"]],
+        ["C13 no evidence → uncertain · it never came up", ["C13"]],
+        ["T3 goal met → verify the learning: probe C13", ["T3", "C13"]]],
+      why: "The code works. Learning evidence is thin on C13, so one probe. I3 is saved, not chased now.",
+      kit: [["base", "answer_side_question", "probe_understanding"], ["read_file"], ["current_focus", "probe_target", "open_issues"]] },
+    { t: "Probe and close", a: [["TASK_COMPLETED", "ok"]], d: "COMPLETE_TASK",
+      m: "Whether the model gets the pricing tool. `tools` is the list of functions OpenAI is allowed to call, and candidates don't get the pricing one.",
+      read: ["the message", "open issues"], readNodes: ["T3", "I3"],
+      set: { C13: "known", T3: "RESOLVED", D1: "needed" }, stack: [],
+      changes: [["C13 uncertain → known · evidence E11, explained what the if on line 722 decides", ["C13"]],
+        ["T3 active → resolved · the check passed and C15, C17, C13 are known", ["T3"]],
+        ["I3 stays open → carried to the learner record", ["I3", "CARRIED"]],
+        ["C15 + discovered misconception: “after an empty loop it is None” (from E4)", ["C15"]],
+        ["C15 + discovered way to say it: “it never gets assigned, exactly like x in last([])” (from E7)", ["C15"]],
+        ["D1 added to the bank, labeled discovered: a test can swap the real OpenAI client for a fake one · I3 links to it · no crafter runs", ["D1", "I3"]],
+        ["journey gets the T3 line · focus → none · the loop closes", ["JOURNEY"]]],
+      why: "Task success (the check) and learning success (C15, C17, C13) are both there.",
+      kit: [["base", "close_task"], ["write_journey"], ["task_goal", "journey_so_far", "open_issues"]] }
+  ];
+
+  var EVIDENCE = [
+    { id: "E1", s: 1, n: "T3", x: "reproduced the bug as a guest", src: "pasted run output" },
+    { id: "E2", s: 2, n: "T3", x: "found the broad except at line 821", src: "pasted search result" },
+    { id: "E3", s: 3, n: "C17", x: "made the hidden error visible", src: "pasted run output" },
+    { id: "E4", s: 4, n: "I1", x: "predicted None (the JS habit)", src: "message" },
+    { id: "E5", s: 5, n: "I1", x: "explained x after the loop", src: "message + pasted run" },
+    { id: "E6", s: 6, n: "I2", x: "read lines 469–470", src: "message" },
+    { id: "E7", s: 7, n: "I1", x: "explained why label is unbound for a guest", src: "message" },
+    { id: "E8", s: 7, n: "C15", x: "explained it on the real code", src: "message" },
+    { id: "E9", s: 8, n: "T3", x: "found question_label (line 610)", src: "message" },
+    { id: "E10", s: 9, n: "T3", x: "check/test_t3.py: 2 passed", src: "pasted test output" },
+    { id: "E11", s: 10, n: "C13", x: "explained what the if on line 722 decides", short: "explained the if on line 722", src: "message" }
+  ];
+  var RETURN = {
+    T3: { s: 3, x: "has the traceback; line 722 reads label" },
+    I1: { s: 5, x: "gets last([]); must connect it to label" }
+  };
+  var CREATED = { T3: 0, C15: 0, C17: 0, C13: 0, C04: 0, C05: 0, JOURNEY: 0, CARRIED: 0, I1: 3, I2: 5, I3: 9, D1: 10 };
+  var DISCOVERED = {
+    C15: [{ s: 10, x: "misconception: after an empty loop it is None", from: "E4 · T3 step 4 · I1" },
+          { s: 10, x: "way to say it: it never gets assigned, exactly like x in last([])", from: "E7 · T3 step 7 · I1" }]
+  };
+  var NEEDS_RUN = { run_tests: "phase 1: the learner runs the check in VS Code", scratch_pad: "phase 1: the learner runs the snippet locally" };
+  var WORD = { ACTIVE: "active", SUSPENDED: "paused", RESOLVED: "resolved", OPEN: "saved", needed: "no evidence",
+    uncertain: "uncertain", missing: "missing", known: "known", record: "record" };
+  var N = STEPS.length;
+
+  /* ================= derived: snapshots, change ids ================= */
+  var SNAP = [];
+  (function () {
+    var cur = {}, stack = [], open = [];
+    STEPS.forEach(function (s, i) {
+      var set = s.set || {};
+      Object.keys(set).forEach(function (k) { cur[k] = set[k]; });
+      if (s.stack) stack = s.stack;
+      if (s.open) open = s.open;
+      s.changes = s.changes.map(function (c, k) { return { id: i + "." + (k + 1), text: c[0], nodes: c[1] }; });
+      SNAP.push({ status: Object.assign({}, cur), stack: stack.slice(), open: open.slice() });
+    });
+  })();
+
+  /* ================= helpers ================= */
+  var SVGNS = "http://www.w3.org/2000/svg";
+  function $(id) { return document.getElementById(id); }
+  function mk(tag, attrs, parent, text) {
+    var e = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function fmt(s) { return esc(s).replace(/`([^`]+)`/g, "<code>$1</code>"); }
+  function exists(id, i) { return SNAP[i].status[id] !== undefined; }
+  function topOf(i) { var st = SNAP[i].stack; return st.length ? st[st.length - 1] : null; }
+  function evFor(id, i) { return EVIDENCE.filter(function (e) { return e.n === id && e.s <= i; }); }
+  function changesFor(id, i) {
+    var out = [];
+    for (var s = 0; s <= i; s++) STEPS[s].changes.forEach(function (c) { if (c.nodes.indexOf(id) !== -1) out.push(c); });
+    return out;
+  }
+  function changedCount(id, i) {
+    return STEPS[i].changes.filter(function (c) { return c.nodes.indexOf(id) !== -1; }).length;
+  }
+
+  /* ================= state ================= */
+  var active = -1, picked = null;
+  function selected(i) { return picked && exists(picked, i) ? picked : (topOf(i) || "T3"); }
+
+  /* ================= the map ================= */
+  var REGIONS = [
+    { x: 16, y: 12, w: 196, h: 584, t: "LEARNER RECORD", s: "What the learner brings from earlier tasks" },
+    { x: 228, y: 12, w: 496, h: 584, t: "THIS TASK", s: "The root, plus every node the orchestrator creates" },
+    { x: 740, y: 12, w: 244, h: 584, t: "CONCEPT BANK", s: "Made by the crafter; discoveries added at close, labeled" }
+  ];
+  var PATHS = {
+    "T3-I1": "M560,184 C560,222 587,220 587,258",
+    "I1-I2": "M587,362 L587,430",
+    "T3-I3": "M384,184 C384,222 339,220 339,258",
+    "I1-C15": "M708,305 L756,305",
+    req: "M622,128 H744 M744,111 V311 M744,111 H756 M744,201 H756 M744,311 H756",
+    "I3-CARRIED": "M244,330 C214,330 228,467 200,467"
+  };
+
+  function tag(g, right, y, word, cls) {
+    var text = word.toUpperCase(), w = text.length * 4.6 + 12;
+    mk("rect", { x: right - w, y: y, width: w, height: 14, rx: 7, "class": "m-tag " + cls }, g);
+    mk("text", { x: right - w / 2, y: y + 9.8, "class": "m-tag-t" }, g, text);
+  }
+
+  function renderMap(i) {
+    var svg = $("map");
+    clear(svg);
+    var snap = SNAP[i], top = topOf(i), sel = selected(i), step = STEPS[i];
+    mk("rect", { x: 0, y: 0, width: 1000, height: 610, "class": "m-bg" }, svg);
+    REGIONS.forEach(function (r) {
+      mk("rect", { x: r.x, y: r.y, width: r.w, height: r.h, rx: 14, "class": "m-region" }, svg);
+      mk("text", { x: r.x + 16, y: r.y + 24, "class": "m-rtitle" }, svg, r.t);
+      mk("text", { x: r.x + 16, y: r.y + 39, "class": "m-rsub" }, svg, r.s);
+    });
+
+    // focus stack trail
+    var st = snap.stack;
+    for (var k = 1; k < st.length; k++) {
+      var key = st[k - 1] + "-" + st[k];
+      if (PATHS[key]) mk("path", { d: PATHS[key], "class": "m-trail" }, svg);
+    }
+
+    // edges
+    mk("path", { d: PATHS.req, "class": "m-edge req" }, svg);
+    mk("text", { x: 646, y: 121, "class": "m-elabel" }, svg, "REQUIRES");
+    if (exists("I1", i)) {
+      mk("path", { d: PATHS["T3-I1"], "class": "m-edge" }, svg);
+      mk("text", { x: 594, y: 226, "class": "m-elabel" }, svg, "DETOUR");
+      mk("path", { d: PATHS["I1-C15"], "class": "m-edge match" }, svg);
+      mk("text", { x: 711, y: 320, "class": "m-elabel match" }, svg, "MATCHES");
+    }
+    if (exists("I2", i)) {
+      mk("path", { d: PATHS["I1-I2"], "class": "m-edge" }, svg);
+      mk("text", { x: 595, y: 400, "class": "m-elabel" }, svg, "NESTED DETOUR");
+    }
+    if (exists("I3", i)) {
+      mk("path", { d: PATHS["T3-I3"], "class": "m-edge dash" }, svg);
+      mk("text", { x: 252, y: 224, "class": "m-elabel" }, svg, "SAVED · NOT BLOCKING");
+    }
+    if (i === N - 1) {
+      mk("path", { d: PATHS["I3-CARRIED"], "class": "m-edge dash", "marker-end": "url(#arrow)" }, svg);
+      mk("text", { x: 236, y: 410, "class": "m-elabel" }, svg, "CARRIED");
+    }
+
+    DRAW_ORDER.forEach(function (id) { if (exists(id, i)) drawNode(svg, id, i, top, sel, step); });
+    svg.setAttribute("aria-label", "Orchestrator map at step " + i + ". Focus: " + (top || "none") + ".");
+  }
+
+  function drawNode(svg, id, i, top, sel, step) {
+    var n = NODES[id], b = n.box, st = SNAP[i].status[id];
+    var cls = "m-node o-" + n.origin + " st-" + st + (id === sel ? " sel" : "");
+    var g = mk("g", { "class": cls, tabindex: 0, role: "button", "data-id": id,
+      "aria-label": id + ", " + n.name + ", " + WORD[st] + ". Show its record." }, svg);
+    if (CREATED[id] === i && i > 0) g.classList.add("flash");
+    mk("rect", { x: b.x - 4, y: b.y - 4, width: b.w + 8, height: b.h + 8, rx: 13, "class": "m-sel" }, g);
+    if (step.readNodes.indexOf(id) !== -1) mk("rect", { x: b.x - 7, y: b.y - 7, width: b.w + 14, height: b.h + 14, rx: 15, "class": "m-read" }, g);
+    mk("rect", { x: b.x, y: b.y, width: b.w, height: b.h, rx: 10, "class": "m-box" }, g);
+
+    var x = b.x + 12, R = b.x + b.w - 10;
+    if (n.kind === "task" || n.kind === "issue") {
+      mk("text", { x: x, y: b.y + 19, "class": "m-id" }, g, id);
+      mk("text", { x: x + 28, y: b.y + 18.5, "class": "m-cat" }, g, n.cat);
+      tag(g, R, b.y + 8, WORD[st], "tg-" + st);
+      mk("text", { x: x, y: b.y + 33, "class": "m-origin" }, g,
+        n.origin === "discovered" ? "DISCOVERED AT STEP " + CREATED[id] : n.originText);
+      var ty = id === "T3" ? 53 : 51;
+      n.title.forEach(function (line, k) { mk("text", { x: x, y: b.y + ty + k * 15, "class": "m-title" }, g, line); });
+      var info, infoCls = "m-info";
+      if (id === "T3") info = "done-check: test_t3.py · " + (i >= 9 ? "2 passed (pasted)" : "not run yet");
+      else if (id === "I3" && exists("D1", i)) info = "bank: D1 (new, discovered)";
+      else if (n.bank) info = "bank: " + n.bank + " (matches)";
+      else { info = "bank: none · new knowledge"; infoCls += " none"; }
+      mk("text", { x: x, y: b.y + (id === "T3" ? 88 : 84), "class": infoCls }, g, info);
+      var ev = evFor(id, i);
+      var evLine = ev.length ? ev.length + " evidence · " + ev.map(function (e) { return e.id; }).join(" ") : "no evidence yet";
+      if (st === "SUSPENDED" && RETURN[id]) evLine += "  ·  ↩ return note saved";
+      mk("text", { x: x, y: b.y + (id === "T3" ? 103 : 98), "class": "m-ev" }, g, evLine);
+    } else if (n.kind === "concept") {
+      mk("text", { x: x, y: b.y + 19, "class": "m-id" }, g, id);
+      tag(g, R, b.y + 8, WORD[st], "tg-" + st);
+      mk("text", { x: x, y: b.y + 33, "class": "m-origin" }, g, n.originText);
+      mk("text", { x: x, y: b.y + 49, "class": "m-title" }, g, n.name);
+      var last = evFor(id, i).slice(-1)[0], line;
+      if (n.origin === "record") line = (id === "C04" && i >= 3) ? "used in T3 · no detour" : "reuse, never re-teach";
+      else if (last) line = "✓ " + (last.short || last.x) + " (" + last.id + ")";
+      else if (id === "D1") line = "linked from I3 · no evidence yet";
+      else line = id === "C15" && exists("I1", i) ? "matched by I1" : "required by T3 · no evidence yet";
+      if (n.origin === "record") mk("text", { x: x, y: b.y + 61, "class": "m-info" }, g, line);
+      else mk("text", { x: x, y: b.y + 66, "class": "m-info" }, g, line);
+    } else {
+      mk("text", { x: x, y: b.y + 19, "class": "m-cat" }, g, n.cat);
+      var lines;
+      if (id === "JOURNEY") {
+        lines = [["T1 · closed", ""], ["T2 · closed", ""]];
+        if (i === N - 1) lines = lines.concat([["T3 · closed", ""], ["reproduced → except 821 →", "dim"], ["I1 loop scope (I2 nested) →", "dim"], ["fixed line 722 → probe C13", "dim"]]);
+      } else {
+        lines = i === N - 1 ? [["I3 · how the test fakes", ""], ["OpenAI · open", ""]] : [["none", "dim"]];
+      }
+      lines.forEach(function (L, k) { mk("text", { x: x, y: b.y + 38 + k * 14, "class": "m-line" + (L[1] ? " " + L[1] : "") }, g, L[0]); });
+    }
+
+    if (id === top) {
+      mk("rect", { x: b.x + 10, y: b.y - 8, width: 74, height: 16, rx: 8, "class": "m-here" }, g);
+      mk("text", { x: b.x + 47, y: b.y + 3.5, "class": "m-here-t" }, g, "YOU ARE HERE");
+    }
+    var cnt = changedCount(id, i);
+    if (cnt) {
+      mk("circle", { cx: b.x + b.w, cy: b.y, r: 9, "class": "m-badge" }, g);
+      mk("text", { x: b.x + b.w, y: b.y + 3.4, "class": "m-badge-t" }, g, String(cnt));
+    }
+    g.addEventListener("click", function () { pick(id); });
+    g.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(id); }
+    });
+  }
+
+  /* ================= session record (LearningSession fields) ================= */
+  function renderSession(i) {
+    var snap = SNAP[i], top = topOf(i);
+    var susp = snap.stack.slice(0, -1);
+    var know = ["C15", "C17", "C13", "C04", "C05"].concat(exists("D1", i) ? ["D1"] : []).map(function (c) { return c + " " + WORD[snap.status[c]]; }).join(" · ");
+    function kv(k, v) { return '<span class="kv"><span>' + k + "</span><span>" + esc(v) + "</span></span>"; }
+    $("session").innerHTML = '<span class="lbl">Session record</span>' +
+      kv("root_task_id", "T3") +
+      kv("current_focus_id", top || "— (closed)") +
+      kv("suspended_focus_stack", susp.length ? susp.join(" › ") : "—") +
+      kv("open_issue_ids", snap.open.length ? snap.open.join(", ") : "—") +
+      kv("concept_knowledge", know);
+  }
+
+  /* ================= inspector ================= */
+  function renderInspector(i) {
+    var id = selected(i), n = NODES[id], st = SNAP[i].status[id];
+    var h = '<div class="ins-head"><div class="ins-id"><b>' + id + '</b><span class="origin ' + n.origin + '">' +
+      (n.origin === "discovered" ? "discovered at step " + CREATED[id] : n.origin === "crafted" ? "crafted" : n.origin === "bank" ? "concept bank" : "learner record") +
+      '</span><span class="stword ' + st + '">' + WORD[st] + "</span></div>" +
+      '<p class="ins-title">' + esc(n.name) + "</p></div>";
+    h += '<dl class="fields">';
+    n.fields.forEach(function (f) {
+      h += "<dt>" + esc(f[0]) + "</dt>" + (f[1] == null ? '<dd class="none">' + esc(f[2]) + "</dd>" : "<dd>" + esc(f[1]) + "</dd>");
+    });
+    if (RETURN[id] && RETURN[id].s <= i) {
+      h += "<dt>Return note</dt><dd>“" + esc(RETURN[id].x) + "” (saved at step " + RETURN[id].s + ")</dd>";
+    }
+    h += "</dl>";
+    var disc = (DISCOVERED[id] || []).filter(function (d) { return d.s <= i; });
+    if (disc.length) {
+      h += '<div class="ins-sec"><span class="lbl">Discovered entries</span><ul class="ins-list">' + disc.map(function (d) {
+        return '<li' + (d.s === i ? ' class="now"' : "") + '><span class="id">new</span><span>' + esc(d.x) + ' <span class="src">· discovered, ' + esc(d.from) + "</span></span></li>";
+      }).join("") + "</ul></div>";
+    }
+    var ev = evFor(id, i);
+    h += '<div class="ins-sec"><span class="lbl">Evidence so far</span>';
+    h += ev.length ? '<ul class="ins-list">' + ev.map(function (e) {
+      return "<li" + (e.s === i ? ' class="now"' : "") + '><span class="id">' + e.id + "</span><span>" + esc(e.x) +
+        ' <span class="src">· step ' + e.s + ", " + esc(e.src) + "</span></span></li>";
+    }).join("") + "</ul>" : '<p class="hint">None yet.</p>';
+    h += "</div>";
+    var ch = changesFor(id, i);
+    h += '<div class="ins-sec"><span class="lbl">Every change to ' + id + "</span>";
+    h += ch.length ? '<ul class="ins-list">' + ch.map(function (c) {
+      return "<li" + (c.id.split(".")[0] === String(i) ? ' class="now"' : "") + '><span class="id">' + c.id + "</span><span>" + esc(c.text) + "</span></li>";
+    }).join("") + "</ul>" : '<p class="hint">No changes yet.</p>';
+    h += "</div>";
+    var ptr = "T3 map · step " + i + " · " + id + " · " + n.name;
+    h += '<div class="pointer"><span class="lbl">Point at this</span><input id="ptr" type="text" readonly value="' + esc(ptr) + '">' +
+      '<button class="btn text" id="copyBtn" type="button">Copy pointer</button></div>';
+    $("inspector").innerHTML = h;
+    $("copyBtn").addEventListener("click", function () {
+      var btn = this, input = $("ptr");
+      function fallback() { input.focus(); input.select(); btn.textContent = "Selected, press Ctrl+C"; }
+      try {
+        navigator.clipboard.writeText(input.value).then(function () { btn.textContent = "Copied"; }, fallback);
+      } catch (e) { fallback(); }
+    });
+  }
+
+  /* ================= what the orchestrator did ================= */
+  function renderDid(i) {
+    var s = STEPS[i];
+    function chips(list, cls) { return '<div class="chips">' + list.map(function (x) { return '<span class="chip' + (cls ? " " + cls : "") + '">' + esc(x) + "</span>"; }).join("") + "</div>"; }
+    var h = "";
+    h += '<div class="drow"><span class="lbl">Read</span>' + chips(s.read) + "</div>";
+    h += '<div class="drow"><span class="lbl">Nodes read</span>' + chips(s.readNodes, "node") + "</div>";
+    h += '<div class="drow"><span class="lbl">Assessed</span><div class="chips">' + s.a.map(function (a) {
+      return '<span class="pill ' + a[1] + '">' + esc(a[0]) + "</span>";
+    }).join("") + '<span class="decision">→ ' + esc(s.d) + "</span></div></div>";
+    h += '<div class="drow"><span class="lbl">Changed</span><ul class="changes">' + s.changes.map(function (c) {
+      return '<li class="chg-row" tabindex="0" data-node="' + c.nodes[0] + '" data-nodes="' + c.nodes.join(",") + '"><span class="id">' + c.id + "</span><span>" + esc(c.text) + "</span></li>";
+    }).join("") + "</ul></div>";
+    h += '<div class="drow"><span class="lbl">Why</span><p class="why">' + fmt(s.why) + "</p></div>";
+    var tools = '<div class="chips">' + s.kit[1].map(function (t) {
+      return NEEDS_RUN[t] ? '<span class="chip p1" title="' + esc(NEEDS_RUN[t]) + '">' + t + " · learner runs</span>" : '<span class="chip">' + t + "</span>";
+    }).join("") + "</div>";
+    h += '<div class="drow"><span class="lbl">Hands the tutor</span><div class="chips" style="display:grid;gap:5px">' +
+      chips(s.kit[0]) + tools + chips(s.kit[2], "node") + "</div></div>";
+    h += '<p class="hint">Click a change to select its node. Templates, then tools, then state values; a dashed tool needs code to run, which the learner does in phase 1.</p>';
+    $("did").innerHTML = h;
+    Array.prototype.forEach.call($("did").querySelectorAll(".chg-row"), function (row) {
+      var first = row.getAttribute("data-node"), all = row.getAttribute("data-nodes").split(",");
+      row.addEventListener("click", function () { pick(first); });
+      row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(first); } });
+      row.addEventListener("mouseenter", function () { setHover(all); });
+      row.addEventListener("mouseleave", function () { setHover([]); });
+    });
+  }
+
+  function setHover(ids) {
+    Array.prototype.forEach.call($("map").querySelectorAll(".m-node"), function (g) {
+      g.classList.toggle("hl", ids.indexOf(g.getAttribute("data-id")) !== -1);
+    });
+  }
+
+  /* ================= step bar ================= */
+  var dots = [];
+  for (var d = 0; d < N; d++) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "dot";
+    b.textContent = String(d);
+    b.setAttribute("aria-label", "Step " + d + ": " + STEPS[d].t);
+    b.addEventListener("click", (function (k) { return function () { go(k); }; })(d));
+    $("dots").appendChild(b);
+    dots.push(b);
+  }
+  function renderBar(i) {
+    dots.forEach(function (el, k) {
+      el.className = "dot" + (k === i ? " on" : k < i ? " past" : "");
+      if (k === i) el.setAttribute("aria-current", "step"); else el.removeAttribute("aria-current");
+    });
+    var s = STEPS[i];
+    $("sbNo").textContent = "Step " + i;
+    $("sbTitle").textContent = s.t;
+    $("sbAssess").innerHTML = s.a.map(function (a) { return '<span class="pill ' + a[1] + '">' + esc(a[0]) + "</span>"; }).join("") +
+      '<span class="decision">→ ' + esc(s.d) + "</span>";
+    $("sbSaid").innerHTML = s.m ? '<span class="lbl">Learner</span>' + fmt(s.m)
+      : '<span class="lbl">Engine</span>Takes T3 from <code>ladder.md</code> and opens a fresh loop.';
+    var p = $("sbPasted");
+    if (s.pasted) { p.hidden = false; p.innerHTML = '<span class="lbl">Pasted from VS Code</span>' + esc(s.pasted); }
+    else p.hidden = true;
+    $("prevBtn").disabled = i === 0;
+    $("nextBtn").disabled = i === N - 1;
+  }
+
+  /* ================= navigation ================= */
+  function writeHash(i) {
+    try { history.replaceState(null, "", "#s" + i + "-" + selected(i)); } catch (e) { /* hash is a convenience */ }
+  }
+  function renderAll(i) {
+    renderBar(i);
+    renderSession(i);
+    renderMap(i);
+    renderInspector(i);
+    renderDid(i);
+    writeHash(i);
+  }
+  function go(i) {
+    i = Math.max(0, Math.min(N - 1, i));
+    if (i === active) return;
+    active = i;
+    renderAll(i);
+  }
+  function pick(id) {
+    picked = id;
+    renderMap(active);
+    renderInspector(active);
+    writeHash(active);
+  }
+
+  $("prevBtn").addEventListener("click", function () { go(active - 1); });
+  $("nextBtn").addEventListener("click", function () { go(active + 1); });
+  document.addEventListener("keydown", function (e) {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    var t = (e.target && e.target.tagName) || "";
+    if (/INPUT|TEXTAREA|SELECT/.test(t)) return;
+    if (e.key === "ArrowRight") { e.preventDefault(); go(active + 1); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); go(active - 1); }
+  });
+
+  var start = 5;
+  var m = /^#s(\d+)(?:-([A-Z0-9]+))?$/.exec(location.hash || "");
+  if (m) {
+    start = Math.min(N - 1, parseInt(m[1], 10));
+    if (m[2] && NODES[m[2]]) picked = m[2];
+  }
+  go(start);
+})();
+</script>

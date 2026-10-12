@@ -1,9 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTutor } from "@/lib/session";
-import type { Ref, Unit } from "@/lib/api/types";
+import type { Attachment } from "@/lib/api/types";
 import Icon from "./Icon";
-import { stationHighlights } from '@/lib/scanner';
 type TreeNode = {
   name: string;
   path: string;
@@ -42,7 +41,6 @@ function ExplorerRow({
   open(path: string): void;
 }) {
   const [closed, setClosed] = useState(false);
-  const { snapshot } = useTutor();
   return (
     <div
       className={
@@ -90,11 +88,6 @@ function ExplorerRow({
         <span className="ex-name-clip">
           <span className="ex-name">{node.name}</span>
         </span>
-        {node.file && (
-          <span className="ex-count">
-            {snapshot?.units.filter((u) => stationHighlights(u).some(h => h.file === node.path)).length || ""}
-          </span>
-        )}
       </div>
       {!node.file && (
         <div className="ex-children">
@@ -113,25 +106,28 @@ function ExplorerRow({
   );
 }
 export default function Codebase({
-  unit,
+  first,
+  focus,
   attach,
 }: {
-  unit?: Unit;
-  attach(ref: Ref, x: number, y: number): void;
+  first?: string;
+  focus?: { path: string; at: number } | null;
+  attach(attachment: Attachment, x: number, y: number): void;
 }) {
-  const { files, snapshot } = useTutor(),
+  const { files, loadFile } = useTutor(),
     [selected, setSelected] = useState<string | null>(null),
-    [focus, setFocus] = useState(false),
     [collapsed, setCollapsed] = useState(false);
-  const paths = [
-    ...new Set([
-      ...Object.keys(files),
-      ...(snapshot?.units.flatMap((u) => stationHighlights(u).map(h => h.file)) || []),
-    ]),
-  ];
-  const path = selected || (unit && stationHighlights(unit)[0]?.file) || paths[0] || "",
+  const paths = Object.keys(files);
+  const path =
+      selected || (first && first in files ? first : paths[0]) || "",
     source = files[path],
     lines = source?.split("\n") || [];
+  useEffect(() => {
+    if (path && files[path] == null) void loadFile(path);
+  }, [path, files, loadFile]);
+  useEffect(() => {
+    if (focus) setSelected(focus.path);
+  }, [focus]);
   function select(e: React.MouseEvent) {
     const selection = window.getSelection();
     if (!selection?.toString().trim()) return;
@@ -152,10 +148,10 @@ export default function Codebase({
       hi = Math.max(Number(a.dataset.line), Number(b.dataset.line));
     attach(
       {
-        kind: "code",
-        label: path,
-        snippet: lines.slice(lo - 1, hi).join("\n"),
-        source: { file: path, lo, hi },
+        kind: "repository_code",
+        label: `${path} · lines ${lo} to ${hi}`,
+        text: lines.slice(lo - 1, hi).join("\n"),
+        source: { file: path, first_line: lo, last_line: hi },
       },
       e.clientX,
       e.clientY,
@@ -195,51 +191,19 @@ export default function Codebase({
         </div>
       </div>
       <div className="cb-code">
-        <div className="cb-toolbar">
-          <button
-            className="ftoggle"
-            id="focusToggle"
-            role="switch"
-            aria-checked={focus}
-            title="Show only the current unit's highlights"
-            onClick={() => setFocus(!focus)}
-          >
-            <span className="ftoggle-track">
-              <span className="ftoggle-knob" />
-            </span>
-            <span className="ftoggle-label">Focus current unit</span>
-          </button>
-        </div>
         <div className="cb-scroll">
           <div className="codebase" id="codebase" onMouseUp={select}>
-            {source === undefined ? (
+            {source == null ? (
               <span className="file-sep">
-                Choose the source folder to view this file.
+                {path ? "Loading…" : "No files yet."}
               </span>
             ) : (
-              lines.map((line, i) => {
-                const matches = snapshot?.units.filter(
-                    (u) => stationHighlights(u).some(h => h.file === path && i + 1 >= h.lo && i + 1 <= h.hi),
-                  ) || [],
-                  range = matches.find(u => u.id === unit?.id) || matches[0],
-                  current = range?.id === unit?.id,
-                  lit = range && (!focus || current);
-                return (
-                  <div
-                    className={
-                      "code-line" + (lit ? (current ? " hl" : " hl2") : "")
-                    }
-                    key={i}
-                    data-line={i + 1}
-                  >
-                    <span className="ln">{i + 1}</span>
-                    <span className="code">{line || " "}</span>
-                    {lit && stationHighlights(range).some(h => h.file === path && i + 1 === h.lo) && (
-                      <span className="utag">{range.slug}</span>
-                    )}
-                  </div>
-                );
-              })
+              lines.map((line, i) => (
+                <div className="code-line" key={i} data-line={i + 1}>
+                  <span className="ln">{i + 1}</span>
+                  <span className="code">{line || " "}</span>
+                </div>
+              ))
             )}
           </div>
         </div>

@@ -4,7 +4,7 @@ import type {
   Identity,
   Handlers,
   StreamEvents,
-  ScanEvents,
+  PreparingEvents,
 } from "./types";
 export class ApiError extends Error {
   constructor(
@@ -23,7 +23,7 @@ export function createLiveApi(base: string, identity: Identity): Api {
     const token = await identity.getToken();
     if (!token || !identity.user_id)
       throw new Error("Sign in before connecting to the backend.");
-    // user_id travels in a header, never as an extra JSON field (AsideBody forbids extras).
+    // user_id travels in a header, never as an extra JSON field.
     return { Authorization: `Bearer ${token}`, "X-User-Id": identity.user_id };
   };
   async function request<T>(path: string, body?: unknown): Promise<T> {
@@ -38,7 +38,7 @@ export function createLiveApi(base: string, identity: Identity): Api {
     }
     return response.json() as Promise<T>;
   }
-  function subscribe<T extends StreamEvents | ScanEvents>(
+  function subscribe<T extends StreamEvents | PreparingEvents>(
     path: string,
     handlers: Handlers<T>,
   ): () => void {
@@ -62,7 +62,8 @@ export function createLiveApi(base: string, identity: Identity): Api {
           if (disposed) return;
           try {
             const callback = handlers[key as keyof T] as
-              ((value: unknown) => void) | undefined;
+              | ((value: unknown) => void)
+              | undefined;
             callback?.(JSON.parse((e as MessageEvent).data));
           } catch (error) {
             handlers.error?.(
@@ -87,24 +88,23 @@ export function createLiveApi(base: string, identity: Identity): Api {
       source?.close();
     };
   }
-  const id = (value: string | number) => encodeURIComponent(String(value));
+  const id = (value: string) => encodeURIComponent(value);
+  const workspace = (value: string) => `/workspaces/${id(value)}`;
   return {
-    codebases: () => request("/codebases"),
-    register: (body) => request("/codebases", body),
-    importRepo: (body) => request("/codebases/import", body),
-    open: (value) => request(`/codebases/${id(value)}/open`, {}),
-    init: (body) => request("/session", body),
-    map: () => request("/session/map", {}),
-    resume: () => request("/session/resume", {}),
-    park: (value, unit_id) =>
-      request(`/journey/${id(value)}/park`, { unit_id }),
+    workspaces: () => request("/workspaces"),
+    importRepository: (body) => request("/workspaces/import", body),
+    preparing: (value, handlers) =>
+      subscribe<PreparingEvents>(`${workspace(value)}/preparing`, handlers),
+    task: (value, task) => request(`${workspace(value)}/tasks/${id(task)}`),
+    start: (value) => request(`${workspace(value)}/start`, {}),
     snapshot: (value, since) =>
-      request(`/journey/${id(value)}${since == null ? "" : `?since=${since}`}`),
-    answer: (value, body) => request(`/journey/${id(value)}/answer`, body),
-    aside: (value, body) => request(`/journey/${id(value)}/aside`, body),
-    workspace: (body) => request("/workspace", body),
+      request(`${workspace(value)}${since == null ? "" : `?since=${since}`}`),
+    send: (value, body) => request(`${workspace(value)}/messages`, body),
     stream: (value, handlers) =>
-      subscribe<StreamEvents>(`/journey/${id(value)}/stream`, handlers),
-    scan: (handlers) => subscribe<ScanEvents>("/session/map/stream", handlers),
+      subscribe<StreamEvents>(`${workspace(value)}/stream`, handlers),
+    stop: (value) => request(`${workspace(value)}/stop`, {}),
+    files: (value) => request(`${workspace(value)}/files`),
+    file: (value, path) =>
+      request(`${workspace(value)}/file?path=${encodeURIComponent(path)}`),
   };
 }
