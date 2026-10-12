@@ -2,7 +2,8 @@
 // Page 1 of the backend spec: new_completly_desighn/FRONTEND.md §7.
 export type Id = string;
 
-// IDs are written in full, never shortened: "task-3", "issue-1".
+// IDs are written in full, never shortened. The form "task-3", "issue-1" is NOT DECIDED:
+// choice 7, new_completly_desighn/LEGO.md §16.
 
 // One learner + one imported repository.
 export interface Workspace {
@@ -91,7 +92,7 @@ export type StoryKind =
   | "needed_first"
   | "saved_for_later"
   | "put_on_hold"
-  | "picked_up"
+  | "picked_up" // NOT DECIDED: choice 6, LEGO.md §16
   | "cleared"
   | "already_knew"
   | "came_back"

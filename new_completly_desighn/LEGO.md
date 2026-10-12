@@ -276,7 +276,7 @@ Code builds the answer format from this tree each turn, so a branch that can't e
                   concept checked + the waiting room empty)
 ```
 
-The kind of work picks the tutor's piece (spec §2 activities = spec §5 kinds). In an issue, it is the issue's own kind of work, fixed when it opened, so the tutor's style doesn't jump from turn to turn; a really different need is a new issue. On the task, it is the turn's main kind of work, named by ON_TRACK.
+The kind of work picks the tutor's piece (spec §2 activities = spec §5 kinds). In an issue, it is the issue's own kind of work, fixed when it opened, so the tutor's style doesn't jump from turn to turn; a really different need is a new issue. On the task itself: NOT DECIDED (choice 5); Claude's proposal is the turn's main kind of work, named by ON_TRACK.
 
 ```
  kind of work                tutor piece
@@ -456,10 +456,8 @@ What may **ever** go on each agent's plate:
 ║ every gap · SIDE_QUESTION       ──► effect.add_to_waiting_room (§17)
 ║ WANTS_TO_GO                     ──► the learner wins: that issue is now
 ║ WRONG_IDEA                      ──► effect.record_difficulty (task sheet)
-║ then                            ──► effect.pick_now: the learner's wish, then
-║                                     priority 1–4, then the task's own work,
-║                                     then priority 5 (§17) ──► card C if an
-║                                     issue is now
+║ then                            ──► effect.pick_now (§17.3, NOT DECIDED:
+║                                     choice 4) ──► card C if an issue is now
 ║ then: the task is done          ──► card E
 ╠═ 3 · TUTOR (from the card the turn ends in, §8) ════════════════════════════
 ║ instructions  ■ tutor.base  ■ keep_goal_in_view
@@ -538,8 +536,9 @@ What may **ever** go on each agent's plate:
 ║               then effect.pick_now (§17): a waiting issue may come first
 ╠═ TUTOR ═════════════════════════════════════════════════════════════════════
 ║ instructions  ■ tutor.base  ■ bridge_back (this turn only)
-║               ■ the piece of the step above: an issue's own kind of work,
-║                 or the task's last kind of work
+║               ■ the piece of the step above: an issue's own kind of work;
+║                 for the task: NOT DECIDED (choice 5), proposal: its last
+║                 kind of work
 ║ facts         ■ studs: return_to + what the pieces need
 ╠═ NEXT ══════════════════════════════════════════════════════════════════════
 ║ card C if the step above is an issue · card B if it is the task
@@ -1162,7 +1161,8 @@ Read and Grep come built in with the Agent SDK. On the plain Claude API we write
   pick_now                   the learner's wish, else the waiting room's order (§17);
                              the issue that is now: one level deeper ·
                              "↳ Went to learn first …", "↳ Needed first …" or
-                             "↳ Picked up — …"; the step we leave keeps its return note
+                             "↳ Picked up — …" (NOT DECIDED: choice 6); the step we
+                             leave keeps its return note
   put_on_hold                the learner leaves an issue unfinished or switches away:
                              on hold, with its note, never lost · "‖ Put on hold — …"
   back_one_step              "★ Cleared — …" or "✕ Already knew it — …" · one step back
@@ -1390,8 +1390,8 @@ These rules made the design. They work anywhere an LLM has to choose inside a sy
    ✓ the stuck counter is per issue and per task, and kept while on hold
    ✓ the task closes only when its waiting room is empty: nothing passes to
      the next task; for now, an issue can't be dropped
-   ✓ in an issue, the tutor's style follows the issue's own kind of work; on
-     the task, the turn's main kind of work
+   ✓ in an issue, the tutor's style follows the issue's own kind of work
+     (on the task itself: choice 5, not decided)
    ✓ the word stays "issue"
    ✓ on screen, the task panel's Issues group is the waiting room (FRONTEND.md)
 
@@ -1402,15 +1402,30 @@ These rules made the design. They work anywhere an LLM has to choose inside a sy
      it "already knew it" when met on the issue's first turn
    · the question tree in §3
    · the contracts in §11
-   · which issues the evaluator judges (kinds.yaml, judged_by, §17): concept ·
-     task_meaning · reading_the_code · showing_mastery; the orchestrator's green
-     flag alone for the other six
-   · code picks what is now only when something changes (§17), so an issue the
-     learner left doesn't bounce back on the next turn
 
- STILL OPEN (you)
-   · hole 4, hole 13, hole 16, hole 18 below
-   · the NEW tutor pieces (§12): write them now, or during the build?
+ NOT DECIDED: CLAUDE'S OWN CHOICES, written up on 2026-10-12 without you
+   Each one is marked "NOT DECIDED" where it appears. Decide each one.
+   choice 1  which issues the evaluator judges (kinds.yaml, judged_by, §17.9)
+             proposal: concept · task_meaning · reading_the_code ·
+             showing_mastery; the orchestrator's green flag alone for the rest
+   choice 2  no bouncing (§17.3): code picks a new "now" only when something
+             changes, so an issue the learner left doesn't come straight back
+   choice 3  priority 4 vs 5 (§17.2): a side question = 5; anything else that
+             doesn't block = 4
+   choice 4  the pick order (§17.3): the learner's wish, then priority 1 to 4,
+             then the focus's own work, then priority 5
+   choice 5  on the task itself, the tutor's style = the turn's main kind of
+             work; after coming back to the task, the task's last kind of work
+   choice 6  a new map line "↳ Picked up — <issue>", for when an issue on hold
+             becomes now (frontend and FRONTEND.md §4)
+   choice 7  IDs in the API written "task-3" and "issue-1" (BACKEND_SPEC.md §4,
+             the frontend's demo data)
+
+ STILL OPEN (you), in this order
+   1  hole 19 below: where we stopped on 2026-10-12
+   2  hole 4 · hole 13 · hole 16 · hole 18
+   3  the NEW tutor pieces (§12): write them now, or during the build?
+   4  choices 1 to 7 above
 
  HOLES FOUND WITH THE WALKTHROUGH
    "checked"
@@ -1438,6 +1453,20 @@ These rules made the design. They work anywhere an LLM has to choose inside a sy
    found on 2026-10-12
    hole 18  record_difficulty runs for a GAP about a concept, but a GAP's leaf
             has no what_went_wrong to fill the difficulty
+   hole 19  a concept can lose its check and never get it back:
+              box 3 · explains why label is unbound for a guest  ☑ at turn 8,
+                and a box stays ☑ forever
+              concept 15 · loop variables outlive the loop  ☑ checked
+              turn 10: WRONG_IDEA about concept 15 ──► ☐ unchecked (your
+                decision, 2026-10-11)
+              the evaluator only judges boxes that aren't ☑ ──► nothing left
+                to judge ──► concept 15 stays ☐ forever ──► task 3 never closes
+            a. the box unticks too: the learner shows it again
+            b. the box stays ☑ but can be judged again while its concept is
+               ☐; met ──► the concept is ☑ again          ← Claude's pick
+            c. a concept never unchecks; the wrong idea goes into the
+               difficulties only (reverses your 2026-10-11 decision)
+            NOT DECIDED: waiting for your answer
 ```
 
 ---
@@ -1478,7 +1507,9 @@ Code writes it the moment the issue is named, so its kit is ready when its turn 
  │ state          on hold                    code             │
  │ note           "you found the fixture     code, when it    │
  │                in conftest.py"            was paused       │
- │ judged by      the evaluator              kinds.yaml       │
+ │ judged by      the evaluator              kinds.yaml,      │
+ │                                           NOT DECIDED:     │
+ │                                           choice 1         │
  │ kit            teach_one_concept ·        kinds.yaml       │
  │                experiment_first ·                          │
  │                read_concept ·                              │
@@ -1500,9 +1531,14 @@ Code computes it from the issue's card, with `priority.yaml`. The orchestrator n
  3         blocks something else       blocks: yes · any other kind of work
  4         the current work            blocks: no · from a progress or problem leaf
  5         can wait                    blocks: no · a side question
+
+ the order 1 to 5: decided by you · how 4 and 5 are told apart: NOT DECIDED,
+ choice 3
 ```
 
 ### 17.3 What is now
+
+NOT DECIDED: the order below is choice 4, and the last paragraph is choice 2 (§16). Decided by you: the learner's wish wins, and blocking issues come before the rest.
 
 ```
  code picks, in this order:
@@ -1630,7 +1666,7 @@ On hold, in priority order:
 ```yaml
 concept:
   description: an idea they need
-  judged_by: evaluator                    # proposal, §16
+  judged_by: evaluator                    # NOT DECIDED: choice 1, §16
   tutor:
     pieces: [teach_one_concept, experiment_first]
     tools:  [read_concept]
@@ -1646,4 +1682,4 @@ tools_and_setup:
 
 ### 17.10 On screen
 
-The task panel's Issues group is the waiting room: nested, in priority order, with no numbers. Dark is now, pale is on hold, grey is cleared. The map stays the story, with two more lines: `‖ Put on hold — …` and `↳ Picked up — …`. See `FRONTEND.md` §3 and §4.
+The task panel's Issues group is the waiting room: nested, in priority order, with no numbers. Dark is now, pale is on hold, grey is cleared. The map stays the story, with two more lines: `‖ Put on hold — …` and `↳ Picked up — …` (NOT DECIDED: choice 6). See `FRONTEND.md` §3 and §4.

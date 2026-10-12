@@ -185,7 +185,8 @@ The task can't close while anything in it is still dark or pale.
  ↳ Needed first — <issue>                 ↳ Needed first —                same
  ○ Saved for later <issue>                ○ Noted for later               new word
  ‖ Put on hold — <issue>                  nothing                         new line
- ↳ Picked up — <issue>                    nothing                         new line
+ ↳ Picked up — <issue>                    nothing                         NOT DECIDED:
+                                                                          choice 6
  ★ Cleared — <issue>                      ★ Sealed — you own              new word
  ✕ Already knew it — <issue>              nothing                         new line
  ↩ Came back to <step above>              ↩ Came back to                  same
@@ -317,7 +318,8 @@ StoryLine      { id, task_id, issue_id, turn, depth, kind, text, picking_up }
                kind: started · did · ticked · almost · found_a_gap · went_to_learn_first ·
                      needed_first · saved_for_later · put_on_hold · picked_up · cleared ·
                      already_knew · came_back · done
-IDs            written in full, never shortened: "task-3", "issue-1"
+IDs            written in full, never shortened; "task-3", "issue-1" is NOT DECIDED:
+               choice 7, LEGO.md §16
 Message        { id, task_id, turn, role: learner | tutor, text, attachments }
 Attachment     { kind: repository_code | editor_code | conversation, label, text, source }
 

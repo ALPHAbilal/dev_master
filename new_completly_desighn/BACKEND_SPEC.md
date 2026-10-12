@@ -2,7 +2,7 @@
 
 Draft 0.3 · 2026-10-12 · builds `LEGO.md` (draft 0.20) behind the contract in `FRONTEND.md` (draft 0.6), on Supabase, with Claude as `BUILD_WITH_CLAUDE.md` maps it. Replaces draft 0.1, which is in `archive/new_completly_desighn/`.
 
-**Naming rule:** no abbreviations; every ID is written in full (task 3, issue 1, concept 15, box 2), never shortened (never T3, I1 or C15). In the API, IDs are `task-3` and `issue-1`. Whatever a model reads or writes is the full label, word + number + name, made by `engine/names.py` only. On the learner's screen, no IDs at all (`FRONTEND.md`, brand rule).
+**Naming rule:** no abbreviations; every ID is written in full (task 3, issue 1, concept 15, box 2), never shortened (never T3, I1 or C15). In the API, IDs are `task-3` and `issue-1` (NOT DECIDED: choice 7, `LEGO.md` §16). Whatever a model reads or writes is the full label, word + number + name, made by `engine/names.py` only. On the learner's screen, no IDs at all (`FRONTEND.md`, brand rule).
 
 ---
 
@@ -51,6 +51,8 @@ Draft 0.3 · 2026-10-12 · builds `LEGO.md` (draft 0.20) behind the contract in 
                                               issue; in an issue, the tutor follows the issue's
                                               own kind of work
  ─────────────────────────────────────────── still open
+ a concept can lose its check and never get   open: LEGO.md hole 19, where we stopped
+ it back
  a box explained inside an issue ticks only   open: LEGO.md hole 16
  on the next turn
  the issue → concept link is a guess          open: LEGO.md hole 4
@@ -58,6 +60,7 @@ Draft 0.3 · 2026-10-12 · builds `LEGO.md` (draft 0.20) behind the contract in 
  ladder
  a GAP's difficulty has no what_went_wrong    open: LEGO.md hole 18
  the tutor's new pieces are not written       open: now, or during the build (§20, step 3)
+ Claude's own choices 1 to 7                  NOT DECIDED: LEGO.md §16
 ```
 
 ---
@@ -202,11 +205,11 @@ question_1:
 # kinds.yaml (excerpt)
 debugging:
   description: finding why it fails
-  judged_by: orchestrator
+  judged_by: orchestrator                 # NOT DECIDED: choice 1, LEGO.md §16
   tutor: { pieces: [guide_debugging], tools: [], files: [] }
 concept:
   description: an idea they need
-  judged_by: evaluator
+  judged_by: evaluator                    # NOT DECIDED: choice 1, LEGO.md §16
   tutor: { pieces: [teach_one_concept, experiment_first], tools: [read_concept],
            files: [the linked concept] }
 
@@ -214,6 +217,7 @@ concept:
 - { priority: 1, when: { kind_of_work: frustration } }
 - { priority: 2, when: { blocks: true, kind_of_work: [concept, task_meaning] } }
 - { priority: 3, when: { blocks: true } }
+# rules 4 and 5: NOT DECIDED, choice 3, LEGO.md §16
 - { priority: 4, when: { blocks: false, from: [progress, problem] } }
 - { priority: 5, when: { blocks: false, from: [turns_away] } }
 
@@ -491,7 +495,7 @@ One request carries the tools and the structured answer format. The model may ca
 
 ### 8.1 Its pieces
 
-Code picks them from the card the turn ends in, the leaf, the kind of work and, when stuck, the why. In an issue, the kind of work is the issue's own; on the task, it is the turn's main kind from ON_TRACK; after BACK to the task, it is the task's last one. The mapping is `LEGO.md` §4, §7, §9 and §17, kept in `cards.yaml`, `kinds.yaml` and `stuck.yaml`.
+Code picks them from the card the turn ends in, the leaf, the kind of work and, when stuck, the why. In an issue, the kind of work is the issue's own; on the task itself, NOT DECIDED (choice 5, `LEGO.md` §16): the proposal is the turn's main kind from ON_TRACK, and after BACK to the task, the task's last one. The mapping is `LEGO.md` §4, §7, §9 and §17, kept in `cards.yaml`, `kinds.yaml` and `stuck.yaml`.
 
 ### 8.2 Its system prompt, rebuilt every turn
 
