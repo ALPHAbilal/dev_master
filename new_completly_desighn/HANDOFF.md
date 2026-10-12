@@ -31,7 +31,7 @@ Old designs are in `archive/` (see `archive/README.md`). Don't build from them.
  [x] the Claude mapping checked                      BUILD_WITH_CLAUDE.md
  [x] the frontend rebuilt for the new design         agentic_tutor/frontend, demo mode
  [x] the backend spec written                        BACKEND_SPEC.md 0.2
- [ ] the 4 decisions of BACKEND_SPEC.md §22
+ [~] the 4 decisions of BACKEND_SPEC.md §22         3 done; the holes, one by one
  [ ] build steps 1 to 9                              BACKEND_SPEC.md §20
 ```
 
@@ -56,7 +56,7 @@ Demo mode plays task T3 from turn 6. Any message plays the next turn, and the fi
  Fly         app backend-withered-morning-5909 · Frankfurt · runs tutor_v2 today
              secret ANTHROPIC_API_KEY
  Supabase    organization ALPHAbilal · project agentic-tutor · ref rbsvlxqdmbpwenyxeobu
-             eu-central-1 · Postgres 17 · PAUSED on 2026-10-12: restore it before build step 1
+             eu-central-1 · Postgres 17 · restored 2026-10-12
  git         dev_master (this repository, which also tracks agentic_tutor/) and the nested
              agentic_tutor repository (GitHub ALPHAbilal/agentic-tutor), which Vercel and Fly
              deploy; a push there rebuilds production
@@ -85,11 +85,12 @@ Demo mode plays task T3 from turn 6. Any message plays the next turn, and the fi
  teaching     the answer is never given; the answer key stays locked
 ```
 
-## 6. Decisions waiting (BACKEND_SPEC.md §22)
+## 6. Decisions (BACKEND_SPEC.md §22)
 
 ```
- 1  restore the Supabase project now               my pick: yes
- 2  how learners sign in                           my pick: GitHub; or a link by email
- 3  the 9 proposals for LEGO.md's holes (§0)       my pick: accept all
- 4  where the new backend runs                     my pick: a second Fly app, then the switch
+ 1  restore the Supabase project now               done
+ 2  how learners sign in                           a link by email only
+ 3  the 9 proposals for LEGO.md's holes (§0)       WAITING: decided one by one
+ 4  where the new backend runs                     replaces tutor_v2 completely, in the
+                                                   current Fly app
 ```

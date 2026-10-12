@@ -21,17 +21,19 @@ Draft 0.2 · 2026-10-12 · builds `LEGO.md` (draft 0.19) behind the contract in 
  contract        FRONTEND.md §7–§8; the frontend is built and runs it in demo mode
  context         fresh agents per task; instructions are never history; no caching, no compaction
  phase 1         no code runs on the server; the learner pastes code and output
- migration       a new package next to tutor_v2; tutor_v2 is deleted at the switch
+ migration       tutor_graph replaces tutor_v2 completely, in the current Fly app; tutor_v2 is
+                 deleted
+ sign-in         a link by email only (Supabase Auth)
 ```
 
 ### Before the build starts
 
 ```
- 1  restore the Supabase project     it is paused (status INACTIVE)            needs your OK
+ 1  restore the Supabase project     done 2026-10-12
  2  one Haiku 5.5 test call          confirms structured outputs and the size  needs the API key
                                      of our answer format
  3  a sign-in screen                 the frontend reads a Supabase session     frontend, small
-                                     but cannot create one yet
+                                     but cannot create one yet; email link
 ```
 
 ### My proposals for the open holes of LEGO.md §16
@@ -725,9 +727,9 @@ Haiku 5.5 costs $0.10 per million input tokens and $0.50 per million output toke
  the per-workspace lock, the event helper,     the pattern is kept, rewritten
  the replay log for late subscribers
  the Agent SDK permission setup                the pattern is kept, for the crafters
- Dockerfile (Node and the Claude CLI for the   adapted; deployed as a second Fly app until
- Agent SDK) · fly.toml                         the switch
- everything else in tutor_v2                   deleted at the switch
+ Dockerfile (Node and the Claude CLI for the   adapted; deployed to the current Fly app,
+ Agent SDK) · fly.toml                         in place of tutor_v2
+ everything else in tutor_v2                   deleted
 ```
 
 ---
@@ -737,8 +739,8 @@ Haiku 5.5 costs $0.10 per million input tokens and $0.50 per million output toke
 ```
  STEP                WHAT                                                    DONE WHEN
  ──────────────────  ──────────────────────────────────────────────────────  ─────────────────────────────────
- 1  foundations      restore Supabase · the migrations · the package ·       the server starts; the config
-                     the config loader · auth · /health                       check passes
+ 1  foundations      the migrations · the package · the config loader ·      the server starts; the config
+                     auth · /health                                           check passes
  2  the read side    snapshot, ladder, task and file routes, on a T3 seed     the frontend in live mode shows
                      loaded into Postgres                                     T3 from the backend
  3  the engine       where · checks · cards · the tree → format · the         unit tests green; the T3 replay
@@ -752,9 +754,9 @@ Haiku 5.5 costs $0.10 per million input tokens and $0.50 per million output toke
                      seed                                                     cost per turn is recorded
  7  preparing        the import route, the job, both crafters, the checks,    a small real repository prepares
                      the ordering, the preparing stream                       end to end
- 8  ship             a second Fly app, Vercel in live mode, the sign-in       you learn one task on your own
-                     screen                                                   repository
- 9  the switch       tutor_v2 deleted                                         your call
+ 8  ship             tutor_graph replaces tutor_v2 in the current Fly app;   you learn one task on your own
+                     tutor_v2 deleted · Vercel in live mode · the email       repository
+                     sign-in screen
 ```
 
 ---
@@ -769,8 +771,8 @@ Haiku 5.5 costs $0.10 per million input tokens and $0.50 per million output toke
  the answer format is too large for            the test call checks it first; if needed, a
  structured outputs                            flatter format with the same checks in code
  a long task passes 100K tokens                logged; then we revisit compaction
- a free Supabase project pauses when idle      it is paused today; for real learners, the paid
-                                               plan or regular use
+ a free Supabase project pauses when idle      it paused once (restored 2026-10-12); for real
+                                               learners, the paid plan or regular use
  one machine only: the lock and the events     enough for now; later the events move to Postgres
  live in the process                           notifications
  a large repository costs a lot to prepare     the size limit; the cost is logged per step
@@ -780,17 +782,13 @@ Haiku 5.5 costs $0.10 per million input tokens and $0.50 per million output toke
 
 ---
 
-## 22. Decisions waiting for you
+## 22. Decisions
 
 ```
- 1  restore the Supabase project now           a. yes                                 ← my pick
-                                               b. at step 1 of the build
- 2  how learners sign in                       a. GitHub, since they import GitHub    ← my pick
-                                                  repositories
-                                               b. a link by email
- 3  the proposals in §0 for LEGO.md's holes    a. accept all                          ← my pick
-                                               b. go through them one by one
- 4  where the new backend runs                 a. a second Fly app during the build,  ← my pick
-                                                  then the switch
-                                               b. replace tutor_v2 in the current app
+ 1  restore the Supabase project now           yes: restored                          you, 2026-10-12
+ 2  how learners sign in                       a link by email only                   you, 2026-10-12
+ 3  the proposals in §0 for LEGO.md's holes    one by one                             you, 2026-10-12
+                                               WAITING: each hole decided in turn
+ 4  where the new backend runs                 replaces tutor_v2 completely, in the   you, 2026-10-12
+                                               current Fly app
 ```
