@@ -1,6 +1,6 @@
 # Frontend: what changes
 
-Draft 0.6 · 2026-10-12 · companion to `LEGO.md` (draft 0.20)
+Draft 0.6 · 2026-10-12 · companion to `LEGO.md` (draft 0.21)
 
 **The rule:** we keep the screen we have and change only what the new design needs. The backend spec then serves exactly the contract in §7.
 
@@ -153,7 +153,7 @@ It sits in the second sidebar, which opens when a task is clicked (§2, state 3)
             they are for the tutor; the story already shows those moments
 ```
 
-A concept that was checked and then missed goes back to ☐. Nothing else marks it.
+A concept that was checked and then missed goes back to ☐. Nothing else marks it. Its boxes stay ticked; it is ☑ again when one of them is judged met again.
 
 **The Issues group is the waiting room** (decided 2026-10-12). It shows every issue of the task, nested under the issue it was named in, in the priority order the server sends. No numbers and no labels: the tone says the state.
 

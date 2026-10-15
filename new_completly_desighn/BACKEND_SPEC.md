@@ -1,6 +1,6 @@
 # Backend spec: `tutor_graph`
 
-Draft 0.3 · 2026-10-12 · builds `LEGO.md` (draft 0.20) behind the contract in `FRONTEND.md` (draft 0.6), on Supabase, with Claude as `BUILD_WITH_CLAUDE.md` maps it. Replaces draft 0.1, which is in `archive/new_completly_desighn/`.
+Draft 0.3 · 2026-10-12 · builds `LEGO.md` (draft 0.21) behind the contract in `FRONTEND.md` (draft 0.6), on Supabase, with Claude as `BUILD_WITH_CLAUDE.md` maps it. Replaces draft 0.1, which is in `archive/new_completly_desighn/`.
 
 **Naming rule:** no abbreviations; every ID is written in full (task 3, issue 1, concept 15, box 2), never shortened (never T3, I1 or C15). In the API, IDs are `task-3` and `issue-1` (NOT DECIDED: choice 7, `LEGO.md` §16). Whatever a model reads or writes is the full label, word + number + name, made by `engine/names.py` only. On the learner's screen, no IDs at all (`FRONTEND.md`, brand rule).
 
@@ -16,7 +16,7 @@ Draft 0.3 · 2026-10-12 · builds `LEGO.md` (draft 0.20) behind the contract in 
                  (eu-central-1)
  model           Claude Haiku 5.5 (claude-haiku-5-5) for every agent
  agents          orchestrator, evaluator, tutor on the Claude API; the two crafters on the Agent SDK
- agentic layer   LEGO.md 0.20 as written: cards, pieces, plates, the question tree, the task sheet,
+ agentic layer   LEGO.md 0.21 as written: cards, pieces, plates, the question tree, the task sheet,
                  the stuck ladder, checkpoints, the waiting room
  contract        FRONTEND.md §7–§8; the frontend is built and runs it in demo mode
  context         fresh agents per task; instructions are never history; no caching, no compaction
@@ -50,16 +50,25 @@ Draft 0.3 · 2026-10-12 · builds `LEGO.md` (draft 0.20) behind the contract in 
  one turn mixes kinds; kinds flip             the waiting room (LEGO.md §17): every need is an
                                               issue; in an issue, the tutor follows the issue's
                                               own kind of work
+ a concept can lose its check and never get   2026-10-14, LEGO.md hole 19: the box stays
+ it back                                      ticked; while its concept is unchecked, the
+                                              evaluator may judge it again; met ──► the
+                                              concept is checked again
+ the issue → concept link is a guess          2026-10-14, LEGO.md hole 4: before a checked
+                                              concept goes back to unchecked, code asks the
+                                              evaluator; met ──► unchecked; not met or
+                                              unclear ──► it stays checked
+ kinds overlap with UNCERTAIN and the stuck   2026-10-14, LEGO.md hole 13: showing_mastery
+ ladder                                       and frustration are removed; 8 kinds of work,
+                                              4 priorities
+ a box explained inside an issue ticks only   2026-10-14, LEGO.md hole 16: in an issue,
+ on the next turn                             evaluate may also judge the task's boxes
+ a GAP's difficulty has no what_went_wrong    2026-10-14, LEGO.md hole 18: a difficulty has a
+                                              label, wrong_idea or missing, and a text; a
+                                              GAP's text is its issue title
+ the tutor's new pieces are not written       2026-10-14: written during the build (§20,
+                                              step 3), judged in a real session (step 6)
  ─────────────────────────────────────────── still open
- a concept can lose its check and never get   open: LEGO.md hole 19, where we stopped
- it back
- a box explained inside an issue ticks only   open: LEGO.md hole 16
- on the next turn
- the issue → concept link is a guess          open: LEGO.md hole 4
- kinds overlap with UNCERTAIN and the stuck   open: LEGO.md hole 13
- ladder
- a GAP's difficulty has no what_went_wrong    open: LEGO.md hole 18
- the tutor's new pieces are not written       open: now, or during the build (§20, step 3)
  Claude's own choices 1 to 7                  NOT DECIDED: LEGO.md §16
 ```
 
@@ -149,14 +158,14 @@ agentic_tutor/backend/tutor_graph/
 agentic_tutor/backend/config/
 ├── models.yaml              per agent: model, effort, max tokens, tool rounds
 ├── tree.yaml                the questions, their options and short descriptions (LEGO §3)
-├── kinds.yaml               the ten kinds of work: name, description, judged_by, and the
+├── kinds.yaml               the 8 kinds of work: name, description, judged_by, and the
 │                            tutor's kit: pieces, tools, files (LEGO §4, §17.9)
-├── priority.yaml            priority 1 to 5, computed from an issue's card (LEGO §17.2)
+├── priority.yaml            priority 1 to 4, computed from an issue's card (LEGO §17.2)
 ├── stuck.yaml               the levels, their whys, each why's tutor piece (LEGO §9)
 ├── cards.yaml               per card: the fixed and gated pieces of each plate (LEGO §7)
 ├── pieces/
 │   ├── orchestrator/*.md    base · on_task · in_issue · stuck · waiting_room · deep
-│   ├── evaluator/*.md       task_box · closes_when
+│   ├── evaluator/*.md       task_box · closes_when · confirm_difficulty
 │   └── tutor/*.md           base and every piece of LEGO §12
 ├── tools/*.md               one guide per tool: what · when · when not · how
 ├── story.yaml               story line kind → its words (the screen draws the marks)
@@ -214,19 +223,17 @@ concept:
            files: [the linked concept] }
 
 # priority.yaml
-- { priority: 1, when: { kind_of_work: frustration } }
-- { priority: 2, when: { blocks: true, kind_of_work: [concept, task_meaning] } }
-- { priority: 3, when: { blocks: true } }
-# rules 4 and 5: NOT DECIDED, choice 3, LEGO.md §16
-- { priority: 4, when: { blocks: false, from: [progress, problem] } }
-- { priority: 5, when: { blocks: false, from: [turns_away] } }
+- { priority: 1, when: { blocks: true, kind_of_work: [concept, task_meaning] } }
+- { priority: 2, when: { blocks: true } }
+# rules 3 and 4: NOT DECIDED, choice 3, LEGO.md §16
+- { priority: 3, when: { blocks: false, from: [progress, problem] } }
+- { priority: 4, when: { blocks: false, from: [turns_away] } }
 
 # stuck.yaml (excerpt)
 levels:
   - { from_turns: 2, whys: { didnt_get_it: reframe_explanation, hasnt_said_view: ask_their_view } }
   - { from_turns: 3, whys: { step_too_big: smaller_step, lost_where_to_look: point_to_place } }
   - { from_turns: 4, whys: { needs_one_done: worked_example, too_many_paths: offer_choices } }
-any_level: { frustrated: encourage_pause }
 ```
 
 Changing a description, a level or a piece is a config change, never a code change.
@@ -280,7 +287,7 @@ All tables live in a schema named `tutor`. Supabase's data API does not expose i
 ```
  box_ticks          workspace_id · task_id · box_number · ticked_at_turn
  concept_progress   workspace_id · task_id · concept_number · checked · times_it_came_up
- difficulties       workspace_id · task_id · concept_number · turn · what_went_wrong
+ difficulties       workspace_id · task_id · concept_number · turn · label (wrong_idea | missing) · text
                     · had_it_then_missed · issue_id
  issues             workspace_id · number (issue 1; "issue-1" in the API) · opened_in_task
                     · parent_issue_id · title · kind_of_work · blocks · closes_when
@@ -429,7 +436,8 @@ All tables live in a schema named `tutor`. Supabase's data API does not expose i
  search_repo        pattern                     at most 50 matches in the repository copy
  read_journey       task                        a closed task's journey
  evaluate           target, turns               runs the evaluator (§7) and returns its
-                                                checked verdict
+                                                checked verdict; target: a box to judge, or
+                                                in an issue, the issue or a box to judge
  pull_checkpoints   which                       writes checkpoints into this call's temporary
                                                 folder; returns the file's path (§12)
  Read · Grep        path · pattern              only inside that temporary folder
@@ -461,8 +469,9 @@ One request carries the tools and the structured answer format. The model may ca
 ### 7.1 Its plate
 
 ```
- instructions      evaluator.task_box, or evaluator.closes_when
- target            one box with its text, or one issue's closing condition
+ instructions      evaluator.task_box, evaluator.closes_when, or evaluator.confirm_difficulty
+ target            one box with its text, one issue's closing condition, or a checked
+                   concept and a difficulty's label
  answer key        the task's, for a box only; an issue has none
  learner turns     the turns the orchestrator named, copied word for word by code
  tools             pull_checkpoints (what the learner and the tutor said, never the
@@ -483,11 +492,15 @@ One request carries the tools and the structured answer format. The model may ca
 - The target is the one asked.
 - The verdict is one of the three values, and there are no other fields.
 - Any failed check counts as `unclear`.
-- Met on a box: the box ticks at once, recording the turn (§10). Met on an issue: Question 0 may now answer "no".
+- Met on a box: the box ticks at once, recording the turn (§10), on the task or inside an issue (`LEGO.md` hole 16). Met on an issue: Question 0 may now answer "no".
 
 ### 7.4 The answer key stays locked
 
 `answer_keys` is read by one function, `agents/evaluator.py: answer_key_for(task)`. A test fails if any other module reads that table. No route, tool or tutor plate ever carries it.
+
+### 7.5 Before a concept unchecks
+
+`LEGO.md` hole 4. A WRONG_IDEA or a GAP names a concept that is checked. Before it goes back to unchecked, code calls the evaluator with `evaluator.confirm_difficulty`: the target is that concept and the difficulty's label, such as "a wrong idea about concept 15 · loop variables outlive the loop", never the orchestrator's sentence; the turn is this one. Met ──► unchecked, with a `had_it_then_missed` row. Not met or unclear ──► it stays checked. The difficulty is written either way.
 
 ---
 
@@ -552,7 +565,8 @@ The gates are in §16.
  check_box              the evaluator said met on a box       box_ticks ·                ticked
                                                               concept_progress
  record_difficulty      WRONG_IDEA, or a GAP about a concept  difficulties ·             almost (wrong idea)
-                                                              concept_progress
+                        a checked concept unchecks only       concept_progress
+                        after the evaluator's met (§7.5)
  add_to_waiting_room    every gap · SIDE_QUESTION · a new     issues: on hold, with      found_a_gap, or
                         issue from WANTS_TO_GO                its priority               saved_for_later
  pick_now               something changed: an issue cleared,  issues · stack             went_to_learn_first,
@@ -578,7 +592,9 @@ Every effect of a turn commits in one transaction, together with its story lines
 - **One sheet per task, written by code only.** A new task's sheet is always fresh.
 - **A box ticks** when the evaluator says met. The tick records the turn, so the ticks also show the order the boxes were ticked in.
 - **A concept is checked** when all of its boxes are ticked.
-- **It goes back to unchecked** when a WRONG_IDEA or a GAP about it comes after. A `had_it_then_missed` row then keeps the turn, the issue and the angle.
+- **It goes back to unchecked** when a WRONG_IDEA or a GAP about it comes after and the evaluator confirms it (§7.5). A `had_it_then_missed` row then keeps the turn, the issue, the label and the angle.
+- **A difficulty** has a label, `wrong_idea` or `missing`, and a text: a WRONG_IDEA's what_went_wrong, or a GAP's issue title.
+- **It is checked again** when one of its boxes is judged met after that. The box stays ticked, with its first turn; while its concept is unchecked, the evaluator may judge it again (`LEGO.md` hole 19).
 - **times_it_came_up** grows on every turn that touches the concept: a leaf names it, the focus issue is linked to it, or one of its boxes is judged.
 - **The task is done** when the job box is ticked, every concept is checked, and the waiting room is empty.
 - **Who reads it:** the tutor (always) and the orchestrator (every turn). The evaluator never does. The learner gets the view of §4.4: no difficulties, and no box text before the tick.
@@ -827,9 +843,10 @@ Haiku 5.5 costs $0.10 per million input tokens and $0.50 per million output toke
  2  how learners sign in                       a link by email only                   you, 2026-10-12
  3  LEGO.md's holes                            one by one: quotes removed · kinds     you, 2026-10-12
                                                as names · full labels · the waiting
-                                               room (LEGO.md §17); holes 4, 13, 16,
-                                               18 and the tutor's new pieces are
-                                               still open (§0)
+                                               room (LEGO.md §17)
+                                               holes 19, 4, 13, 16, 18 and the        you, 2026-10-14
+                                               tutor's new pieces: §0
+                                               Claude's choices 1 to 7: still open
  4  where the new backend runs                 replaces tutor_v2 completely, in the   you, 2026-10-12
                                                current Fly app
 ```

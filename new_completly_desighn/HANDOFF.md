@@ -1,87 +1,65 @@
 # Handoff: continue here
 
-Updated 2026-10-12, end of the session. Claude's memory stays on the laptop it was made on. This file carries everything a new session needs, including how to work with the user (§4).
+Updated 2026-10-14. Claude's memory stays on the laptop it was made on. This file carries everything a new session needs, including how to work with the user (§4).
 
 ## 0. Where we stopped
 
-We are closing the design holes one by one. The user is answering **hole 19** (`LEGO.md` §16). The question was asked and explained, and the user will answer it on the other computer.
+Every hole of `LEGO.md` §16 is closed (§3 below). We are now going through **Claude's own choices 1 to 7**, which Claude wrote up without the user. **Choice 1** was explained, and the user has not answered yet.
 
-**Hole 19 · a concept can lose its check and never get it back**
+**Choice 1 · who decides that an issue is finished?**
 
 ```
- the rules today
- 1  a box, once ☑, stays ☑ forever in the task                     LEGO.md §12
- 2  a concept is checked = all its boxes ☑                         LEGO.md §10
- 3  a WRONG_IDEA or GAP about a checked concept ──► back to ☐      the user, 2026-10-11
- 4  the task closes only when every concept is checked             LEGO.md §10
-
- turn 8    the learner explains why label is unbound for a guest; the evaluator: met
-           box 3 · explains why label is unbound for a guest        ☑ forever
-           concept 15 · loop variables outlive the loop             ☑ checked
- turn 10   learner: "so after any loop, the variable is None?"
-           orchestrator: WRONG_IDEA about
-           concept 15 · loop variables outlive the loop             ☐ unchecked
- turn 11+  box 3 · explains why label is unbound for a guest        still ☑ forever
-           the evaluator only judges boxes that aren't ☑ ──► nothing left to judge
-           concept 15 · loop variables outlive the loop             ☐ stuck forever
-           task 3 · guests always get the generic error             never closes
+ the evaluator           a separate model that sees only what the learner said and
+                         answers met | not met | unclear; independent, one more call
+ the orchestrator alone  it gives the green flag itself; no second model
 ```
 
 ```
- a. the box unticks too        the learner shows it again ──► ☑ ──► the concept ☑
- b. the box stays ☑, but can   while its concept is ☐, the evaluator may      ← Claude's pick
-    be judged again            judge it again; met ──► the concept ☑ again
- c. a concept never unchecks   the wrong idea goes into the difficulties only;
-                               this reverses the user's 2026-10-11 decision
+ understanding                              doing
+ ─────────────────────────────────────      ─────────────────────────────────────
+ concept · task_meaning · reading_the_code  planning · writing_code · tools_and_setup
+                                            debugging · testing_and_checking
+
+ issue · what a mock is              kind concept
+   closes when: explains what a mock replaces
+   learner: "a mock replaces the real OpenAI client"
+   ──► someone has to judge whether that explanation is right    the evaluator
+
+ issue · how to run pytest           kind tools_and_setup
+   closes when: the tests run
+   learner: pastes "3 passed"
+   ──► the output says it                                        the orchestrator alone
 ```
 
-How the task sheet reaches each agent, which the user asked about (`LEGO.md` §10, `BACKEND_SPEC.md` §4):
-
 ```
- the database rows ──► code builds the task sheet as text, every turn
-                         ├──► the orchestrator: pasted into its prompt as the fact task_sheet
-                         ├──► the tutor: pasted into its system prompt
-                         ├──► the evaluator: never
-                         └──► the screen: ☑ and ☐ only
- "checked" is a yes or no inside it; checked and unchecked concepts are both
- always shown; code's gate closes the task only when every concept is checked
+ a  split by kind    understanding ──► the evaluator; doing ──► the orchestrator   ◄ Claude's pick
+                     alone
+ b  always           the evaluator for every issue; safest, one more call each time
+ c  never            the orchestrator alone for every issue; cheapest, no second check
 ```
 
 **To resume with Claude,** open Claude Code in `dev_master` and say:
 
-> Read `new_completly_desighn/HANDOFF.md` and follow §4. We continue at hole 19: I answer a, b or c.
+> Read `new_completly_desighn/HANDOFF.md` and follow §4. We continue at choice 1: I answer a, b or c.
 
 ## 1. The queue, in order
 
-One numbering only: `LEGO.md`'s. Never renumber.
-
 ```
- 1  hole 19       a concept can lose its check and never get it back   ◄ now
- 2  hole 4        the link from an issue to a concept is the orchestrator's guess
- 3  hole 13       overlaps: showing_mastery with UNCERTAIN; frustration as a kind of
-                  work and as a why on the stuck ladder
- 4  hole 16       a box explained inside an issue is ticked only on the next turn
- 5  hole 18       a GAP about a concept writes a difficulty, but a GAP has no
-                  what_went_wrong
- 6  the tutor's   write the NEW tutor pieces now, or during the build?
-    new pieces
- 7  choice 1–7    Claude's own choices, written up without the user and marked
-                  "NOT DECIDED" wherever they appear (LEGO.md §16):
-                  1 which issues the evaluator judges
-                  2 no bouncing: a new "now" only when something changes
-                  3 priority 4 vs 5: a side question = 5
-                  4 the pick order: wish · 1 to 4 · the focus's own work · 5
-                  5 on the task itself, the tutor's style = the turn's kind
-                  6 a new map line "↳ Picked up"
-                  7 IDs in the API: "task-3", "issue-1"
- then           update the docs, walk task 3 through the final design, then build
-                step 1 (BACKEND_SPEC.md §20)
+ 1  choice 1   which issues the evaluator judges                          ◄ now
+ 2  choice 2   no bouncing: a new "now" only when something changes
+ 3  choice 3   priority 3 vs 4: a side question = 4
+ 4  choice 4   the pick order: wish · priority 1 to 3 · the focus's own work · 4
+ 5  choice 5   on the task itself, the tutor's style = the turn's kind of work
+ 6  choice 6   a new map line "↳ Picked up"
+ 7  choice 7   IDs in the API: "task-3", "issue-1"
+ then          write every answer into the docs in one pass; walk task 3 through
+               the final design; build step 1 (BACKEND_SPEC.md §20)
 ```
 
 ## 2. Where we are
 
 ```
- [x] the agentic layer designed                      LEGO.md 0.20
+ [x] the agentic layer designed                      LEGO.md 0.21
  [x] the Claude mapping checked                      BUILD_WITH_CLAUDE.md
  [x] the frontend rebuilt for the new design         agentic_tutor/frontend, demo mode
  [x] the backend spec written                        BACKEND_SPEC.md 0.3
@@ -94,7 +72,7 @@ Read in this order:
 
 ```
  1  HANDOFF.md                  this file
- 2  LEGO.md                     the agentic layer, draft 0.20; §16 has every decision, every
+ 2  LEGO.md                     the agentic layer, draft 0.21; §16 has every decision, every
                                 hole and choices 1 to 7; §17 is the waiting room
  3  BUILD_WITH_CLAUDE.md        every piece on the Claude API and the Agent SDK, checked
  4  FRONTEND.md                 the learner's screen, draft 0.6: built; its contract is §7–§8
@@ -108,9 +86,10 @@ Read in this order:
 
 Old designs are in `archive/` (see `archive/README.md`). Don't build from them.
 
-## 3. Decided on 2026-10-12
+## 3. Decided
 
 ```
+ 2026-10-12
  Supabase        restored
  sign-in         a link by email only
  the backend     tutor_graph replaces tutor_v2 completely, in the current Fly app
@@ -119,8 +98,8 @@ Old designs are in `archive/` (see `archive/README.md`). Don't build from them.
  kinds of work   names, not numbers: "kind_of_work": "debugging"
  labels          every ID in full: task 3, issue 1, never T3 or I1; a model reads and
                  writes word + number + name; engine/names.py makes every label
- the waiting     LEGO.md §17: every need is an issue; ordered by priority 1 to 5 (the
- room            order is the user's); the orchestrator names issues and gives the
+ the waiting     LEGO.md §17: every need is an issue; ordered by priority, 1 to 4 since
+ room            2026-10-14; the order is the user's; the orchestrator names issues and gives the
                  green flag, code does the rest; the learner wins a switch; any number
                  of switches, nothing lost; left unfinished ──► on hold; issues inside a
                  cleared issue move up; the stuck counter is per issue, kept on hold;
@@ -128,6 +107,22 @@ Old designs are in `archive/` (see `archive/README.md`). Don't build from them.
  the word        "issue" stays; there is no separate "needs" list
  on screen       the task panel's Issues group is the waiting room: dark now, pale on
                  hold, grey cleared
+
+ 2026-10-14
+ hole 19         b: a box stays ☑ forever, but while its concept is unchecked the
+                 evaluator may judge it again; met ──► checked again
+ hole 4          c: before a checked concept goes back to unchecked, code asks the
+                 evaluator whether this turn really shows it; met ──► unchecked;
+                 not met or unclear ──► it stays checked
+ hole 13         showing_mastery removed: "I get it" with no proof is UNCERTAIN;
+                 frustration removed everywhere: the kind of work, the stuck why,
+                 priority 1, encourage_pause ──► 8 kinds of work, 4 priorities
+ hole 16         a: in an issue, evaluate may also judge the task's boxes
+ hole 18         a difficulty is JSON with a label and a text:
+                 { "turn": 3, "label": "missing", "text": "<the GAP's issue title>" }
+                 { "turn": 10, "label": "wrong_idea", "text": "<its what_went_wrong>" }
+ tutor pieces    the 9 new texts are written during the build, step 3, and judged
+                 in a real task 3 session, step 6
 ```
 
 ## 4. How to work with the user: follow this
@@ -149,6 +144,9 @@ These rules come from the user. Claude's memory of them stays on the first lapto
  answers       short; mostly ASCII diagrams; complex things made simple; no side notes
                in parentheses inside diagrams; draw only what really exists
  choosing      show options side by side, so the user picks
+ one at a time one hole or choice per message, explained from the basics; on an
+               answer, go straight to the next one; write nothing into the docs
+               until every answer is in, then write them all in one pass
  git           Claude commits, in WSL; the user does everything on GitHub and pushes
                from Windows PowerShell; never set up a GitHub login in WSL
  line endings  this repository has no .gitattributes, so Windows flips line endings;
@@ -180,9 +178,8 @@ Demo mode plays task 3 from turn 6. Any message plays the next turn. The fifth t
              when idle
  git         dev_master (this repository, which also tracks agentic_tutor/) and the
              agentic-tutor repository (GitHub ALPHAbilal/agentic-tutor), which Vercel
-             and Fly deploy; a push there rebuilds production. On the laptop used on
-             2026-10-12, agentic-tutor was not cloned: the frontend changes of that day
-             live in dev_master only
+             and Fly deploy; a push there rebuilds production. The frontend in both
+             is the same since 2026-10-14
  not ours    devmind-web.vercel.app is a different, older project
 ```
 

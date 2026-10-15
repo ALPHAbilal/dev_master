@@ -1,6 +1,6 @@
 # LEGO: the intelligence layer, piece by piece
 
-Draft 0.20 · 2026-10-12 · `?` = waiting for your answer
+Draft 0.21 · 2026-10-14 · `?` = waiting for your answer
 
 **Naming rule, for everything:** no abbreviations. Every field name is a full phrase. Every ID is written in full (task 3, issue 1, concept 15, box 2), never shortened (never T3, I1 or C15). Whatever a model reads or writes carries the full label: word + number + name, such as `concept 15 · loop variables outlive the loop`. One place in code makes every label: `engine/names.py` (§11.3).
 
@@ -203,8 +203,6 @@ What the orchestrator sees for each option: one short description. It never sees
      tools_and_setup        editor, running, installing
      debugging              finding why it fails
      testing_and_checking   making sure it works
-     showing_mastery        showing they really understand
-     frustration            upset, tired, close to giving up
 
  WHY STUCK                                       (only this level's set is shown)
      level 1    didnt_get_it          the explanation didn't land
@@ -213,7 +211,6 @@ What the orchestrator sees for each option: one short description. It never sees
                 lost_where_to_look    they don't know where to look
      level 3    needs_one_done        they need to see a similar one done
                 too_many_paths        too many options; they can't pick
-     any level  frustrated            upset or tired
 ```
 
 Which branch exists when:
@@ -227,7 +224,8 @@ Which branch exists when:
  BACK                          Question 0 = no                           code
  WANTS_TO_GO · an issue on     an issue on hold exists                   the orchestrator
  hold
- evaluate a box                an unticked box exists                    the orchestrator
+ evaluate a box                an unticked box exists, or a ☑ box whose  the orchestrator
+                               concept is unchecked
  Question 2 · still stuck      stuck level 1 or higher; code counts      the orchestrator picks why
  DONE                          the job box ☑ + every concept checked +   code
                                the waiting room empty
@@ -259,7 +257,7 @@ Code builds the answer format from this tree each turn, so a branch that can't e
  UNCERTAIN        understanding uncertain                     the orchestrator    probe_understanding
  WRONG_IDEA       a misconception about the current work      the orchestrator    the same piece + misconception_to_watch;
                                                                                   the difficulty goes into the task sheet
- GAP that blocks  gap found · needs something first           the orchestrator    into the waiting room at priority 2 or 3;
+ GAP that blocks  gap found · needs something first           the orchestrator    into the waiting room at priority 1 or 2;
                                                                                   it comes first: the piece for its kind
  several GAPs     several gaps                                the orchestrator    all into the waiting room, in priority
                                                                                   order; the top one is now
@@ -289,8 +287,6 @@ The kind of work picks the tutor's piece (spec §2 activities = spec §5 kinds).
  tools_and_setup             fix_setup                               NEW
  debugging                   guide_debugging
  testing_and_checking        check_results                           NEW
- showing_mastery             probe_understanding
- frustration                 encourage_pause                         NEW
 ```
 
 `kinds.yaml` gives every kind of work its whole kit: its tutor pieces, and any tools and files they bring (§17).
@@ -357,8 +353,9 @@ What may **ever** go on each agent's plate:
    never          the answer key · the tutor's instructions · talks to the learner
 
  EVALUATOR · the judge · knows the least                  ████
-   instructions   evaluator.task_box or evaluator.closes_when
-   facts          ONE target: a box, or an issue's closing condition
+   instructions   evaluator.task_box · evaluator.closes_when · evaluator.confirm_difficulty
+   facts          ONE target: a box, an issue's closing condition, or a checked concept
+                  and a difficulty's label
    files          the answer key (task boxes only)
    tools          pull_checkpoints · Read · Grep (in its temporary folder)
    message        the learner turns the orchestrator points to, copied word for word
@@ -439,7 +436,7 @@ What may **ever** go on each agent's plate:
 ║ files         □ concepts  □ repository  □ journeys  □ task sheets
 ║ tools         ■ read_concept  ■ read_file  ■ search_repo  ■ read_journey
 ║               ■ pull_checkpoints  ■ Read  ■ Grep
-║               ◇ evaluate (any unticked box, in any order) (check.has_unticked_box)
+║               ◇ evaluate (any box to judge, in any order) (check.has_box_to_judge)
 ║ message       the learner's message + pasted code · the tutor's last reply
 ║ answer        the question tree (§3), from Question 1 (no Question 0 here)
 ╠═    the EVALUATOR, only when the orchestrator calls evaluate ═══════════════
@@ -450,7 +447,7 @@ What may **ever** go on each agent's plate:
 ║ message       the learner turns the orchestrator points to, word for word
 ║ answer        VERDICT { box, met | not met | unclear }
 ║               met ──► effect.check_box at once (records the turn; checks the
-║               concept when all its boxes are ☑)
+║               concept when all its boxes are ☑, or again after it was unchecked)
 ╠═ 2 · CODE AFTER ════════════════════════════════════════════════════════════
 ║ every leaf                      ──► effect.record_progress · stuck counter
 ║ every gap · SIDE_QUESTION       ──► effect.add_to_waiting_room (§17)
@@ -487,16 +484,18 @@ What may **ever** go on each agent's plate:
 ║ files         □ concepts  □ repository  □ journeys  □ task sheets
 ║ tools         ■ read_concept  ■ read_file  ■ search_repo  ■ read_journey
 ║               ■ pull_checkpoints  ■ Read  ■ Grep
-║               ■ evaluate (this issue only; hole 16 is open)
+║               ■ evaluate (this issue, or any box to judge, check.has_box_to_judge)
 ║ message       the learner's message + pasted code · the tutor's last reply
 ║ answer        the question tree (§3), from Question 0
 ╠═    the EVALUATOR, only when the orchestrator calls evaluate ═══════════════
-║ instructions  ■ evaluator.closes_when
-║ facts         ■ the issue, with its closing condition
-║ files         none (an issue has no answer key)
+║ instructions  ■ evaluator.closes_when, for the issue
+║               ◇ evaluator.task_box, for a box of the task
+║ facts         ■ the issue, with its closing condition, or the box
+║ files         ◇ the answer key of this task, for a box only
 ║ tools         ■ pull_checkpoints  ■ Read  ■ Grep
 ║ message       the learner turns the orchestrator points to, word for word
-║ answer        VERDICT { issue, met | not met | unclear }
+║ answer        VERDICT { issue or box, met | not met | unclear }
+║               met on a box ──► effect.check_box at once, as on the task
 ╠═ 2 · CODE AFTER ════════════════════════════════════════════════════════════
 ║ every leaf                      ──► effect.record_progress · stuck counter
 ║ BACK                            ──► card D, this turn
@@ -586,7 +585,7 @@ Task 3 (guests always get the generic error). The learner pastes the traceback:
      │      blocks:        yes
      │      closes_when:   explains why label is unbound for a guest
      │      return_note:   you have the traceback; line 722 reads label
-     │  code: issue 1 into the waiting room at priority 2 · it comes first ·
+     │  code: issue 1 into the waiting room at priority 1 · it comes first ·
      │        task 3 keeps its return note · one level deeper
      ▼ END    card C · in issue 1                           stack: task 3 ▸ issue 1
         tutor: tutor.base + teach_one_concept + experiment_first (concept) ──► REPLY
@@ -599,12 +598,13 @@ The learner explains why `label` is unbound:
      │
      ▼ START  card C · in issue 1                           stack: task 3 ▸ issue 1
      │  Question 0: orchestrator ── evaluate(issue 1) ──► evaluator ──► met ──► BACK
+     │  orchestrator ── evaluate(box 3) ──► evaluator ──► met ──► code ticks box 3
      ▼        card D   code: ★ Cleared issue 1 · one step back
      ▼ END    card B · on the task                          stack: task 3
         tutor: bridge_back + keep_goal_in_view + guide_debugging
                (task 3's last kind of work: debugging) ──► REPLY
-     ▼ NOTE   concept 15 is not checked yet: only its box (box 3) can check it.
-              hole 16, open: evaluate could also judge box 3 inside the issue
+     ▼ NOTE   box 3 · explains why label is unbound for a guest is ticked in the same
+              turn, inside the issue, so concept 15 is checked before the tutor replies
 ```
 
 ---
@@ -630,7 +630,6 @@ The learner explains why `label` is unbound:
    4 or more               3      needs to see one done                      worked_example · NEW
                                   (a similar one, never this task's answer)
                                   too many paths open                        offer_choices · NEW
-   any                     any    frustrated or tired                        encourage_pause · NEW
 
    any progress ──► back to level 0
    the answer itself ──► NEVER, at any level
@@ -698,8 +697,10 @@ One task sheet per task, per learner. It holds the task's boxes, grouped the way
       "checked": true,
       "times_it_came_up": 5,
       "difficulties": [
-        { "turn": 4,
-          "what_went_wrong": "expected label to have a value after a loop that never ran" }
+        { "turn": 3, "label": "missing",
+          "text": "a loop variable only exists if the loop ran" },
+        { "turn": 4, "label": "wrong_idea",
+          "text": "expected label to have a value after a loop that never ran" }
       ],
       "had_it_then_missed": []
     }
@@ -720,18 +721,23 @@ One task sheet per task, per learner. It holds the task's boxes, grouped the way
    ticked_at_turn       the turn the evaluator said met; null until then; the
                         turns also show the order the boxes were ticked in
  checked                true when all of this concept's boxes are ticked; back to
-                        false when a WRONG_IDEA or a GAP about it comes after
+                        false when a WRONG_IDEA or a GAP about it comes after and
+                        the evaluator confirms it; true again when one of its boxes
+                        is judged met after that
  times_it_came_up       how many turns touched this concept: a leaf named it, the
                         focus issue is linked to it, or one of its boxes was judged
  difficulties           every WRONG_IDEA or GAP about this concept, in order
    turn                 the turn it showed
-   what_went_wrong      one sentence, from the orchestrator's leaf
-                        (hole 18, open: a GAP's leaf has no what_went_wrong)
- had_it_then_missed     every time the concept was checked and a WRONG_IDEA or a
-                        GAP about it came after
+   label                wrong_idea or missing: the orchestrator's answer to
+                        Question 2
+   text                 one sentence: a WRONG_IDEA's what_went_wrong, or a GAP's
+                        issue title
+ had_it_then_missed     every time the concept was checked, a WRONG_IDEA or a GAP
+                        about it came after, and the evaluator confirmed it
    turn                 the turn it broke
    issue                the issue opened for it, if a GAP opened one
-   angle_they_missed    the leaf's what_went_wrong: the new angle where it broke
+   label                wrong_idea or missing
+   angle_they_missed    the difficulty's text: the new angle where it broke
 
  no quotes: the learner's exact words are already in the tutor's history
 
@@ -748,9 +754,13 @@ One task sheet per task, per learner. It holds the task's boxes, grouped the way
                                     every count 0
  the evaluator says met on a box    that box gets ticked_at_turn; if it was the concept's last
                                     unticked box, the concept becomes checked
- a WRONG_IDEA or a GAP names a      a new difficulty; if the concept was checked: checked =
- concept (or the focus issue is     false and a new had_it_then_missed entry
- linked to one)
+ the evaluator says met on a ☑ box  the box keeps its first ticked_at_turn; the concept is
+ of an unchecked concept            checked again
+ a WRONG_IDEA or a GAP names a      a new difficulty, with its label and text; if the concept
+ concept (or the focus issue is     was checked, code first asks the evaluator
+ linked to one)                     (evaluator.confirm_difficulty, §11.4): met ──► checked =
+                                    false and a new had_it_then_missed entry; not met or
+                                    unclear ──► it stays checked
  any turn that touches a concept    times_it_came_up + 1
  the task closes (card E)           archived; the raw discoveries go into the concept bank
  anywhere else                      nothing
@@ -821,7 +831,7 @@ Agents never talk to each other. Code carries and checks every message.
    orchestrator.base (role, how to walk)     ■                 ■                 600
    the card's piece (on_task or in_issue)    ■                 ■                 150
    the question tree + option descriptions   ■ questions 1–3   ■ questions 0–3   400
-   the 10 kinds of work + their descriptions ■                 ■                 200
+   the 8 kinds of work + their descriptions  ■                 ■                 200
    task_goal                                 ■                 ■                 30
    next_box                                  ■                 —                 15
    stack + return notes                      ■                 ■                 60
@@ -905,7 +915,7 @@ Code builds the allowed values into the answer format each turn, so a wrong valu
  problem.type        unsure · wrong_idea · missing · stuck (stuck only
                      from level 1)
  why                 this level's set only (§9)
- kind_of_work        the 10 names (§3)
+ kind_of_work        the 8 names (§3)
  probe_target        the unticked boxes + the task's concepts, as labels
  issue_on_hold       the issues on hold, as labels (only if any exist)
  concept             the concept bank, as labels
@@ -920,10 +930,13 @@ Code checks after the answer: `still_an_issue: false` only after the green flag 
 
 ```
  IN   (built by code; nothing comes from the orchestrator's own words)
-   [instructions]   evaluator.task_box  or  evaluator.closes_when
+   [instructions]   evaluator.task_box  or  evaluator.closes_when  or
+                    evaluator.confirm_difficulty
    [target]         box 2: "found the real error (label unbound)"
                     or issue 1's closing condition:
                     "explains why label is unbound for a guest"
+                    or a checked concept and a label: "a wrong idea about
+                    concept 15 · loop variables outlive the loop"
    [answer key]     the answer key of task 3        (task boxes only)
    [learner turns]  turn 12 · learner: "…"           copied word for word
                     turn 13 · learner: "…"
@@ -942,7 +955,9 @@ Code checks after the answer: `still_an_issue: false` only after the green flag 
    fields · any failure ──► counted as "unclear"
 ```
 
-It sees what was said, never what the orchestrator thought, so its verdict stays independent. Its answer has no free text at all, only closed values, so the answer key can't leak through it.
+It sees what was said, never what the orchestrator thought, so its verdict stays independent.
+
+**Who calls it.** The orchestrator calls `evaluate` for a box or an issue. Code calls `evaluator.confirm_difficulty` by itself, before a checked concept goes back to unchecked (hole 4): the target is that concept and the difficulty's label, never the orchestrator's sentence; the turn is this one. Met means this turn really shows it. Its answer has no free text at all, only closed values, so the answer key can't leak through it.
 
 ### 11.5 The tutor: instructions are never history
 
@@ -1051,6 +1066,9 @@ Read and Grep come built in with the Agent SDK. On the plain Claude API we write
   EVALUATOR
   evaluator.task_box               ■ card B            judge one box, with the answer key
   evaluator.closes_when            ■ card C            judge one issue's closing condition
+  evaluator.confirm_difficulty     ■ code, any card    a checked concept would go back to
+                                                       unchecked: does this turn really show
+                                                       the wrong idea or the missing piece?
 
   TUTOR                            needs (studs)                    used for
   tutor.base                       —                                always
@@ -1066,9 +1084,7 @@ Read and Grep come built in with the Agent SDK. On the plain Claude API we write
   fix_setup                        current_focus                    tools_and_setup       NEW
   guide_debugging                  current_focus                    debugging
   check_results                    current_focus                    testing_and_checking  NEW
-  probe_understanding              probe_target                     showing_mastery ·
-                                                                    UNCERTAIN
-  encourage_pause                  —                                frustration           NEW
+  probe_understanding              probe_target                     UNCERTAIN
   answer_side_question             side_question                    SIDE_QUESTION, 1 turn
   bridge_back                      return_to                        after BACK
   close_task                       task_sheet · journey_so_far      card E
@@ -1152,10 +1168,12 @@ Read and Grep come built in with the Agent SDK. On the plain Claude API we write
 
   record_progress            evidence rows · "✓ Did …"
   check_box                  ☑ forever in this task · records the turn · checks the
-                             concept when all its boxes are ☑ · "☑ …"
+                             concept when all its boxes are ☑ · met on a ☑ box of an
+                             unchecked concept: the concept is checked again · "☑ …"
   record_difficulty          a WRONG_IDEA or a GAP about a concept goes into the task
-                             sheet · a checked concept goes back to unchecked, with a
-                             had_it_then_missed entry
+                             sheet, with its label and text · a checked concept goes
+                             back to unchecked, with a had_it_then_missed entry, only
+                             after the evaluator's met (evaluator.confirm_difficulty)
   add_to_waiting_room        a new issue, on hold, with its priority (§17) ·
                              "⚠ Found a gap …" or "○ Saved for later …"
   pick_now                   the learner's wish, else the waiting room's order (§17);
@@ -1180,7 +1198,8 @@ Read and Grep come built in with the Agent SDK. On the plain Claude API we write
   task_just_opened           no learner message yet in this task
   on_task                    the stack holds only the task
   in_issue                   the stack holds the task and at least one issue
-  has_unticked_box           an unticked box exists (any of them can be judged)
+  has_box_to_judge           an unticked box exists, or a ☑ box whose concept is
+                             unchecked (any of them can be judged)
   has_on_hold                an issue waits on hold in this task's waiting room
   evaluator_met              the evaluator said met this turn
   task_done                  the job box ☑, every concept checked, and the waiting
@@ -1376,7 +1395,7 @@ These rules made the design. They work anywhere an LLM has to choose inside a sy
      code makes them all: engine/names.py
    ✓ the waiting room (§17): an issue is the one structure for everything the
      learner needs; there is no separate "needs" list
-   ✓ the waiting room is ordered by priority, 1 to 5, because a learner can't
+   ✓ the waiting room is ordered by priority, 1 to 4 since 2026-10-14, because a learner can't
      move forward through a hole in their understanding
    ✓ the orchestrator names issues and gives the green flag; code computes the
      priority, orders, picks, pauses, writes the notes and snaps the kits
@@ -1395,6 +1414,24 @@ These rules made the design. They work anywhere an LLM has to choose inside a sy
    ✓ the word stays "issue"
    ✓ on screen, the task panel's Issues group is the waiting room (FRONTEND.md)
 
+ DECIDED (you, 2026-10-14)
+   ✓ hole 19, b: a box stays ☑ forever, but while its concept is unchecked the
+     evaluator may judge it again; met ──► the concept is checked again
+   ✓ hole 4, c: before a checked concept goes back to unchecked, code asks the
+     evaluator whether this turn really shows the wrong idea or the missing
+     piece about it (evaluator.confirm_difficulty); met ──► unchecked; not met
+     or unclear ──► it stays checked
+   ✓ hole 13: showing_mastery is removed; "I get it" with no proof is UNCERTAIN,
+     and real understanding is the evaluator's met on a box
+   ✓ hole 13: frustration is removed everywhere: the kind of work, the stuck
+     why, priority 1 and encourage_pause; 8 kinds of work, 4 priorities
+   ✓ hole 16, a: in an issue, evaluate may judge the issue and the task's boxes
+   ✓ hole 18: a difficulty carries a label, wrong_idea or missing, and a text:
+     a WRONG_IDEA's what_went_wrong, or a GAP's issue title; had_it_then_missed
+     carries the same label
+   ✓ the 9 new tutor pieces are written during the build (BACKEND_SPEC.md §20,
+     step 3) and judged in a real task 3 session (step 6)
+
  MY PROPOSALS (say no to any)
    · the evaluator reads the learner turns the orchestrator points to, copied
      word for word by code
@@ -1406,14 +1443,14 @@ These rules made the design. They work anywhere an LLM has to choose inside a sy
  NOT DECIDED: CLAUDE'S OWN CHOICES, written up on 2026-10-12 without you
    Each one is marked "NOT DECIDED" where it appears. Decide each one.
    choice 1  which issues the evaluator judges (kinds.yaml, judged_by, §17.9)
-             proposal: concept · task_meaning · reading_the_code ·
-             showing_mastery; the orchestrator's green flag alone for the rest
+             proposal: concept · task_meaning · reading_the_code;
+             the orchestrator's green flag alone for the rest
    choice 2  no bouncing (§17.3): code picks a new "now" only when something
              changes, so an issue the learner left doesn't come straight back
-   choice 3  priority 4 vs 5 (§17.2): a side question = 5; anything else that
-             doesn't block = 4
-   choice 4  the pick order (§17.3): the learner's wish, then priority 1 to 4,
-             then the focus's own work, then priority 5
+   choice 3  priority 3 vs 4 (§17.2): a side question = 4; anything else that
+             doesn't block = 3
+   choice 4  the pick order (§17.3): the learner's wish, then priority 1 to 3,
+             then the focus's own work, then priority 4
    choice 5  on the task itself, the tutor's style = the turn's main kind of
              work; after coming back to the task, the task's last kind of work
    choice 6  a new map line "↳ Picked up — <issue>", for when an issue on hold
@@ -1422,17 +1459,15 @@ These rules made the design. They work anywhere an LLM has to choose inside a sy
              the frontend's demo data)
 
  STILL OPEN (you), in this order
-   1  hole 19 below: where we stopped on 2026-10-12
-   2  hole 4 · hole 13 · hole 16 · hole 18
-   3  the NEW tutor pieces (§12): write them now, or during the build?
-   4  choices 1 to 7 above
+   1  choices 1 to 7 above: choice 1 is next
 
  HOLES FOUND WITH THE WALKTHROUGH
    "checked"
    hole 1   closed: every box sits under one concept; checked = all its boxes ☑
    hole 2   closed: a box belongs to exactly one concept
    hole 3   closed: every concept has at least one box
-   hole 4   the link from an issue to a concept is the orchestrator's guess
+   hole 4   closed: c; the link is still the orchestrator's guess, but a checked
+            concept goes back to unchecked only after the evaluator's met
    hole 5   closed: checked goes back to false; had_it_then_missed keeps the angle
    "the learner's words are really in that turn"
    hole 6   closed: no quotes
@@ -1443,30 +1478,17 @@ These rules made the design. They work anywhere an LLM has to choose inside a sy
    hole 10  closed: in an issue, the kind of work is always the issue's own
    hole 11  closed: every need is an issue in the waiting room (§17)
    hole 12  closed: in an issue, the kind of work is fixed when it opens
-   hole 13  overlaps: showing_mastery with UNCERTAIN; frustration as a kind of
-            work (priority 1) and as a why on the stuck ladder
+   hole 13  closed: showing_mastery and frustration are removed
    hole 14  closed: "kind_of_work": "debugging"
    from the walkthrough page
    hole 15  closed: a wrong answer is the WRONG_IDEA leaf (no progress)
-   hole 16  a box explained inside an issue is ticked only on the next turn
+   hole 16  closed: a; in an issue, evaluate may also judge the task's boxes
    hole 17  closed: no recorder; code counts at once
    found on 2026-10-12
-   hole 18  record_difficulty runs for a GAP about a concept, but a GAP's leaf
-            has no what_went_wrong to fill the difficulty
-   hole 19  a concept can lose its check and never get it back:
-              box 3 · explains why label is unbound for a guest  ☑ at turn 8,
-                and a box stays ☑ forever
-              concept 15 · loop variables outlive the loop  ☑ checked
-              turn 10: WRONG_IDEA about concept 15 ──► ☐ unchecked (your
-                decision, 2026-10-11)
-              the evaluator only judges boxes that aren't ☑ ──► nothing left
-                to judge ──► concept 15 stays ☐ forever ──► task 3 never closes
-            a. the box unticks too: the learner shows it again
-            b. the box stays ☑ but can be judged again while its concept is
-               ☐; met ──► the concept is ☑ again          ← Claude's pick
-            c. a concept never unchecks; the wrong idea goes into the
-               difficulties only (reverses your 2026-10-11 decision)
-            NOT DECIDED: waiting for your answer
+   hole 18  closed: a difficulty has a label, wrong_idea or missing, and a text;
+            a GAP's text is its issue title
+   hole 19  closed: b; a box stays ☑, and while its concept is unchecked the
+            evaluator may judge it again; met ──► the concept is checked again
 ```
 
 ---
@@ -1477,9 +1499,9 @@ Decided 2026-10-12. Everything the learner needs is an issue. Issues wait in the
 
 ```
                   ┌──────── THE WAITING ROOM · task 3 ──────────┐
- new issues ────► │ ‖ the pytest warnings           priority 5  │
- any turn,        │ ‖ what a mock is                priority 2  │
- always welcome   │ ‖ why label is unbound          priority 2  │ ◄ paused, with its note
+ new issues ────► │ ‖ the pytest warnings           priority 4  │
+ any turn,        │ ‖ what a mock is                priority 1  │
+ always welcome   │ ‖ why label is unbound          priority 1  │ ◄ paused, with its note
                   └───────────────────┬─────────────────────────┘
                                       │ code picks what is now
                                       ▼
@@ -1501,7 +1523,7 @@ Code writes it the moment the issue is named, so its kit is ready when its turn 
  │ blocks         yes                        the orchestrator │
  │ closes_when    explains what a mock       the orchestrator │
  │                replaces                                    │
- │ priority       2 · blocks understanding   code             │
+ │ priority       1 · blocks understanding   code             │
  │ parent         issue 2 · how the test     code             │
  │                fakes OpenAI                                │
  │ state          on hold                    code             │
@@ -1526,13 +1548,12 @@ Code computes it from the issue's card, with `priority.yaml`. The orchestrator n
 ```
  PRIORITY  WHAT                        FROM THE CARD
  ────────  ──────────────────────────  ──────────────────────────────────────────────
- 1         frustration                 kind_of_work: frustration
- 2         blocks understanding        blocks: yes · concept or task_meaning
- 3         blocks something else       blocks: yes · any other kind of work
- 4         the current work            blocks: no · from a progress or problem leaf
- 5         can wait                    blocks: no · a side question
+ 1         blocks understanding        blocks: yes · concept or task_meaning
+ 2         blocks something else       blocks: yes · any other kind of work
+ 3         the current work            blocks: no · from a progress or problem leaf
+ 4         can wait                    blocks: no · a side question
 
- the order 1 to 5: decided by you · how 4 and 5 are told apart: NOT DECIDED,
+ the order 1 to 4: decided by you · how 3 and 4 are told apart: NOT DECIDED,
  choice 3
 ```
 
@@ -1543,9 +1564,9 @@ NOT DECIDED: the order below is choice 4, and the last paragraph is choice 2 (§
 ```
  code picks, in this order:
    1  the learner's wish: WANTS_TO_GO wins, whatever its priority
-   2  an issue on hold at priority 1, 2, 3, then 4
+   2  an issue on hold at priority 1, 2, then 3
    3  the focus's own work: the task's boxes, or the issue's closing condition
-   4  an issue on hold at priority 5, once the focus's own work is done
+   4  an issue on hold at priority 4, once the focus's own work is done
 
  code picks only when something changes: the issue that is now is cleared, a
  new issue is named, or the learner asks for one. An issue the learner left
@@ -1615,10 +1636,10 @@ On hold, in priority order:
  SCENARIO                          WHAT HAPPENS
  ────────────────────────────────  ──────────────────────────────────────────────────
  a task opens                      an empty waiting room
- a gap that blocks                 named at priority 2 or 3 ──► now, one level deeper
+ a gap that blocks                 named at priority 1 or 2 ──► now, one level deeper
  several gaps                      all named; the top one is now; the others wait
- a gap that can wait               named at priority 4, on hold
- a side question                   answered briefly; named at priority 5, on hold
+ a gap that can wait               named at priority 3, on hold
+ a side question                   answered briefly; named at priority 4, on hold
  WANTS_TO_GO                       the learner wins: that one is now; the current one
                                    goes on hold, with its note
  switches inside switches          each one pauses the one before, with its note;
@@ -1628,7 +1649,6 @@ On hold, in priority order:
                                    code picks what is now
  already knew it                   met on its first turn: "already knew"
  stuck                             the ladder counts per issue; kept while on hold
- frustration                       priority 1: it comes first
  every box ☑, issues still on      not done: each one is picked in turn
  hold                              tutor: "every box is ticked, but … is still waiting"
  every box ☑, waiting room empty   DONE ──► card E
