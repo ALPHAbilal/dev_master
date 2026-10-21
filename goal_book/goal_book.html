@@ -1,0 +1,518 @@
+<title>Goal Book</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the conversation on the left; the goal's book on the right, laid out like a docs site:
+   pages in a sidebar (the platform's sidebar style), the lesson in the middle, "On this page" on the right.
+   A lesson is a list of blocks: heading, paragraph, term, table, diagram, code, quote, note, list, examples,
+   resource, steps, exercise, check. The Sources switch, top right, shows each block's sources under it.
+   Selecting text highlights it and adds it to the agent's context. Both sidebars resize by dragging their edge.
+   Type follows modelcontextprotocol.io: Inter, 16px on 28px lines, 24px and 20px headings, 14px tables
+   and code on 24px lines. The space for each block's sources is always kept, so the
+   Sources switch only shows or hides them and nothing moves.
+   Light only, the platform's palette. */
+:root{
+  --bg:#ffffff; --canvas:#f4f4f2; --hover:#ebeae6; --hover-2:#e3e1db; --line:#e3e1db; --guide:#d8d6cf; --bar:#e3e1db;
+  --ink:#1e2024; --ink-2:#4a4d53; --ink-3:#7a7d84; --ink-4:#a8a6a0; --pale:#c3c1ba;
+  --accent:#4f7290; --accent-soft:rgba(79,114,144,.15); --on-accent:#ffffff; --mark:rgba(79,114,144,.22);
+  --ui:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;
+  --mono:"Geist Mono","Cascadia Code","SF Mono",Consolas,monospace;
+  color-scheme:light;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{height:100%}
+body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:var(--ui);font-size:14px;line-height:21px;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+svg{flex:none}
+.page{display:flex;flex-direction:column;height:100%}
+.frame{position:relative;flex:1;min-height:0;display:grid;grid-template-columns:var(--chat-w,340px) minmax(0,1fr);overflow:hidden;background:var(--bg)}
+.frame.dragging,.frame.dragging *{cursor:col-resize!important;user-select:none!important}
+.col{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0}
+.chat-col{border-right:1px solid var(--line)}
+.col-head{flex:none;display:flex;align-items:center;gap:8px;height:48px;padding:0 8px}
+.scroll{flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin}
+.row-btn{display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border:0;border-radius:8px;background:none;font-size:14px;line-height:21px;color:var(--ink);cursor:pointer}
+.row-btn:hover{background:var(--hover)}
+.ic{width:20px;height:20px;flex:none;display:grid;place-items:center;color:var(--ink-3)}
+.bar{display:inline-block;height:8px;border-radius:5px;background:var(--bar)}
+/* a column's right edge: drag to resize */
+.grip{position:absolute;top:0;right:-4px;bottom:0;z-index:6;width:8px;cursor:col-resize;touch-action:none}
+.grip::after{content:"";position:absolute;top:0;bottom:0;left:3px;width:2px;background:transparent}
+.grip:hover::after,.frame.dragging .grip.active::after{background:var(--guide)}
+
+/* the conversation */
+.turns{display:flex;flex-direction:column;gap:18px;padding:20px 16px 16px}
+.turn{display:flex;flex-direction:column;gap:8px}
+.turn.learner{align-items:flex-end}
+.say{font-size:15px;line-height:22px;color:var(--ink);overflow-wrap:anywhere}
+.turn.learner .say{max-width:92%;padding:12px 16px;border-radius:12px;background:var(--hover);line-height:20px}
+.quotes{display:flex;flex-direction:column;align-items:flex-end;gap:4px;max-width:92%}
+.quote-chip{padding:2px 8px;border-radius:6px;background:var(--mark);font-size:13px;line-height:19px;color:var(--ink-2);overflow-wrap:anywhere}
+.act{display:flex;align-items:center;gap:8px;font-size:13px;line-height:17px;color:var(--ink-3)}
+.placed{display:flex;flex-wrap:wrap;gap:6px}
+.placed button{display:inline-flex;align-items:center;gap:6px;max-width:100%;min-height:28px;padding:3px 10px;border:0;border-radius:7px;background:var(--hover);font-size:13px;line-height:19px;color:var(--ink-2);text-align:left;cursor:pointer}
+.placed button:hover{background:var(--hover-2);color:var(--ink)}
+.placed .sep{color:var(--ink-4)}
+.composer-wrap{flex:none;padding:8px 16px 16px}
+.composer{display:flex;flex-direction:column;gap:6px;padding:8px 8px 8px 14px;border:1px solid var(--line);border-radius:14px;background:var(--bg)}
+.composer:focus-within{border-color:var(--pale)}
+.ctx{display:flex;flex-wrap:wrap;gap:6px}
+.ctx button{display:inline-flex;align-items:center;gap:4px;max-width:100%;height:22px;padding:0 4px 0 8px;border:0;border-radius:6px;background:var(--mark);font-size:13px;line-height:17px;color:var(--ink);cursor:pointer}
+.ctx button span{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.composer-row{display:flex;align-items:center;gap:8px;min-height:32px}
+.composer input{flex:1;min-width:0;border:0;outline:0;background:none;padding:5.5px 0;font-size:15px;line-height:21px;color:var(--ink)}
+.composer input::placeholder{color:var(--ink-4)}
+.send{width:32px;height:32px;flex:none;border:0;border-radius:8px;background:var(--hover);color:var(--ink-4);display:grid;place-items:center;cursor:pointer}
+.send.ready{background:var(--accent);color:var(--on-accent)}
+
+/* the book */
+.book-wrap{display:flex;min-width:0;min-height:0;container-type:inline-size}
+.book{flex:1;display:grid;grid-template-columns:var(--pages-w,248px) minmax(0,1fr) 220px;grid-template-rows:48px minmax(0,1fr);min-width:0;min-height:0}
+.pages{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--canvas);border-right:1px solid var(--line)}
+/* the pages sidebar, as in the reference: 14px on 24px lines, titles dark and semibold, 32px between groups,
+   10px between a title and its pages, 36px rows; the text of titles and rows lines up 24px from the edge */
+.goal{grid-column:1/-1;display:flex;align-items:baseline;gap:10px;min-width:0;height:48px;padding:13px 24px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+.goal-title{flex:none;font-size:15px;line-height:22px;font-weight:600;color:var(--ink)}
+.goal-line{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:14px;line-height:20px;color:var(--ink-3)}
+.wide-btn{flex:none;align-self:center;width:32px;height:32px;margin:-13px -12px 0 0;border:0;border-radius:8px;background:none;color:var(--ink-3);display:grid;place-items:center;cursor:pointer}
+.wide-btn:hover{background:var(--hover);color:var(--ink)}
+/* enlarged: the conversation folds away and the book takes the whole frame */
+.frame.wide{grid-template-columns:0 minmax(0,1fr)}
+.frame.wide .chat-col{visibility:hidden;border-right:0}
+.pages .scroll{padding:0 12px 24px}
+.side-label{display:flex;align-items:center;margin:32px 0 10px;padding:0 12px;font-size:14px;line-height:24px;font-weight:600;color:var(--ink)}
+.side-label:first-child{margin-top:20px}
+.nav-row{display:flex;align-items:center;width:100%;min-height:36px;margin:0 0 1px;padding:6px 12px;border:0;border-radius:12px;background:none;font-size:14px;line-height:24px;color:var(--ink-2);text-align:left;cursor:pointer}
+.nav-row span{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.nav-row:hover{background:var(--hover);color:var(--ink)}
+.nav-row.on{background:var(--accent-soft);color:#385876;font-weight:600}
+.nav-row.fresh{background:var(--bg);box-shadow:inset 0 0 0 1px var(--accent);color:var(--ink)}
+
+.lesson-wrap{min-width:0;min-height:0;overflow-y:auto;scrollbar-width:thin}
+.lesson{--fs:16px;--lh:1.75;--gap:1;max-width:768px;margin:0 auto;padding:32px 40px 96px;font-size:var(--fs);line-height:var(--lh)}
+.crumb{display:flex;align-items:center;gap:8px;font-size:.875em;line-height:1.43;font-weight:600;color:var(--accent)}
+.crumb .k{font-weight:400;color:var(--ink-4)}
+.title-row{position:relative;display:flex;align-items:flex-start;gap:8px;margin-top:.5em}
+.title-row h1{flex:1;min-width:0;margin:0;font-size:2.25em;line-height:1.111;font-weight:600;letter-spacing:-.025em;color:var(--ink);text-wrap:balance}
+.tools{flex:none;display:flex;gap:6px;margin-top:4px}
+.toggle{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:13px;line-height:20px;color:var(--ink-2);cursor:pointer}
+.toggle:hover{background:var(--hover)}
+.track{position:relative;width:26px;height:16px;border-radius:8px;background:var(--pale)}
+.track::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--bg)}
+.toggle.on .track{background:var(--accent)}
+.toggle.on .track::after{left:12px}
+
+/* blocks: 1.25em apart, as in the reference; headings set their own space */
+.blk{margin-top:calc(1.25em * var(--gap));border-radius:16px}
+.blk.fresh{margin-left:-16px;margin-right:-16px;padding:12px 16px 14px;background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+.lesson h2{margin:calc(2.25rem * var(--gap)) 0 0;font-size:1.5em;line-height:1.333;font-weight:600;letter-spacing:-.01em;color:var(--ink);scroll-margin-top:16px}
+.lesson h3{margin:calc(2rem * var(--gap)) 0 0;font-size:1.25em;line-height:1.4;font-weight:600;color:var(--ink);scroll-margin-top:16px}
+.lesson :is(h2,h3) + .blk{margin-top:calc(.875em * var(--gap))}
+.b-p{margin:0;color:var(--ink-2)}
+.b-p code,.b-steps code{font-family:var(--mono);font-size:.875em;font-weight:500;padding:.125em .375em;border-radius:6px;background:var(--hover);color:var(--ink)}
+.b-term{display:flex;flex-direction:column;gap:.25em;padding:1em 1.25em;border:1px solid var(--line);border-radius:16px}
+.b-term .w{font-weight:600;color:var(--ink)}
+.b-term .d{color:var(--ink-2)}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.875em;line-height:1.43}
+th{padding:.5em .75em .5em 0;border-bottom:1px solid var(--line);text-align:left;font-weight:600;color:var(--ink);white-space:nowrap}
+td{padding:.75em .75em .75em 0;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink-2)}
+td:first-child{font-weight:600;color:var(--ink)}
+.blk.is-code{margin-bottom:calc(.75em * var(--gap))}
+.code{border:1px solid var(--line);border-radius:16px;background:var(--bg);overflow:hidden}
+.code-head{display:flex;align-items:center;gap:8px;height:40px;padding:0 8px 0 16px;border-bottom:1px solid var(--line)}
+.code-head .f{flex:1;min-width:0;font-size:.8125em;color:var(--ink-3)}
+.code-head button{height:28px;padding:0 8px;border:0;border-radius:7px;background:none;font-size:12px;color:var(--ink-3);cursor:pointer}
+.code-head button:hover{background:var(--hover);color:var(--ink)}
+.code pre{margin:0;padding:1em 1.25em;overflow-x:auto;font-family:var(--mono);font-size:.875em;line-height:1.714;color:var(--ink)}
+.dia{display:flex;flex-direction:column;gap:.75em;padding:1.25em;border:1px solid var(--line);border-radius:16px}
+.dia-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(70px,.8fr) minmax(0,1fr);align-items:center}
+.dia-box{padding:.5em .75em;border:1px solid var(--guide);border-radius:10px;background:var(--bg);font-size:.875em;line-height:1.43;font-weight:500;color:var(--ink);text-align:center}
+.dia-box.to{background:var(--canvas)}
+.dia-link{position:relative;height:20px;text-align:center;font-size:12px;line-height:14px;color:var(--ink-3)}
+.dia-link::before{content:"";position:absolute;left:0;right:6px;top:15px;border-top:1px solid var(--ink-4)}
+.dia-link::after{content:"";position:absolute;right:1px;top:11.5px;border:4px solid transparent;border-left:6px solid var(--ink-4)}
+.b-quote{display:flex;gap:.75em;padding:1em 1.25em;border-radius:16px;background:var(--canvas)}
+.b-quote .qm{flex:none;font-size:1.75em;line-height:1;color:var(--ink-4);font-family:Georgia,serif}
+.b-quote .qt{color:var(--ink-2)}
+.b-quote .who{display:block;margin-top:.25em;font-size:.875em;color:var(--ink-3)}
+.b-note{display:flex;gap:.75em;padding:1em 1.25em;border:1px solid var(--line);border-radius:16px;background:var(--canvas)}
+.b-note .ni{flex:none;display:grid;place-items:center;height:1.714em;color:var(--ink-3)}
+.b-note .tx{font-size:.875em;line-height:1.714;color:var(--ink-2)}
+.b-note .tx b{font-weight:600;color:var(--ink)}
+.b-list{margin:0;padding-left:1.5em;color:var(--ink-2)}
+.b-list li{padding-left:.25em}
+.b-list li+li{margin-top:.5em}
+.b-list li::marker{color:var(--ink-4)}
+.b-ex .h{font-weight:600;color:var(--ink)}
+.ex{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:0 1em;margin-top:.5em;font-size:.875em;line-height:1.714}
+.ex div{padding:.625em 0;border-top:1px solid var(--line);color:var(--ink-2)}
+.ex .q{font-weight:600;color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1em}
+.card{display:flex;flex-direction:column;gap:.25em;padding:1.25em 1.5em;border:1px solid var(--line);border-radius:16px;color:inherit;text-decoration:none}
+.card:hover{border-color:var(--accent)}
+.card .ci{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5em;color:var(--ink-3)}
+.card .ct{font-weight:600;color:var(--ink)}
+.card .cd{font-size:.875em;line-height:1.714;color:var(--ink-3)}
+.tag{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;background:var(--hover);font-size:12px;line-height:16px;font-weight:500;color:var(--ink-2);white-space:nowrap}
+.b-steps{position:relative;margin-left:.375em}
+.b-steps .st{position:relative;padding:0 0 calc(1em * var(--gap)) 1.75em;color:var(--ink-2)}
+.b-steps .st::before{content:"";position:absolute;left:-4px;top:calc(var(--lh) * .5em - 4px);width:9px;height:9px;border-radius:50%;background:var(--bg);box-shadow:inset 0 0 0 1.5px var(--ink-4)}
+.b-steps .st:not(:last-child)::after{content:"";position:absolute;left:0;top:calc(var(--lh) * .5em + 8px);bottom:4px;border-left:1px solid var(--guide)}
+.b-steps .st:last-child{padding-bottom:0}
+.b-exercise{display:flex;flex-direction:column;gap:.5em;padding:1.25em 1.5em;border:1px solid var(--line);border-radius:16px}
+.b-exercise .top{display:flex;align-items:center;gap:8px}
+.b-exercise .nm{flex:1;min-width:0;font-weight:600;color:var(--ink)}
+.b-exercise .tx{color:var(--ink-2)}
+.btn{align-self:flex-start;height:32px;margin-top:.25em;padding:0 12px;border:0;border-radius:8px;background:var(--accent);font-size:13px;font-weight:500;color:var(--on-accent);cursor:pointer}
+.btn:hover{background:#456580}
+.b-check{display:flex;align-items:flex-start;gap:.75em;padding:1em 1.25em;border:1px solid var(--line);border-radius:16px;color:var(--ink-2)}
+.b-check .bx{flex:none;width:14px;height:14px;margin-top:calc(var(--lh) * .5em - 7px);border:1.5px solid var(--pale);border-radius:4px}
+mark{background:var(--mark);color:var(--ink);border-radius:3px;padding:0 1px;cursor:pointer}
+/* the sources under a block */
+.src-off .bsrc{visibility:hidden}
+.bsrc{display:flex;flex-wrap:wrap;gap:.25em 1em;margin-top:.625em;font-size:.75em;line-height:1.5;color:var(--ink-4)}
+.bsrc span{display:inline-flex;gap:6px;min-width:0}
+.bsrc .tt{color:var(--ink-3)}
+.bsrc .d{font-family:var(--mono)}
+
+.rail{min-height:0;overflow-y:auto;padding:34px 16px 24px 8px;scrollbar-width:thin}
+.rail-label{display:flex;align-items:center;gap:8px;height:24px;margin-bottom:8px;font-size:14px;line-height:20px;font-weight:500;color:var(--ink)}
+.otp{display:block;width:100%;padding:6px 0;border:0;background:none;font-size:14px;line-height:20px;color:var(--ink-3);text-align:left;cursor:pointer}
+.otp:hover{color:var(--ink)}
+.otp.l3{padding-left:16px}
+.otp.on{color:var(--ink);font-weight:600}
+
+@container (max-width:900px){ .book{grid-template-columns:var(--pages-w,220px) minmax(0,1fr)} .rail{display:none} .lesson{padding:24px 28px 80px} }
+/* enlarged: pages, lesson and "On this page" sit together in the middle of the screen, as in the reference;
+   the space left over goes equally to both sides, and the goal bar lines up with the pages */
+@container (min-width:901px){
+  .frame.wide .book{grid-template-columns:minmax(0,1fr) var(--pages-w,248px) minmax(0,848px) 256px minmax(0,1fr)}
+  .frame.wide .pages{grid-column:2;background:var(--bg);border-right:0}
+  .frame.wide .lesson-wrap{grid-column:3}
+  .frame.wide .rail{grid-column:4}
+  .frame.wide .goal{padding-left:max(24px,calc((100% - var(--pages-w,248px) - 848px - 256px) / 2 + 24px));padding-right:max(24px,calc((100% - var(--pages-w,248px) - 848px - 256px) / 2 + 12px))}
+  .frame.wide .pages .grip{display:none}
+}
+@container (max-width:600px){ .book{grid-template-columns:minmax(0,1fr)} .pages{display:none} .lesson{padding:20px 16px 72px} .dia-row{grid-template-columns:minmax(0,1fr) 56px minmax(0,1fr)} }
+@media (max-width:900px){
+  .frame{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,.9fr) minmax(0,1.4fr);min-height:860px}
+  .chat-col{border-right:0;border-bottom:1px solid var(--line)}
+  .chat-col .grip{display:none}
+  .frame.wide{grid-template-columns:minmax(0,1fr);grid-template-rows:0 minmax(0,1fr)}
+  .frame.wide .chat-col{border-bottom:0}
+}
+</style>
+
+<div class="page">
+  <div class="frame" id="frame"></div>
+</div>
+
+<script>
+(function(){
+"use strict";
+const sv=(d,s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const I={
+  up:sv('<path d="M8 13V3.5M4 7.5l4-4 4 4"/>'),
+  xs:sv('<path d="m4.5 4.5 7 7M11.5 4.5l-7 7"/>',12),
+  plus:sv('<path d="M8 3v10M3 8h10"/>'),
+  search:sv('<circle cx="7" cy="7" r="4.25"/><path d="m10.25 10.25 3.25 3.25"/>',13),
+  read:sv('<path d="M4 1.75h5.25L12.5 5v9.25H4z"/><path d="M9 1.75v3.5h3.5"/>',13),
+  write:sv('<path d="M3 13h3l7-7-3-3-7 7z"/>',13),
+  expand:sv('<path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9M2.5 6.5v-4h4M2.5 2.5 7 7M13.5 9.5v4h-4M13.5 13.5 9 9"/>'),
+  shrink:sv('<path d="M13.5 6.5h-4v-4M9.5 6.5l4-4M2.5 9.5h4v4M6.5 9.5l-4 4M6.5 2.5v4h-4M6.5 6.5l-4-4M9.5 13.5v-4h4M9.5 9.5l4 4"/>'),
+  lines:sv('<path d="M3 4h10M3 8h7M3 12h9"/>',14),
+  warn:sv('<path d="M8 2.5 14 13H2z"/><path d="M8 6.5v3M8 11.25v.01"/>',14),
+  info:sv('<circle cx="8" cy="8" r="5.75"/><path d="M8 7.5v3.5M8 5.25v.01"/>',14),
+  video:sv('<rect x="2" y="3.5" width="12" height="9" rx="2"/><path d="M7 6.25v3.5L10 8z"/>',18),
+  doc:sv('<path d="M4 1.75h5.25L12.5 5v9.25H4z"/><path d="M9 1.75v3.5h3.5"/>',18)
+};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const $=id=>document.getElementById(id);
+const M="modelcontextprotocol.io";
+const SRC=[
+  ["Introducing the Model Context Protocol","anthropic.com"],["What is the Model Context Protocol?",M],
+  ["Architecture overview",M],["Server concepts",M],["Specification, revision 2025-06-18",M],
+  ["Build an MCP server",M],["Connect local servers to Claude Desktop",M],["MCP Inspector","github.com"],
+  ["Python SDK","github.com"],["JSON-RPC 2.0 Specification","jsonrpc.org"],["Language Server Protocol","microsoft.github.io"],
+  ["Tool poisoning attacks","invariantlabs.ai"],["Hugging Face MCP Course","huggingface.co"],["Security best practices",M]
+];
+const KIND={understanding:"Understanding",practice:"Practice"};
+
+/* every lesson is a list of blocks; this page shows every kind of block */
+const PRIMS=[
+  {t:"p",id:"p0",text:"A server offers what it can do through three building blocks. Your notes server will use all three.",src:[3]},
+  {t:"term",id:"p1",term:"Primitive",def:"One kind of thing a server can offer to an AI app. MCP servers have three: tools, resources and prompts.",src:[3,4]},
+  {t:"h2",id:"h-three",text:"The three building blocks"},
+  {t:"table",id:"p2",head:["Building block","What it is","In your notes app","Who controls it"],rows:[
+    ["Tools","Functions the model decides to call, with arguments it chooses. They can change things.","Search notes · Create a note","Model"],
+    ["Resources","Data the app reads and passes to the model as context. Read only.","One note's text · The list of notebooks","Application"],
+    ["Prompts","Ready-made templates the user picks to start a task.","Summarize a note · Weekly review","User"]],src:[3,4]},
+  {t:"diagram",id:"p3",rows:[["Model","calls","Tools"],["Application","reads","Resources"],["User","picks","Prompts"]],src:[3]},
+  {t:"h2",id:"h-tools",text:"Tools"},
+  {t:"h3",id:"h-tools-how",text:"How a tool is called"},
+  {t:"p",id:"p4",text:"The server lists its tools, each with a name, a description and an input schema. The model picks one, and the client sends a tools/call request with the arguments.",src:[3,4]},
+  {t:"code",id:"p5",file:"request · JSON",code:'{\n  "jsonrpc": "2.0",\n  "id": 7,\n  "method": "tools/call",\n  "params": {\n    "name": "search_notes",\n    "arguments": { "keyword": "mcp" }\n  }\n}',src:[4]},
+  {t:"quote",id:"p6",text:"A rpc call is represented by sending a Request object to a Server.",who:"JSON-RPC 2.0 Specification",src:[9]},
+  {t:"h3",id:"h-tools-ex",text:"Example: search your notes"},
+  {t:"code",id:"p7",file:"server.py",code:'from mcp.server.fastmcp import FastMCP\n\nmcp = FastMCP("notes")\n\n@mcp.tool()\ndef search_notes(keyword: str) -> list[str]:\n    """Return the titles of notes that mention the keyword."""\n    return [n.title for n in NOTES if keyword in n.text]',src:[8]},
+  {t:"note",id:"p8",kind:"warn",label:"Watch out",text:"The model reads a tool's description to decide when to call it. Write it plainly, and never put anything in it you wouldn't show the user.",src:[11,13]},
+  {t:"h2",id:"h-res",text:"Resources"},
+  {t:"h3",id:"h-res-how",text:"How a resource is read"},
+  {t:"p",id:"p9",text:"Each resource has a URI. The app lists them, reads one with resources/read, and decides what to put in front of the model.",src:[3,4]},
+  {t:"list",id:"p10",items:["A resource has a URI, such as notes://mcp-ideas.","It can hold text or binary data.","The app decides when to read it; the model never calls it."],src:[3,4]},
+  {t:"code",id:"p11",file:"server.py",code:'@mcp.resource("notes://{note_id}")\ndef read_note(note_id: str) -> str:\n    """The full text of one note."""\n    return load_note(note_id).text',src:[8]},
+  {t:"h2",id:"h-prompts",text:"Prompts"},
+  {t:"p",id:"p12",text:"The server lists its prompts with their arguments. The user chooses one, often as a slash command, and the client fetches it with prompts/get.",src:[3,4]},
+  {t:"note",id:"p13",kind:"info",label:"Note",text:"A prompt never runs by itself. It only fills in a message the user then sends.",src:[3]},
+  {t:"resource",id:"p14",cards:[
+    {kind:"video",title:"Hugging Face MCP Course",desc:"The first unit covers the same three building blocks, with exercises.",yours:true},
+    {kind:"doc",title:"Server concepts",desc:"The official explanation on modelcontextprotocol.io."}],src:[12,3]},
+  {t:"h2",id:"h-practice",text:"Practice"},
+  {t:"steps",id:"p16",items:["Save the two functions above in server.py.","Run <code>mcp dev server.py</code> to open it in MCP Inspector.","Open Resources and read notes://mcp-ideas."],src:[7,8]},
+  {t:"exercise",id:"p17",title:"Give your notes a search tool",text:"Add search_notes to your own server, then call it from MCP Inspector with a keyword you know is in your notes.",src:[5,7]},
+  {t:"h2",id:"h-check",text:"Check yourself"},
+  {t:"check",id:"p18",text:"Your app keeps a list of recent searches. Which building block fits it, and why?"}
+];
+const PAGES=[
+  {id:"why",group:"Why MCP",title:"Why MCP exists",kind:"understanding",blocks:[
+    {t:"p",id:"w0",text:"MCP is an open protocol that lets any AI app connect to any tool or data source in the same way.",src:[0,1]},
+    {t:"h2",id:"w-h1",text:"The problem it solves"},
+    {t:"p",id:"w1",text:"Before MCP, every AI app needed its own integration for every tool. Ten apps and ten tools could mean a hundred connectors to build and keep working.",src:[0]},
+    {t:"h2",id:"w-h2",text:"One open standard"},
+    {t:"p",id:"w2",text:"Anthropic released MCP as an open standard in November 2024. An app that speaks MCP can use any MCP server, and one server works with every such app.",src:[0]},
+    {t:"h2",id:"w-h3",text:"Where the idea came from"},
+    {t:"p",id:"w3",text:"The Language Server Protocol did the same for code editors: one protocol between any editor and any language. MCP borrows that shape.",src:[10]},
+    {t:"h2",id:"w-h4",text:"Check yourself"},
+    {t:"check",id:"w4",text:"Why does one shared protocol cut the number of integrations?"}]},
+  {id:"arch",group:"How it works",title:"Architecture",kind:"understanding",blocks:[
+    {t:"p",id:"a0",text:"Three roles take part in every MCP connection.",src:[2]},
+    {t:"diagram",id:"a1",rows:[["Host: Claude Desktop","holds","Client"],["Client","one connection","Your notes server"],["Client","one connection","A files server"]],src:[2]},
+    {t:"h2",id:"a-h1",text:"Host, client and server"},
+    {t:"list",id:"a2",items:["The host is the AI app you work in.","A client is the part of the host that holds one connection to one server.","A server is a program that exposes what it can do. Yours will be one."],src:[2]},
+    {t:"h2",id:"a-h2",text:"Check yourself"},
+    {t:"check",id:"a3",text:"If the host connects to three servers, how many clients does it run?"}]},
+  {id:"prims",group:"How it works",title:"Server primitives",kind:"understanding",blocks:PRIMS},
+  {id:"msgs",group:"How it works",title:"Messages and transports",kind:"understanding",blocks:[
+    {t:"p",id:"m0",text:"How the two sides talk, and over what.",src:[4]},
+    {t:"h2",id:"m-h1",text:"JSON-RPC messages"},
+    {t:"p",id:"m1",text:"Every message is JSON-RPC 2.0: a request with an id, a response with the same id, or a notification with none.",src:[9,4]},
+    {t:"h2",id:"m-h2",text:"The handshake"},
+    {t:"p",id:"m2",text:"A session starts with initialize. Client and server each say which capabilities they support, then the client sends initialized.",src:[4]},
+    {t:"h2",id:"m-h3",text:"Two transports"},
+    {t:"table",id:"m3",head:["Transport","When"],rows:[["stdio","The server runs on your machine as a child process."],["Streamable HTTP","The server runs somewhere else."]],src:[4]}]},
+  {id:"plan",group:"Build it",title:"Your plan",kind:"practice",blocks:[
+    {t:"p",id:"pl0",text:"A server that lets an AI app search and read your own notes.",src:[]},
+    {t:"h2",id:"pl-h1",text:"Steps"},
+    {t:"steps",id:"pl1",items:["Build the weather server from the quickstart.","Connect it to Claude Desktop.","Look inside it with MCP Inspector.","Do the first unit of your Hugging Face course.","Expose one of your notes as a resource.","Add a tool that searches your notes."],src:[5,6,7,12]}]},
+  {id:"first",group:"Build it",title:"First server",kind:"practice",blocks:[
+    {t:"p",id:"f0",text:"Start from the official quickstart before writing your own.",src:[5]},
+    {t:"h2",id:"f-h1",text:"Build the quickstart server"},
+    {t:"p",id:"f1",text:"Follow the weather server in Python with the official SDK. It has two tools and runs over stdio.",src:[5,8]},
+    {t:"exercise",id:"f2",title:"Run the weather server",text:"Build it, add it to Claude Desktop, and ask for the weather in a city.",src:[5,6]}]}
+];
+const SECURITY={id:"sec",group:"Security",title:"Security and trust",kind:"understanding",blocks:[
+  {t:"p",id:"s0",text:"Connecting a server means trusting its code and its descriptions.",src:[13]},
+  {t:"h2",id:"s-h1",text:"Tool poisoning"},
+  {t:"p",id:"s1",text:"A server can hide instructions inside a tool's description. The model reads them; the user usually never sees them.",src:[11]},
+  {t:"h2",id:"s-h2",text:"Consent"},
+  {t:"p",id:"s2",text:"The host should ask you before a tool runs or data leaves, and show what will happen.",src:[13,4]},
+  {t:"h2",id:"s-h3",text:"Token passthrough"},
+  {t:"note",id:"s3",kind:"warn",label:"Watch out",text:"A server must not accept a token that was not issued for it and pass it on to other services.",src:[13]}]};
+const EXAMPLES={t:"examples",id:"p-vs",title:"Examples: a tool or a resource?",items:[
+  ["Search your notes for a keyword","A tool: the model decides when to call it, and with which keyword."],
+  ["The text of one note","A resource: the app reads it by its URI and gives it to the model."],
+  ["Create a new note","A tool: it changes something, so you can be asked first."]],src:[3]};
+
+const SCRIPT=[
+  {learner:"I need more examples on resources. I don't get how they differ from tools.",
+   act:["write","Wrote examples from your notes app"],
+   agent:"Here are three from your notes app, under Resources. Ask who decides each time: the model calls a tool, the app reads a resource.",
+   run:()=>{const b=page("prims").blocks;if(!b.some(x=>x.id===EXAMPLES.id))b.splice(b.findIndex(x=>x.id==="p11")+1,0,{...EXAMPLES});return {page:"prims",fresh:EXAMPLES.id,placed:[["prims",EXAMPLES.id,"Resources › "+EXAMPLES.title]]}}},
+  {learner:"What can go wrong when I connect someone else's server?",
+   act:["search","Searched for MCP security · 3 sources"],
+   agent:"A few things that matter before you share your server. I added a page for them.",
+   run:()=>{if(!page("sec"))S.pages.push(JSON.parse(JSON.stringify(SECURITY)));return {page:"sec",fresh:"sec",placed:[["sec",null,null]]}}}
+];
+
+let S;
+function reset(){
+  const w=S?{chat:S.chatW,pages:S.pagesW}:{chat:340,pages:248};
+  S={pages:JSON.parse(JSON.stringify(PAGES)),page:"prims",showSrc:true,wide:S?S.wide:false,chatW:w.chat,pagesW:w.pages,
+     marks:[{pid:"p9",text:"decides what to put in front of the model",sent:false}],fresh:null,busy:false,step:0,scrollTo:null,active:null,
+     turns:[
+      {who:"learner",text:"MCP: why was it created, and how should I approach learning it?"},
+      {who:"agent",act:["search","Searched the web · 12 sources"],text:"I gathered 12 sources and started your book. In short: MCP lets any AI app connect to any tool the same way. Do you have resources of your own? Tell me why you picked them.",placed:[["why",null,null]]},
+      {who:"learner",text:"I have the Hugging Face MCP course. I want to build an MCP server for my own notes app."},
+      {who:"agent",act:["read","Read the course outline"],text:"Then that's your goal. Your course is in Your plan, and How it works covers what you need before building.",placed:[["plan",null,null],["prims",null,null]]}],
+     draft:SCRIPT[0].learner};
+}
+reset();
+const page=id=>S.pages.find(p=>p.id===id);
+
+/* ─── text with highlights ─── */
+function marked(pid,text,raw){
+  const ms=S.marks.filter(m=>m.pid===pid).map(m=>({m,i:text.indexOf(m.text)})).filter(x=>x.i>=0).sort((a,b)=>a.i-b.i);
+  const e=raw?(s=>s):esc;
+  let out="",at=0;
+  ms.forEach(({m,i})=>{if(i<at)return;out+=e(text.slice(at,i))+`<mark data-act="unmark" data-pid="${pid}" data-t="${esc(m.text)}">${esc(m.text)}</mark>`;at=i+m.text.length});
+  return out+e(text.slice(at));
+}
+const hl=(pid,text)=>`<span data-pid="${pid}">${marked(pid,text)}</span>`;
+const srcLine=src=>src&&src.length?`<div class="bsrc">${src.map(i=>`<span><span class="tt">${esc(SRC[i][0])}</span><span class="d">${esc(SRC[i][1])}</span></span>`).join("")}</div>`:"";
+
+function blockHTML(b){
+  if(b.t==="h2")return `<h2 id="${b.id}" data-otp="${b.id}">${esc(b.text)}</h2>`;
+  if(b.t==="h3")return `<h3 id="${b.id}" data-otp="${b.id}">${esc(b.text)}</h3>`;
+  let h="";
+  switch(b.t){
+    case "p":h=`<p class="b-p">${hl(b.id,b.text)}</p>`;break;
+    case "term":h=`<div class="b-term"><span class="w">${esc(b.term)}</span><span class="d">${hl(b.id,b.def)}</span></div>`;break;
+    case "table":h=`<div class="tbl"><table><thead><tr>${b.head.map(x=>`<th>${esc(x)}</th>`).join("")}</tr></thead><tbody>${b.rows.map((r,ri)=>`<tr>${r.map((c,ci)=>`<td>${hl(b.id+"-"+ri+"-"+ci,c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;break;
+    case "diagram":h=`<div class="dia">${b.rows.map(([a,v,z])=>`<div class="dia-row"><div class="dia-box">${esc(a)}</div><div class="dia-link">${esc(v)}</div><div class="dia-box to">${esc(z)}</div></div>`).join("")}</div>`;break;
+    case "code":h=`<div class="code"><div class="code-head"><span class="f">${esc(b.file)}</span><button data-act="copy" data-id="${b.id}">Copy</button></div><pre><code data-pid="${b.id}" data-raw="1">${marked(b.id,b.code)}</code></pre></div>`;break;
+    case "quote":h=`<div class="b-quote"><span class="qm">“</span><div class="qt">${hl(b.id,b.text)}<span class="who">${esc(b.who)}</span></div></div>`;break;
+    case "note":h=`<div class="b-note"><span class="ni">${b.kind==="warn"?I.warn:I.info}</span><span class="tx"><b>${esc(b.label)}.</b> ${hl(b.id,b.text)}</span></div>`;break;
+    case "list":h=`<ul class="b-list">${b.items.map((x,k)=>`<li>${hl(b.id+"-"+k,x)}</li>`).join("")}</ul>`;break;
+    case "examples":h=`<div class="b-ex"><div class="h">${esc(b.title)}</div><div class="ex">${b.items.map(([q,a],k)=>`<div class="q">${hl(b.id+"-q"+k,q)}</div><div>${hl(b.id+"-a"+k,a)}</div>`).join("")}</div></div>`;break;
+    case "resource":h=`<div class="cards">${b.cards.map(c=>`<a class="card" href="#" data-act="noop"><span class="ci">${c.kind==="video"?I.video:I.doc}${c.yours?`<span class="tag">yours</span>`:""}</span><span class="ct">${esc(c.title)}</span><span class="cd">${esc(c.desc)}</span></a>`).join("")}</div>`;break;
+    case "steps":h=`<div class="b-steps">${b.items.map(x=>`<div class="st"><span class="t">${x}</span></div>`).join("")}</div>`;break;
+    case "exercise":h=`<div class="b-exercise"><div class="top"><span class="nm">${esc(b.title)}</span><span class="tag">Practice</span></div><span class="tx">${hl(b.id,b.text)}</span><button class="btn" data-act="noop">Start with the tutor</button></div>`;break;
+    case "check":h=`<div class="b-check"><span class="bx"></span>${hl(b.id,b.text)}</div>`;break;
+  }
+  return `<div class="blk${b.t==="code"?" is-code":""}${S.fresh===b.id?" fresh":""}" id="${b.id}">${h}${srcLine(b.src)}</div>`;
+}
+function lessonHTML(p){
+  return `<article class="lesson${S.showSrc?"":" src-off"}"><div class="crumb"><span>${esc(p.group)}</span><span class="k">${KIND[p.kind]}</span></div>
+    <div class="title-row"><h1>${esc(p.title)}</h1><div class="tools"><button class="toggle${S.showSrc?" on":""}" data-act="toggle" aria-pressed="${S.showSrc}"><span class="track"></span>Sources</button></div></div>
+    ${p.blocks.map(blockHTML).join("")}</article>`;
+}
+function railHTML(p){
+  let h=`<div class="rail-label">${I.lines}<span>On this page</span></div>`;
+  p.blocks.forEach(b=>{if(b.t==="h2"||b.t==="h3")h+=`<button class="otp${b.t==="h3"?" l3":""}${S.active===b.id?" on":""}" data-act="otp" data-id="${b.id}">${esc(b.text)}</button>`});
+  return h;
+}
+function pagesHTML(){
+  let h=`<div class="scroll">`;
+  const groups=[];S.pages.forEach(p=>{if(!groups.includes(p.group))groups.push(p.group)});
+  groups.forEach(g=>{
+    h+=`<div class="side-label">${esc(g)}</div>`;
+    S.pages.filter(p=>p.group===g).forEach(p=>{h+=`<button class="nav-row${p.id===S.page?" on":""}${S.fresh===p.id&&p.id!==S.page?" fresh":""}" data-act="page" data-id="${p.id}"><span>${esc(p.title)}</span></button>`});
+  });
+  return h+`</div><div class="grip" data-grip="pages" role="separator" aria-orientation="vertical" aria-label="Resize the pages"></div>`;
+}
+
+/* ─── the conversation ─── */
+function turnsHTML(){
+  let h=`<div class="turns">`;
+  S.turns.forEach(t=>{
+    h+=`<div class="turn ${t.who}">`;
+    if(t.quotes&&t.quotes.length)h+=`<div class="quotes">${t.quotes.map(q=>`<span class="quote-chip">${esc(q)}</span>`).join("")}</div>`;
+    if(t.act)h+=`<div class="act">${I[t.act[0]]}<span>${esc(t.busy?t.act[1].replace(/^Searched/,"Searching").replace(/^Read /,"Reading ").replace(/^Wrote/,"Writing").replace(/ · .*$/,""):t.act[1])}</span></div>`;
+    h+=t.busy?`<div class="say"><span class="bar" style="width:66%"></span></div>`:`<div class="say">${esc(t.text)}</div>`;
+    if(t.placed&&t.placed.length)h+=`<div class="placed">${t.placed.map(([pg,anchor,label])=>{const p=page(pg);if(!p)return "";return `<button data-act="go" data-id="${pg}" data-a="${anchor||""}"><span>${esc(p.title)}</span>${label?`<span class="sep">›</span><span>${esc(label)}</span>`:""}</button>`}).join("")}</div>`;
+    h+=`</div>`;
+  });
+  return h+`</div>`;
+}
+function composerHTML(){
+  const ctx=S.marks.filter(m=>!m.sent);
+  return `<div class="composer-wrap"><form class="composer" id="composer" autocomplete="off">${ctx.length?`<div class="ctx">${ctx.map(m=>`<button type="button" data-act="unmark" data-pid="${m.pid}" data-t="${esc(m.text)}" aria-label="Remove"><span>${esc(m.text)}</span>${I.xs}</button>`).join("")}</div>`:""}<div class="composer-row"><input id="talk" type="text" placeholder="Ask, or say what you need" aria-label="Talk to the agent" value="${esc(S.draft)}"><button class="send${S.draft.trim()&&!S.busy?" ready":""}" type="submit" aria-label="Send">${I.up}</button></div></form></div>`;
+}
+
+/* ─── render ─── */
+const frame=$("frame");
+function applyWidths(){frame.classList.toggle("wide",S.wide);frame.style.setProperty("--chat-w",S.chatW+"px");frame.style.setProperty("--pages-w",S.pagesW+"px")}
+function render(opts){
+  opts=opts||{};
+  const lw=$("lesson"),keep=lw&&!opts.top?lw.scrollTop:0,cw=$("chat"),keepChat=cw?cw.scrollTop:0;
+  const p=page(S.page);
+  applyWidths();
+  frame.innerHTML=`<div class="col chat-col"><div class="scroll" id="chat">${turnsHTML()}</div>${composerHTML()}<div class="grip" data-grip="chat" role="separator" aria-orientation="vertical" aria-label="Resize the conversation"></div></div>
+    <div class="book-wrap"><div class="book"><header class="goal"><span class="goal-title">An MCP server for my notes app</span><span class="goal-line">Search and read my own notes from an AI app</span><button class="wide-btn" data-act="wide" aria-pressed="${S.wide}" aria-label="${S.wide?"Show the conversation":"Enlarge the book"}">${S.wide?I.shrink:I.expand}</button></header><nav class="pages">${pagesHTML()}</nav><div class="lesson-wrap" id="lesson">${lessonHTML(p)}</div><aside class="rail" id="rail">${railHTML(p)}</aside></div></div>`;
+  const c=$("chat");if(c)c.scrollTop=opts.chat?c.scrollHeight:keepChat;
+  const l=$("lesson");
+  if(S.scrollTo){const t=$(S.scrollTo);if(t)l.scrollTop=Math.max(0,t.getBoundingClientRect().top-l.getBoundingClientRect().top+l.scrollTop-16);S.scrollTo=null}
+  else l.scrollTop=keep;
+  l.addEventListener("scroll",track,{passive:true});track();
+}
+function track(){
+  const l=$("lesson");if(!l)return;
+  const hs=[...l.querySelectorAll("[data-otp]")];let cur=hs.length?hs[0].dataset.otp:null;
+  const top=l.getBoundingClientRect().top+60;
+  hs.forEach(h=>{if(h.getBoundingClientRect().top<=top)cur=h.dataset.otp});
+  if(cur!==S.active){S.active=cur;document.querySelectorAll(".otp").forEach(b=>b.classList.toggle("on",b.dataset.id===cur))}
+}
+function send(){
+  const text=S.draft.trim();if(!text||S.busy)return;
+  const quotes=S.marks.filter(m=>!m.sent).map(m=>m.text);S.marks.forEach(m=>m.sent=true);
+  S.turns.push({who:"learner",text,quotes});
+  const sc=SCRIPT[S.step];
+  if(!sc){S.turns.push({who:"agent",text:"That's the end of this demo. Highlight anything in the book and ask about it.",placed:[]});S.draft="";render({chat:true});return}
+  const turn={who:"agent",act:sc.act,text:"",busy:true,placed:[]};
+  S.turns.push(turn);S.busy=true;S.step++;S.draft=SCRIPT[S.step]?SCRIPT[S.step].learner:"";
+  render({chat:true});
+  setTimeout(()=>{
+    const r=sc.run();turn.text=sc.agent;turn.placed=r.placed;turn.busy=false;S.busy=false;
+    S.fresh=r.fresh;S.page=r.page;S.scrollTo=r.fresh===r.page?null:r.fresh;render({chat:true,top:true});
+  },900);
+}
+
+/* resizing: drag a column's right edge */
+let drag=null;
+frame.addEventListener("pointerdown",e=>{
+  const g=e.target.closest("[data-grip]");if(!g)return;
+  e.preventDefault();g.setPointerCapture(e.pointerId);g.classList.add("active");frame.classList.add("dragging");
+  drag={which:g.dataset.grip,x:e.clientX,start:g.dataset.grip==="chat"?S.chatW:S.pagesW,el:g};
+});
+frame.addEventListener("pointermove",e=>{
+  if(!drag)return;
+  const w=drag.start+(e.clientX-drag.x);
+  if(drag.which==="chat")S.chatW=Math.round(Math.min(Math.max(w,260),Math.min(720,frame.clientWidth-420)));
+  else S.pagesW=Math.round(Math.min(Math.max(w,170),420));
+  applyWidths();
+});
+const endDrag=()=>{if(!drag)return;drag.el.classList.remove("active");frame.classList.remove("dragging");drag=null};
+frame.addEventListener("pointerup",endDrag);frame.addEventListener("pointercancel",endDrag);
+frame.addEventListener("dblclick",e=>{const g=e.target.closest("[data-grip]");if(!g)return;if(g.dataset.grip==="chat")S.chatW=340;else S.pagesW=248;applyWidths()});
+
+frame.addEventListener("wheel",e=>{
+  if(!e.target.closest(".book")||e.target.closest(".lesson-wrap"))return;
+  const own=e.target.closest(".pages .scroll, .rail");
+  if(own&&own.scrollHeight>own.clientHeight+1)return;
+  const l=$("lesson");if(!l||e.ctrlKey)return;
+  l.scrollTop+=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?l.clientHeight:1);
+  e.preventDefault();
+},{passive:false});
+frame.addEventListener("submit",e=>{e.preventDefault();send();const el=$("talk");if(el)el.focus()});
+frame.addEventListener("input",e=>{if(e.target.id!=="talk")return;S.draft=e.target.value;const b=document.querySelector(".send");if(b)b.classList.toggle("ready",!!S.draft.trim()&&!S.busy)});
+frame.addEventListener("mouseup",e=>{
+  if(drag||!e.target.closest(".lesson"))return;
+  const sel=window.getSelection();if(!sel||sel.isCollapsed)return;
+  const a=sel.anchorNode&&(sel.anchorNode.nodeType===1?sel.anchorNode:sel.anchorNode.parentElement),f=sel.focusNode&&(sel.focusNode.nodeType===1?sel.focusNode:sel.focusNode.parentElement);
+  const pa=a&&a.closest("[data-pid]"),pf=f&&f.closest("[data-pid]");
+  if(!pa||pa!==pf)return;
+  const full=pa.textContent;let text=sel.toString().trim();
+  if(!pa.dataset.raw){text=text.replace(/\s+/g," ")}
+  if(text.length<3||!full.includes(text))return;
+  if(!S.marks.some(m=>m.pid===pa.dataset.pid&&m.text===text))S.marks.push({pid:pa.dataset.pid,text,sent:false});
+  sel.removeAllRanges();render();
+});
+frame.addEventListener("click",e=>{
+  const el=e.target.closest("[data-act]");if(!el)return;
+  const a=el.dataset.act;
+  if(a==="noop"){e.preventDefault();return}
+  if(a==="page"){S.page=el.dataset.id;if(S.fresh===S.page)S.fresh=null;render({top:true});return}
+  if(a==="go"){S.page=el.dataset.id;S.scrollTo=el.dataset.a||null;render({top:true});return}
+  if(a==="otp"){const t=$(el.dataset.id),l=$("lesson");if(t&&l)l.scrollTop=Math.max(0,t.getBoundingClientRect().top-l.getBoundingClientRect().top+l.scrollTop-16);return}
+  if(a==="wide"){S.wide=!S.wide;render();return}
+  if(a==="toggle"){S.showSrc=!S.showSrc;const l=document.querySelector(".lesson");if(l)l.classList.toggle("src-off",!S.showSrc);el.classList.toggle("on",S.showSrc);el.setAttribute("aria-pressed",S.showSrc);return}
+  if(a==="copy"){const b=page(S.page).blocks.find(x=>x.id===el.dataset.id);if(b&&navigator.clipboard)navigator.clipboard.writeText(b.code).then(()=>{el.textContent="Copied";setTimeout(()=>{el.textContent="Copy"},1200)}).catch(()=>{});return}
+  if(a==="unmark"){if(el.tagName==="MARK"&&!window.getSelection().isCollapsed)return;S.marks=S.marks.filter(m=>!(m.pid===el.dataset.pid&&m.text===el.dataset.t));render();return}
+  if(a==="restart"){reset();render({top:true})}
+});
+render({top:true});
+})();
+</script>
