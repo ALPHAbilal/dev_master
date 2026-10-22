@@ -1,0 +1,806 @@
+<title>Goal Book search variations</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Four ways to show the search phase of the goal book. Each one plays the same example run:
+   the learner asks a question, the agent searches with Firecrawl, reads, takes notes and writes a page.
+   Top: the variation switch. Middle: the product, as in goal_book.html. Bottom: the calls behind the screen.
+   Light only, the platform's palette, the same tokens as goal_book.html. */
+:root{
+  --bg:#ffffff; --canvas:#f4f4f2; --hover:#ebeae6; --hover-2:#e3e1db; --line:#e3e1db; --guide:#d8d6cf; --bar:#e3e1db;
+  --ink:#1e2024; --ink-2:#4a4d53; --ink-3:#7a7d84; --ink-4:#a8a6a0; --pale:#c3c1ba;
+  --accent:#4f7290; --accent-ink:#385876; --accent-soft:rgba(79,114,144,.15); --on-accent:#ffffff; --mark:rgba(79,114,144,.22);
+  --ui:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;
+  --mono:"Geist Mono","Cascadia Code","SF Mono",Consolas,monospace;
+  color-scheme:light;
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--canvas);color:var(--ink);font-family:var(--ui);font-size:14px;line-height:21px;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+svg{flex:none}
+.wrap{max-width:1480px;margin:0 auto;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:12px}
+
+/* the switch */
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px}
+.ttl{display:flex;align-items:baseline;gap:10px;margin-right:auto;min-width:0}
+.ttl h1{margin:0;font-size:17px;line-height:24px;font-weight:600;letter-spacing:-.01em}
+.ttl .sub{font-size:13px;color:var(--ink-3)}
+.seg{display:flex;flex-wrap:wrap;gap:2px;padding:3px;border-radius:10px;background:var(--hover)}
+.seg button{height:30px;padding:0 12px;border:0;border-radius:8px;background:none;font-size:13px;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.seg button:hover{color:var(--ink)}
+.seg button.on{background:var(--bg);color:var(--ink);font-weight:500;box-shadow:0 0 0 1px var(--line)}
+.ctl{display:flex;gap:6px}
+.ghost{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:13px;color:var(--ink-2);cursor:pointer}
+.ghost:hover{background:var(--hover);color:var(--ink)}
+.ghost.on{border-color:var(--accent);color:var(--accent-ink)}
+.vdesc{margin:0;font-size:14px;line-height:21px;color:var(--ink-2);max-width:820px}
+
+/* the product frame */
+.frame{position:relative;display:grid;grid-template-columns:340px minmax(0,1fr);height:720px;border:1px solid var(--line);border-radius:14px;background:var(--bg);overflow:hidden}
+.col{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0}
+.chat-col{border-right:1px solid var(--line)}
+.scroll{flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin}
+.bar{display:block;height:8px;border-radius:5px;background:var(--bar)}
+
+/* the conversation */
+.turns{display:flex;flex-direction:column;gap:18px;padding:20px 16px 16px}
+.turn{display:flex;flex-direction:column;gap:8px;min-width:0}
+.turn.learner{align-items:flex-end}
+.say{font-size:15px;line-height:22px;color:var(--ink);overflow-wrap:anywhere}
+.turn.learner .say{max-width:92%;padding:12px 16px;border-radius:12px;background:var(--hover);line-height:20px}
+.act{display:flex;align-items:center;gap:8px;font-size:13px;line-height:17px;color:var(--ink-3)}
+.act.busy{color:var(--ink-2)}
+.placed{display:flex;flex-wrap:wrap;gap:6px}
+.placed button{display:inline-flex;align-items:center;gap:6px;max-width:100%;min-height:28px;padding:3px 10px;border:0;border-radius:7px;background:var(--hover);font-size:13px;line-height:19px;color:var(--ink-2);text-align:left;cursor:pointer}
+.placed button:hover{background:var(--hover-2);color:var(--ink)}
+.composer-wrap{flex:none;padding:8px 16px 16px}
+.composer{display:flex;align-items:center;gap:8px;min-height:48px;padding:8px 8px 8px 14px;border:1px solid var(--line);border-radius:14px}
+.composer>span:first-child{flex:1;font-size:15px;color:var(--ink-4)}
+.send{flex:none;width:32px;height:32px;border-radius:8px;background:var(--hover);color:var(--ink-4);display:grid;place-items:center}
+
+/* variation 1: the trail inside the reply */
+.trail{display:flex;flex-direction:column;gap:6px}
+.q{display:flex;align-items:center;gap:8px;min-height:24px;font-size:13px;line-height:18px;color:var(--ink-2)}
+.q .ic{color:var(--ink-3);display:grid;place-items:center}
+.q .qt{flex:1;min-width:0;font-family:var(--mono);font-size:12.5px;overflow-wrap:anywhere}
+.q .qn{flex:none;font-size:12px;color:var(--ink-4);font-variant-numeric:tabular-nums}
+.caret{display:inline-block;width:6px;height:13px;margin-left:1px;vertical-align:-2px;background:var(--ink-3)}
+.rows{display:flex;flex-direction:column;gap:1px;margin:0 0 6px 7px;padding-left:10px;border-left:1px solid var(--line)}
+.srow{display:flex;align-items:center;gap:8px;width:100%;min-height:36px;padding:4px 8px;border:0;border-radius:8px;background:none;text-align:left;cursor:pointer}
+.srow:hover{background:var(--hover)}
+.srow.open{background:var(--hover)}
+.mono{flex:none;width:18px;height:18px;border-radius:5px;background:var(--hover-2);display:grid;place-items:center;font-size:10.5px;font-weight:600;line-height:1;color:var(--ink-2);text-transform:uppercase}
+.sm{flex:1;min-width:0;display:flex;flex-direction:column}
+.sm .tt{font-size:13.5px;line-height:19px;color:var(--ink);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sm .dm{font-size:11.5px;line-height:15px;color:var(--ink-4);font-family:var(--mono);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.state{flex:none;display:flex;align-items:center;gap:6px;font-size:12px;line-height:16px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.state .bar{width:28px;height:6px}
+.st-read .state{color:var(--ink)}
+.st-skipped .tt,.st-skipped .state{color:var(--pale)}
+.st-skipped .mono{color:var(--pale);background:var(--canvas)}
+.st-failed .tt{color:var(--ink-3)}
+.st-found .tt{color:var(--ink-2)}
+.why{margin:-2px 0 4px 34px;font-size:12.5px;line-height:18px;color:var(--ink-3)}
+.taken{display:flex;flex-direction:column;gap:12px;margin:4px 0 10px 34px}
+.tk .say2{font-size:13.5px;line-height:20px;color:var(--ink)}
+.qq{margin-top:6px;padding:7px 10px;border-radius:8px;background:var(--canvas);font-size:12.5px;line-height:19px;color:var(--ink-2)}
+.qq mark{background:var(--mark);color:var(--ink);border-radius:3px;padding:0 1px}
+.to{display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:0;border:0;background:none;font-size:12.5px;line-height:17px;color:var(--accent-ink);cursor:pointer;text-align:left}
+.to:hover{text-decoration:underline}
+.to.wait{color:var(--ink-4);cursor:default;text-decoration:none}
+.empty{font-size:12.5px;line-height:18px;color:var(--ink-3)}
+
+/* the book */
+.book{display:grid;grid-template-rows:48px auto minmax(0,1fr);min-width:0;min-height:0}
+.goal{display:flex;align-items:baseline;gap:10px;min-width:0;height:48px;padding:13px 24px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+.goal-title{flex:none;font-size:15px;line-height:22px;font-weight:600}
+.goal-line{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:14px;line-height:20px;color:var(--ink-3)}
+.viewbar{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 16px;border-bottom:1px solid var(--line);font-size:13px;color:var(--ink-3);min-width:0}
+.viewbar .lead{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
+.viewbar .lead span{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.viewbar .lead b{font-weight:500;color:var(--ink)}
+.viewbar .step{flex:none;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.tabs{display:flex;gap:2px}
+.tabs button{height:30px;padding:0 10px;border:0;border-radius:8px;background:none;font-size:13px;color:var(--ink-3);cursor:pointer}
+.tabs button:hover{background:var(--hover);color:var(--ink)}
+.tabs button.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+.view{min-width:0;min-height:0;display:flex}
+.pageview{flex:1;display:grid;grid-template-columns:232px minmax(0,1fr);min-width:0;min-height:0}
+.pages{min-height:0;overflow-y:auto;padding:0 12px 24px;background:var(--canvas);border-right:1px solid var(--line)}
+.side-label{margin:28px 0 8px;padding:0 12px;font-size:14px;line-height:24px;font-weight:600;color:var(--ink)}
+.side-label:first-child{margin-top:18px}
+.nav-row{display:flex;align-items:center;width:100%;min-height:34px;margin:0 0 1px;padding:5px 12px;border:0;border-radius:12px;background:none;font-size:14px;line-height:24px;color:var(--ink-2);text-align:left;cursor:default}
+.nav-row.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+.nav-row.fresh{background:var(--bg);box-shadow:inset 0 0 0 1px var(--accent);color:var(--ink)}
+.lesson-wrap{min-width:0;min-height:0;overflow-y:auto;scrollbar-width:thin}
+.lesson{max-width:720px;margin:0 auto;padding:28px 40px 80px;font-size:16px;line-height:1.75}
+.crumb{display:flex;gap:8px;font-size:.875em;line-height:1.43;font-weight:600;color:var(--accent)}
+.crumb .k{font-weight:400;color:var(--ink-4)}
+.lesson h1{margin:.5em 0 0;font-size:2.1em;line-height:1.15;font-weight:600;letter-spacing:-.025em;text-wrap:balance}
+.lesson h2{margin:2rem 0 0;font-size:1.4em;line-height:1.33;font-weight:600;letter-spacing:-.01em}
+.blk{margin-top:1.1em;border-radius:14px}
+.lesson h2+.blk{margin-top:.75em}
+.b-p{margin:0;color:var(--ink-2)}
+.b-list{margin:0;padding-left:1.5em;color:var(--ink-2)}
+.b-list li+li{margin-top:.4em}
+.b-note{display:flex;gap:.75em;padding:.9em 1.15em;border:1px solid var(--line);border-radius:14px;background:var(--canvas);font-size:.9em;line-height:1.7;color:var(--ink-2)}
+.b-note b{font-weight:600;color:var(--ink)}
+.b-note .ni{flex:none;padding-top:.2em;color:var(--ink-3)}
+.ph{display:flex;flex-direction:column;gap:10px;padding:6px 0}
+.ph-h{margin-top:2rem}
+.bsrc{display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:.55em}
+.sc{display:inline-flex;align-items:center;gap:6px;max-width:100%;min-height:24px;padding:1px 8px;border:0;border-radius:6px;background:none;font-size:12px;line-height:18px;color:var(--ink-3);cursor:pointer;text-align:left}
+.sc:hover{background:var(--hover);color:var(--ink)}
+.sc .d{font-family:var(--mono);color:var(--ink-4)}
+
+/* variation 2: the search desk */
+.desk{flex:1;display:grid;grid-template-columns:264px minmax(0,1fr) 240px;min-width:0;min-height:0}
+.d-list{min-height:0;overflow-y:auto;padding:12px 10px 20px;background:var(--canvas);border-right:1px solid var(--line)}
+.d-q{display:flex;gap:8px;align-items:flex-start;margin:14px 6px 6px;font-family:var(--mono);font-size:12px;line-height:17px;color:var(--ink-2);overflow-wrap:anywhere}
+.d-q:first-child{margin-top:4px}
+.d-q .ic{color:var(--ink-3);padding-top:1px}
+.d-row{display:flex;align-items:center;gap:8px;width:100%;min-height:40px;padding:4px 8px;border:0;border-radius:10px;background:none;text-align:left;cursor:pointer}
+.d-row:hover{background:var(--hover)}
+.d-row.on{background:var(--bg);box-shadow:inset 0 0 0 1px var(--line)}
+.d-read{min-width:0;min-height:0;overflow-y:auto;padding:24px 32px 64px}
+.d-read .crumb2{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-3)}
+.d-read h2{margin:6px 0 0;font-size:22px;line-height:29px;font-weight:600;letter-spacing:-.015em;text-wrap:balance}
+.d-read .url{margin-top:6px;font-family:var(--mono);font-size:12px;line-height:17px;color:var(--ink-4);overflow-wrap:anywhere}
+.d-read .status{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:12px;padding-bottom:14px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--ink-3)}
+.d-read .status b{font-weight:500;color:var(--ink)}
+.d-read p{margin:16px 0 0;font-size:15px;line-height:26px;color:var(--ink-2);max-width:62ch}
+.d-read p.pale{color:var(--pale)}
+.d-read mark{background:var(--mark);color:var(--ink);border-radius:3px;padding:1px 2px;transition:background .2s}
+.d-read mark.hot{background:rgba(79,114,144,.38)}
+.d-read .lines{display:flex;flex-direction:column;gap:12px;margin-top:20px;max-width:62ch}
+.follow{display:inline-flex;align-items:center;gap:6px;height:28px;margin-top:14px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:12.5px;color:var(--ink-2);cursor:pointer}
+.follow:hover{background:var(--hover)}
+.d-margin{min-height:0;overflow-y:auto;padding:24px 16px 40px;border-left:1px solid var(--line)}
+.m-label{font-size:12.5px;line-height:17px;font-weight:600;color:var(--ink)}
+.m-card{display:flex;flex-direction:column;gap:2px;width:100%;margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);text-align:left;cursor:pointer}
+.m-card:hover,.m-card.hot{border-color:var(--accent)}
+.m-card .say2{font-size:13.5px;line-height:20px;color:var(--ink)}
+.m-none{margin-top:10px;font-size:12.5px;line-height:18px;color:var(--ink-3)}
+.blank{flex:1;display:grid;place-items:center;color:var(--ink-4);font-size:13px}
+
+/* variation 3: the source ledger */
+.ledger{flex:1;min-width:0;min-height:0;overflow:auto;padding:16px 20px 40px}
+.lg-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-bottom:14px}
+.qchip{display:inline-flex;align-items:center;gap:6px;max-width:100%;min-height:26px;padding:2px 10px;border-radius:7px;background:var(--canvas);font-family:var(--mono);font-size:12px;line-height:17px;color:var(--ink-2)}
+.qchip .ic{color:var(--ink-3)}
+.counts{display:flex;gap:14px;margin-left:auto;font-size:13px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.counts b{font-weight:600;color:var(--ink)}
+.lg{width:100%;min-width:720px;border-collapse:collapse;font-size:13px;line-height:19px}
+.lg th{padding:8px 12px 8px 0;border-bottom:1px solid var(--line);text-align:left;font-size:12px;font-weight:500;color:var(--ink-3);white-space:nowrap}
+.lg td{padding:9px 12px 9px 0;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink-2)}
+.lg tr.row{cursor:pointer}
+.lg tr.row:hover td{background:var(--canvas)}
+.lg tr.row.open td{background:var(--canvas)}
+.lg td:first-child{padding-left:8px}
+.lg .srcc{display:flex;align-items:center;gap:8px;min-width:0}
+.lg .srcc .sm{max-width:240px}
+.lg .qcell{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);max-width:180px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.lg .num{font-variant-numeric:tabular-nums;color:var(--ink)}
+.lg .went{display:flex;flex-wrap:wrap;gap:4px}
+.lg .went span{padding:0 7px;border-radius:6px;background:var(--accent-soft);font-size:12px;line-height:20px;color:var(--accent-ink);white-space:nowrap}
+.lg tr.st-skipped .tt,.lg tr.st-skipped td{color:var(--pale)}
+.lg tr.detail td{padding:4px 12px 16px 34px;background:var(--canvas)}
+.pairs{display:flex;flex-direction:column;gap:10px;max-width:760px}
+.pair{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr);gap:10px;align-items:start}
+.pair .qq{margin:0;background:var(--bg)}
+.pair .arrow{padding-top:8px;color:var(--ink-4)}
+.pair .say2{padding-top:6px;font-size:13.5px;line-height:20px;color:var(--ink)}
+.detail .why{margin:0 0 10px}
+
+/* variation 4: search together */
+.flow-wrap{flex:1;min-width:0;min-height:0;overflow:auto;position:relative}
+.flow{position:relative;display:grid;grid-template-columns:200px 250px 270px 190px;gap:0 56px;min-width:940px;padding:18px 24px 96px}
+.wires{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+.wires path{fill:none;stroke:var(--guide);stroke-width:1.25;transition:stroke .15s,opacity .15s}
+.wires path.hot{stroke:var(--accent);stroke-width:1.75}
+.wires.focus path:not(.hot){opacity:.25}
+.fcol{display:flex;flex-direction:column;gap:8px;min-width:0;position:relative;z-index:1}
+.fhead{margin-bottom:4px;font-size:12px;line-height:17px;font-weight:600;color:var(--ink-3)}
+.node{display:flex;flex-direction:column;gap:2px;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);text-align:left;cursor:pointer;transition:opacity .15s,border-color .15s}
+.node:hover{border-color:var(--pale)}
+.node.hot{border-color:var(--accent)}
+.flow.focus .node:not(.hot){opacity:.35}
+.node .row1{display:flex;align-items:center;gap:8px;min-width:0}
+.node .qt2{font-family:var(--mono);font-size:12px;line-height:17px;color:var(--ink);overflow-wrap:anywhere}
+.node .small{font-size:12px;line-height:17px;color:var(--ink-3)}
+.node .say2{font-size:13px;line-height:19px;color:var(--ink)}
+.node.st-skipped .tt{color:var(--pale)}
+.node .qq{margin-top:6px}
+.cb{flex:none;width:16px;height:16px;border:1.5px solid var(--pale);border-radius:4px;display:grid;place-items:center;color:var(--on-accent)}
+.cb.on{background:var(--accent);border-color:var(--accent)}
+.node.choose{cursor:pointer}
+.node .byyou{font-size:11.5px;color:var(--accent-ink)}
+.secnode .row1 .tt{font-size:13px;line-height:19px;color:var(--ink)}
+.secnode.wait .tt{color:var(--pale)}
+.choose-bar{position:sticky;bottom:12px;left:0;z-index:3;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;width:min(680px,calc(100% - 32px));margin:-80px auto 12px;padding:12px 12px 12px 16px;border:1px solid var(--line);border-radius:14px;background:var(--bg);box-shadow:0 6px 24px rgba(30,32,36,.08)}
+.choose-bar span{flex:1;min-width:200px;font-size:14px;line-height:20px;color:var(--ink)}
+.btn{height:32px;padding:0 14px;border:0;border-radius:8px;background:var(--accent);font-size:13px;font-weight:500;color:var(--on-accent);cursor:pointer}
+.btn:hover{background:#456580}
+.btn[disabled]{background:var(--hover-2);color:var(--ink-3);cursor:default}
+
+/* behind the screen */
+.behind{border:1px solid var(--line);border-radius:14px;background:var(--bg);overflow:hidden}
+.behind-h{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 12px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.behind-h b{font-size:14px;font-weight:600}
+.behind-h span{font-size:13px;color:var(--ink-3)}
+.log{max-height:260px;overflow-y:auto;padding:8px 0;font-family:var(--mono);font-size:12px;line-height:19px}
+.log-row{display:grid;grid-template-columns:86px minmax(0,1fr);gap:12px;padding:3px 16px}
+.log-row .who{color:var(--ink-4)}
+.log-row .tx{color:var(--ink-2);overflow-wrap:anywhere}
+.log-row.call .tx{color:var(--ink)}
+.log-row .out{display:block;color:var(--ink-3)}
+.log-empty{padding:6px 16px;color:var(--ink-4)}
+
+/* things arriving */
+.in{animation:arrive .34s ease both}
+@keyframes arrive{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.in{animation:none}.wires path,.node,.d-read mark{transition:none}}
+
+.d-read .m-inline{display:none}
+@media (max-width:1100px){
+  .desk{grid-template-columns:200px minmax(0,1fr)}
+  .d-margin{display:none}
+  .d-read .lines.m-inline{display:flex}
+}
+@media (max-width:900px){
+  .frame{grid-template-columns:minmax(0,1fr);grid-template-rows:380px 640px;height:auto}
+  .chat-col{border-right:0;border-bottom:1px solid var(--line)}
+  .pageview{grid-template-columns:minmax(0,1fr)}
+  .pages{display:none}
+  .lesson{padding:20px 18px 64px}
+  .desk{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+  .d-list{max-height:200px;border-right:0;border-bottom:1px solid var(--line)}
+  .d-read{padding:18px 18px 48px}
+  .ledger{padding:14px 14px 32px}
+  .log-row{grid-template-columns:minmax(0,1fr);gap:0}
+}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="ttl"><h1>Search phase</h1><span class="sub">Example run · source texts shortened</span></div>
+    <nav class="seg" id="seg" aria-label="Variations"></nav>
+    <div class="ctl">
+      <button class="ghost" id="speed" type="button" aria-pressed="false">2×</button>
+      <button class="ghost" id="replay" type="button">Replay</button>
+    </div>
+  </header>
+  <p class="vdesc" id="vdesc"></p>
+  <div class="frame" id="frame"></div>
+  <section class="behind">
+    <div class="behind-h"><b>Behind the screen</b><span>each step of this run, as Firecrawl and Claude would do it</span></div>
+    <div class="log" id="log"></div>
+  </section>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const sv=(d,s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const I={
+  search:sv('<circle cx="7" cy="7" r="4.25"/><path d="m10.25 10.25 3.25 3.25"/>',13),
+  read:sv('<path d="M4 1.75h5.25L12.5 5v9.25H4z"/><path d="M9 1.75v3.5h3.5"/>',13),
+  up:sv('<path d="M8 13V3.5M4 7.5l4-4 4 4"/>'),
+  arrow:sv('<path d="M3 8h9.5M9 4.5 12.5 8 9 11.5"/>',14),
+  to:sv('<path d="M3 8h9.5M9 4.5 12.5 8 9 11.5"/>',12),
+  check:sv('<path d="m3.5 8.5 3 3 6-7"/>',12),
+  warn:sv('<path d="M8 2.5 14 13H2z"/><path d="M8 6.5v3M8 11.25v.01"/>',14)
+};
+
+/* ─── the example run ─── */
+const GOAL=["An MCP server for my notes app","Search and read my own notes from an AI app"];
+const QUESTION="What can go wrong when I connect someone else's server?";
+const PAGE_TITLE="Security and trust";
+const Q=[
+  {text:"risks of connecting a third-party MCP server",why:"Your question, as a search.",found:["S1","S2","S4","S5"]},
+  {text:"MCP tool poisoning attack",why:"Two results name this attack, so I look it up directly.",found:["S3","S6","S7"]}
+];
+const ALL=["S1","S2","S4","S5","S3","S6","S7"];
+const ARRIVE=["S2","S1","S7","S3","S4","S5","S6"];
+const SRC={
+  S1:{title:"Security Best Practices",site:"modelcontextprotocol.io",url:"https://modelcontextprotocol.io/specification/2025-06-18/basic/security_best_practices",
+      desc:"Security risks, attack vectors and best practices for MCP implementations.",status:200,pick:true,
+      why:"The specification's own security page.",
+      text:["This document describes security risks, attack vectors and best practices specific to the Model Context Protocol.",
+            "Confused deputy. Attackers can exploit MCP proxy servers that connect to third-party APIs, creating confused deputy vulnerabilities. The proxy acts with its own authority on a request it should not trust.",
+            "Token passthrough is an anti-pattern where a server accepts tokens from a client without checking who they were issued to, then passes them on to another API. MCP servers MUST NOT accept any tokens that were not explicitly issued for the MCP server."],
+      tk:[{id:"S1a",say:"A server must never pass on a token that wasn't issued to it.",quote:"MCP servers MUST NOT accept any tokens that were not explicitly issued for the MCP server."},
+          {id:"S1b",say:"A server in the middle can be tricked into lending its access to someone else.",quote:"Attackers can exploit MCP proxy servers that connect to third-party APIs, creating confused deputy vulnerabilities."}]},
+  S2:{title:"Tools · Specification",site:"modelcontextprotocol.io",url:"https://modelcontextprotocol.io/specification/2025-06-18/server/tools",
+      desc:"Tools let servers expose functions that models can call.",status:200,pick:true,
+      why:"Says what a host must do before a tool runs.",
+      text:["Tools enable models to interact with external systems, such as querying databases, calling APIs, or performing computations.",
+            "For trust & safety and security, there SHOULD always be a human in the loop with the ability to deny tool invocations. Applications SHOULD show which tools are exposed to the AI model.",
+            "Clients MUST consider tool annotations to be untrusted unless they come from trusted servers."],
+      tk:[{id:"S2a",say:"A person should be able to refuse any tool call.",quote:"there SHOULD always be a human in the loop with the ability to deny tool invocations"},
+          {id:"S2b",say:"What a tool says about itself is untrusted unless the server is trusted.",quote:"Clients MUST consider tool annotations to be untrusted unless they come from trusted servers."}]},
+  S3:{title:"MCP Security Notification: Tool Poisoning Attacks",site:"invariantlabs.ai",url:"https://invariantlabs.ai/blog/mcp-security-notification-tool-poisoning-attacks",
+      desc:"Hidden instructions in tool descriptions can take over an agent.",status:200,pick:true,
+      why:"The lab that first described tool poisoning.",
+      text:["We found a vulnerability in the Model Context Protocol that allows what we call Tool Poisoning Attacks.",
+            "A Tool Poisoning Attack occurs when malicious instructions are embedded within MCP tool descriptions that are invisible to users but visible to AI models.",
+            "Even when a user approves a server at first, a malicious server can change the tool description after the client has already approved it."],
+      tk:[{id:"S3a",say:"Instructions can hide in a tool's description: the model sees them, the user doesn't.",quote:"malicious instructions are embedded within MCP tool descriptions that are invisible to users but visible to AI models"},
+          {id:"S3b",say:"A server can change its descriptions after you approved it.",quote:"a malicious server can change the tool description after the client has already approved it"}]},
+  S4:{title:"MCP has prompt injection security problems",site:"simonwillison.net",url:"https://simonwillison.net/2025/Apr/9/mcp-prompt-injection/",
+      desc:"Why mixing tools with untrusted input is a problem MCP hasn't solved.",status:200,pick:true,
+      why:"An independent engineer who explains the risk plainly.",
+      text:["The Model Context Protocol has attracted a lot of excitement. It also carries a security problem that is hard to solve.",
+            "The core problem is mixing together tools that can perform actions on the user's behalf with exposure to potentially untrusted input.",
+            "Any tool that reads text from outside, such as an email, a web page or a note, can carry instructions the model then follows."],
+      tk:[{id:"S4a",say:"The core risk: a tool that acts for you, reading text from strangers.",quote:"mixing together tools that can perform actions on the user's behalf with exposure to potentially untrusted input"}]},
+  S5:{title:"10 MCP security tips every developer needs",site:"medium.com",url:"https://medium.com/@example/10-mcp-security-tips",
+      desc:"Ten quick tips to keep your MCP setup safe.",status:200,pick:false,
+      whyNot:"Tips with no sources. The specification says the same, with its reasons.",
+      text:["1. Only install servers you trust. 2. Review what each tool can do. 3. Keep servers updated. 4. Use least privilege.","The remaining tips repeat these with other wording."],
+      tk:[],empty:"Nothing new: every tip here is already in the specification, without its reasons."},
+  S6:{title:"awesome-mcp-servers",site:"github.com",url:"https://github.com/punkpeye/awesome-mcp-servers",
+      desc:"A curated list of MCP servers.",status:200,pick:false,
+      whyNot:"A list of servers, not an explanation of the attack.",
+      text:["A curated list of Model Context Protocol servers, grouped by category: browser automation, databases, file systems, search and more."],
+      tk:[],empty:"A list of servers. It doesn't explain any attack."},
+  S7:{title:"Protecting against indirect injection attacks in MCP",site:"devblogs.microsoft.com",url:"https://devblogs.microsoft.com/blog/protecting-against-indirect-injection-attacks-mcp",
+      desc:"How hosts can guard against indirect prompt injection through MCP.",status:403,pick:true,
+      why:"A host maker's own guidance.",failed:"The page didn't load: status 403. I went on without it.",
+      text:[],tk:[]}
+};
+const SECTIONS=[
+  {h:null,blocks:[{id:"b1",t:"p",tk:["S4a"],text:"Connecting a server means trusting its code and every description it sends. The danger grows when a tool that can act for you also reads text from strangers."}]},
+  {h:"Tool poisoning",blocks:[
+    {id:"b2",t:"p",tk:["S3a"],text:"A server can hide instructions inside a tool's description. The model reads them; you usually never see them."},
+    {id:"b3",t:"note",tk:["S3b"],label:"Watch out",text:"A server can change a tool's description after you approved it. Approving once is not approving forever."},
+    {id:"b4",t:"p",tk:["S2b"],text:"So treat what a tool says about itself as untrusted, unless you trust the server that sent it."}]},
+  {h:"Consent",blocks:[{id:"b5",t:"p",tk:["S2a"],text:"The host should let you refuse a tool call before it runs, and show you which tools the model can use."}]},
+  {h:"Token passthrough",blocks:[
+    {id:"b6",t:"note",tk:["S1a"],label:"Watch out",text:"A server must not accept a token that was not issued for it, and pass it on to other services."},
+    {id:"b7",t:"p",tk:["S1b"],text:"A server that sits between you and another service can be tricked into using its own access for someone else."}]}
+];
+const TKB={};SECTIONS.forEach((s,si)=>s.blocks.forEach(b=>b.tk.forEach(t=>{TKB[t]={b,s,si}})));
+const TK={};Object.values(SRC).forEach(s=>s.tk.forEach(t=>{TK[t.id]=t}));
+const placeLabel=t=>{const s=TKB[t].s;return s.h?PAGE_TITLE+" › "+s.h:PAGE_TITLE};
+const secLabel=si=>SECTIONS[si].h||"Opening";
+
+const VARS=[
+  {name:"In the conversation",desc:"The search runs inside the agent's reply. Every source the agent finds gets a row; open one to see what was taken from it, word for word, and where it went in the book."},
+  {name:"Search desk",desc:"While the agent searches, the book becomes a desk. You read each page over the agent's shoulder: what it takes is marked in the text, with its note in the margin."},
+  {name:"Source ledger",desc:"Every source in one table: which search found it, whether it was read, how much was taken and where it went. Open a row to see each quote next to the note made from it."},
+  {name:"Search together",desc:"The agent stops before reading and shows its picks with a reason for each. You change them, then follow each source along its lines to the page it fed."}
+];
+
+/* ─── state ─── */
+let S,ui={v:0,open:{},sel:null,follow:true,view:"search",focus:null,hover:null,quote:{}},seen=new Set(),run=0,speed=1,resume=null,lastSel=null,lastAuto=null;
+function reset(){
+  S={step:"planning",q:Q.map(()=>({typed:0,done:false,n:0})),src:{},written:[],log:[],waiting:false,reading:{done:0,total:0},auto:null};
+  ALL.forEach(i=>{S.src[i]={found:false,pick:null,by:"agent",st:"",tk:0}});
+  ui.open={};ui.sel=null;ui.follow=true;ui.view="search";ui.focus=null;ui.hover=null;ui.quote={};
+  seen=new Set();lastSel=null;lastAuto=null;
+}
+const fr=k=>{if(seen.has(k))return "";seen.add(k);return " in"};
+const tkShown=t=>{const i=t.slice(0,2),n=t.charCodeAt(2)-97;return S.src[i].tk>n};
+const isWritten=b=>S.written.includes(b);
+const willWrite=b=>b.tk.some(tkShown);
+const shownTk=i=>SRC[i].tk.slice(0,S.src[i].tk);
+const cnt=()=>({found:ALL.filter(i=>S.src[i].found).length,read:ALL.filter(i=>S.src[i].st==="read").length,
+  taken:ALL.reduce((n,i)=>n+S.src[i].tk,0),chosen:ALL.filter(i=>S.src[i].pick).length});
+const done=()=>S.step==="done";
+function stateText(i){
+  const s=S.src[i],d=SRC[i];
+  if(s.st==="skipped")return s.by==="you"?"left out by you":"skipped";
+  if(s.st==="reading")return `<span class="bar"></span>reading`;
+  if(s.st==="failed")return "didn't load";
+  if(s.st==="read"){if(!d.tk.length)return "nothing new";return s.tk?`${s.tk} taken`:"read"}
+  if(s.pick===true)return "to read";
+  return "";
+}
+function why(i){
+  const s=S.src[i],d=SRC[i];
+  if(s.pick===null)return "";
+  if(s.st==="failed")return d.failed;
+  if(s.st==="read"&&!d.tk.length)return d.empty;
+  if(s.by==="you")return s.pick?"You picked this one.":"You left this one out.";
+  return s.pick?d.why:d.whyNot;
+}
+function actText(){
+  const c=cnt();
+  switch(S.step){
+    case "planning":return "Planning the search";
+    case "searching":return "Searching the web";
+    case "choosing":return S.waiting?"Waiting for your picks":"Choosing what to read";
+    case "reading":return `Reading ${S.reading.done} of ${S.reading.total}`;
+    case "deriving":return "Taking notes";
+    case "writing":return "Writing "+PAGE_TITLE;
+    default:return `Searched the web · read ${c.read} of ${c.found} sources`;
+  }
+}
+function log(who,text,out){S.log.push({who,text,out})}
+
+/* ─── the player ─── */
+const wait=(ms,id)=>new Promise((res,rej)=>setTimeout(()=>id===run?res():rej("stop"),ms/speed));
+async function play(){
+  const id=++run;reset();render();
+  try{await script(id)}catch(e){if(e!=="stop")throw e}
+}
+async function script(id){
+  const w=ms=>wait(ms,id);
+  await w(700);
+  for(let qi=0;qi<Q.length;qi++){
+    S.step="searching";
+    const t=Q[qi].text;
+    for(let k=1;k<=t.length;k++){S.q[qi].typed=k;render();await w(26)}
+    S.q[qi].done=true;
+    log("Firecrawl",`firecrawl.search("${t}", limit=${Q[qi].found.length})`);
+    render();await w(420);
+    for(const i of Q[qi].found){S.src[i].found=true;render();await w(230)}
+    S.q[qi].n=Q[qi].found.length;
+    S.log[S.log.length-1].out=`→ ${Q[qi].found.length} results in data.web: url · title · description · position`;
+    render();await w(qi===0?650:450);
+  }
+  S.step="choosing";render();await w(350);
+  for(const i of ALL){S.src[i].pick=SRC[i].pick;render();await w(260)}
+  log("Claude","picks what to read from the search results, with one reason for each");
+  if(ui.v===3){
+    S.waiting=true;render();
+    await new Promise(r=>{resume=r});
+    if(id!==run)throw "stop";
+    S.waiting=false;resume=null;
+  }
+  const chosen=ARRIVE.filter(i=>S.src[i].pick);
+  ALL.filter(i=>!S.src[i].pick).forEach(i=>{S.src[i].st="skipped"});
+  S.step="reading";S.reading={done:0,total:chosen.length};
+  chosen.forEach(i=>{S.src[i].st="reading"});
+  log("Firecrawl",`firecrawl.start_batch_scrape(${chosen.length} urls, formats=["markdown"], webhook=…)`,"→ a job id; each page arrives as a batch_scrape.page event");
+  render();await w(800);
+  for(const i of chosen){
+    const d=SRC[i];
+    S.src[i].st=d.status===200?"read":"failed";S.reading.done++;
+    if(ui.follow&&d.status===200)S.auto=i;
+    log("event",`batch_scrape.page · ${d.site} · metadata.statusCode ${d.status}`,d.status===200?"→ the page as markdown":"→ metadata.error: the page refused the request");
+    render();await w(700);
+  }
+  log("event","batch_scrape.completed");
+  S.step="deriving";render();await w(400);
+  for(const i of chosen){
+    const d=SRC[i];if(S.src[i].st!=="read")continue;
+    S.auto=i;
+    for(let k=0;k<d.tk.length;k++){S.src[i].tk=k+1;render();await w(620)}
+    if(d.tk.length){
+      log("Claude",`reads the markdown of ${d.site} → ${d.tk.length} ${d.tk.length>1?"notes":"note"}, each with its exact quote`);
+      log("code","finds each quote, word for word, in that markdown ✓");
+    }else log("Claude",`reads the markdown of ${d.site} → nothing new`);
+    render();await w(350);
+  }
+  S.auto=null;
+  S.step="writing";
+  log("Claude",`writes "${PAGE_TITLE}"; each block keeps the notes it came from`);
+  render();await w(400);
+  for(const s of SECTIONS)for(const b of s.blocks){
+    if(!willWrite(b))continue;
+    S.written.push(b.id);render();await w(420);
+  }
+  const c=cnt();
+  log("code",`saves the search: ${c.found} found · ${c.read} read · ${c.taken} notes · ${S.written.length} blocks`);
+  S.step="done";
+  if(ui.v===1||ui.v===2||ui.v===3)ui.view="page";
+  render();
+}
+
+/* ─── shared pieces ─── */
+const mono=i=>`<span class="mono">${esc(SRC[i].site[0])}</span>`;
+const srcMeta=i=>`<span class="sm"><span class="tt">${esc(SRC[i].title)}</span><span class="dm">${esc(SRC[i].site)}</span></span>`;
+function quoteHTML(q){return `<div class="qq">“<mark>${esc(q)}</mark>”</div>`}
+function toHTML(t){
+  if(isWritten(TKB[t].b.id))return `<button class="to" data-act="goblock" data-id="${TKB[t].b.id}">${I.to}<span>${esc(placeLabel(t))}</span></button>`;
+  return `<span class="to wait">${I.to}<span>not written yet</span></span>`;
+}
+function blockHTML(b){
+  const srcs=[...new Set(b.tk.map(t=>t.slice(0,2)))];
+  const chips=`<div class="bsrc">${srcs.map(i=>`<button class="sc" data-act="src" data-id="${i}"><span>${esc(SRC[i].title)}</span><span class="d">${esc(SRC[i].site)}</span></button>`).join("")}</div>`;
+  const body=b.t==="note"
+    ?`<div class="b-note"><span class="ni">${I.warn}</span><span><b>${esc(b.label)}.</b> ${esc(b.text)}</span></div>`
+    :`<p class="b-p">${esc(b.text)}</p>`;
+  return `<div class="blk${fr("blk"+b.id)}" id="blk-${b.id}">${body}${chips}</div>`;
+}
+function secLesson(){
+  let h=`<article class="lesson"><div class="crumb"><span>Security</span><span class="k">Understanding</span></div><h1>${PAGE_TITLE}</h1>`;
+  SECTIONS.forEach((s,si)=>{
+    const bs=s.blocks.filter(willWrite);if(!bs.length)return;
+    if(s.h)h+=bs.some(b=>isWritten(b.id))?`<h2 class="${fr("h"+si)}">${esc(s.h)}</h2>`:`<div class="ph-h"><span class="bar" style="width:34%;height:12px"></span></div>`;
+    bs.forEach(b=>{h+=isWritten(b.id)?blockHTML(b):`<div class="blk ph"><span class="bar" style="width:94%"></span><span class="bar" style="width:68%"></span></div>`});
+  });
+  return h+`</article>`;
+}
+function archLesson(){
+  return `<article class="lesson"><div class="crumb"><span>How it works</span><span class="k">Understanding</span></div><h1>Architecture</h1>
+  <div class="blk"><p class="b-p">Three roles take part in every MCP connection.</p></div>
+  <h2>Host, client and server</h2>
+  <div class="blk"><ul class="b-list"><li>The host is the AI app you work in.</li><li>A client is the part of the host that holds one connection to one server.</li><li>A server is a program that exposes what it can do. Yours will be one.</li></ul></div></article>`;
+}
+function pagesSide(cur){
+  const g=[["Why MCP",["Why MCP exists"]],["How it works",["Architecture","Server primitives","Messages and transports"]],["Build it",["Your plan","First server"]]];
+  if(S.written.length)g.push(["Security",[PAGE_TITLE]]);
+  let h=`<nav class="pages">`;
+  g.forEach(([gr,ps])=>{h+=`<div class="side-label">${esc(gr)}</div>`;ps.forEach(p=>{
+    const fresh=p===PAGE_TITLE&&!done();
+    h+=`<div class="nav-row${p===cur?" on":""}${fresh&&p!==cur?" fresh":""}${p===PAGE_TITLE?fr("nav"):""}">${esc(p)}</div>`})});
+  return h+`</nav>`;
+}
+function pageView(){
+  const sec=S.written.length>0;
+  return `<div class="pageview">${pagesSide(sec?PAGE_TITLE:"Architecture")}<div class="lesson-wrap" id="lesson" data-keep>${sec?secLesson():archLesson()}</div></div>`;
+}
+
+/* ─── the conversation ─── */
+function chatHTML(){
+  let h=`<div class="turns">
+    <div class="turn learner"><div class="say">I want to build an MCP server for my own notes app.</div></div>
+    <div class="turn agent"><div class="act">${I.read}<span>Read the course outline</span></div><div class="say">Then that's your goal. Your plan and How it works are ready in your book.</div></div>
+    <div class="turn learner"><div class="say">${esc(QUESTION)}</div></div>
+    <div class="turn agent"><div class="act${done()?"":" busy"}">${I.search}<span>${esc(actText())}</span></div>`;
+  if(ui.v===0)h+=trailHTML();
+  if(done()){
+    const c=cnt();
+    h+=`<div class="say${fr("final")}">${ui.v===0
+      ?`I read ${c.read} sources and wrote ${PAGE_TITLE}. Open any source above to see what I took from it, word for word.`
+      :`I read ${c.read} sources and wrote ${PAGE_TITLE}. How it was found shows what I took from each one, word for word.`}</div>
+      <div class="placed${fr("placed")}"><button data-act="view" data-view="page">${esc(PAGE_TITLE)}</button>${ui.v===0?"":`<button data-act="view" data-view="search">How it was found</button>`}</div>`;
+  }
+  return h+`</div></div>`;
+}
+function trailHTML(){
+  let h=`<div class="trail">`;
+  Q.forEach((q,qi)=>{
+    const s=S.q[qi];if(!s.typed)return;
+    h+=`<div class="q${fr("q"+qi)}"><span class="ic">${I.search}</span><span class="qt">${esc(q.text.slice(0,s.typed))}${s.done?"":`<span class="caret"></span>`}</span>${s.n?`<span class="qn">${s.n} found</span>`:""}</div>`;
+    const rows=q.found.filter(i=>S.src[i].found);
+    if(!rows.length)return;
+    h+=`<div class="rows">`;
+    rows.forEach(i=>{
+      const s=S.src[i],open=ui.open[i]===true||(ui.open[i]!==false&&S.auto===i&&ui.follow);
+      const st=s.st||(s.pick===false?"skipped":"found");
+      h+=`<button class="srow st-${st}${open?" open":""}${fr("r"+i)}" data-act="open" data-id="${i}" id="row-${i}">${mono(i)}${srcMeta(i)}<span class="state">${stateText(i)}</span></button>`;
+      const y=why(i);
+      if(y&&!open)h+=`<div class="why${fr("w"+i+s.st)}">${esc(y)}</div>`;
+      if(open){
+        h+=`<div class="taken" id="taken-${i}">`;
+        if(y)h+=`<div class="empty">${esc(y)}</div>`;
+        shownTk(i).forEach(t=>{h+=`<div class="tk${fr("tk"+t.id)}"><div class="say2">${esc(t.say)}</div>${quoteHTML(t.quote)}${toHTML(t.id)}</div>`});
+        if(s.st==="reading"||(s.st==="read"&&S.src[i].tk<SRC[i].tk.length&&!done()))h+=`<div class="ph"><span class="bar" style="width:80%"></span><span class="bar" style="width:55%"></span></div>`;
+        if(!s.st&&s.pick!==false)h+=`<div class="empty">${esc(SRC[i].desc)}</div>`;
+        h+=`</div>`;
+      }
+    });
+    h+=`</div>`;
+  });
+  return h+`</div>`;
+}
+
+/* ─── variation 2: the desk ─── */
+function deskHTML(){
+  const sel=ui.follow?(S.auto||ui.sel):ui.sel;
+  let h=`<div class="desk"><div class="d-list" id="dlist" data-keep>`;
+  Q.forEach((q,qi)=>{
+    const s=S.q[qi];if(!s.typed)return;
+    h+=`<div class="d-q${fr("dq"+qi)}"><span class="ic">${I.search}</span><span>${esc(q.text.slice(0,s.typed))}${s.done?"":`<span class="caret"></span>`}</span></div>`;
+    q.found.filter(i=>S.src[i].found).forEach(i=>{
+      const st=S.src[i].st||(S.src[i].pick===false?"skipped":"found");
+      h+=`<button class="d-row st-${st}${sel===i?" on":""}${fr("dr"+i)}" data-act="sel" data-id="${i}">${mono(i)}${srcMeta(i)}<span class="state">${stateText(i)}</span></button>`;
+    });
+  });
+  h+=`</div>`;
+  if(!sel){
+    h+=`<div class="d-read" id="dread"><div class="blank" style="height:100%">${S.step==="planning"?"Planning the search":S.src.S1.found?"Open a source to read it":"Searching the web"}</div></div><div class="d-margin"></div></div>`;
+    return h;
+  }
+  const d=SRC[sel],s=S.src[sel],tks=shownTk(sel);
+  h+=`<div class="d-read" id="dread" data-keep><div class="crumb2">${mono(sel)}<span>${esc(d.site)}</span></div><h2>${esc(d.title)}</h2><div class="url">${esc(d.url)}</div>
+    <div class="status"><span>${s.st==="read"?`<b>Read</b> · status 200`:s.st==="failed"?`<b>Didn't load</b> · status ${d.status}`:s.st==="reading"?"<b>Reading</b>":s.st==="skipped"?"<b>Not read</b>":"<b>Found</b> · search result only"}</span>${why(sel)?`<span>${esc(why(sel))}</span>`:""}${s.st==="read"&&d.tk.length?`<span><b>${s.tk}</b> of the notes come from here</span>`:""}</div>`;
+  if(s.st==="read"){
+    d.text.forEach(p=>{
+      let html=esc(p);
+      tks.forEach(t=>{const e=esc(t.quote);html=html.replace(e,`<mark data-tkm="${t.id}" class="${ui.hover===t.id?"hot":""}">${e}</mark>`)});
+      h+=`<p>${html}</p>`;
+    });
+    h+=`<div class="lines m-inline">${tks.map(t=>`<div class="tk"><div class="say2">${esc(t.say)}</div>${toHTML(t.id)}</div>`).join("")}</div>`;
+  }else if(s.st==="reading"){
+    h+=`<div class="lines"><span class="bar" style="width:96%"></span><span class="bar" style="width:88%"></span><span class="bar" style="width:72%"></span><span class="bar" style="width:90%"></span></div>`;
+  }else{
+    h+=`<p class="${s.st==="skipped"||s.st==="failed"?"pale":""}">${esc(d.desc)}</p>`;
+  }
+  if(!ui.follow&&!done())h+=`<button class="follow" data-act="follow">${I.arrow}Follow the agent</button>`;
+  h+=`</div><div class="d-margin" id="dmargin" data-keep><div class="m-label">Taken from this page</div>`;
+  if(tks.length)tks.forEach(t=>{h+=`<div class="m-card${ui.hover===t.id?" hot":""}${fr("mc"+t.id)}" data-act="mark" data-id="${t.id}" data-tkh="${t.id}"><span class="say2">${esc(t.say)}</span>${toHTML(t.id)}</div>`});
+  else h+=`<div class="m-none">${s.st==="read"?esc(d.empty||""):s.st==="reading"?"Reading the page":"Nothing, this page wasn't read."}</div>`;
+  return h+`</div></div>`;
+}
+
+/* ─── variation 3: the ledger ─── */
+function ledgerHTML(){
+  const c=cnt();
+  let h=`<div class="ledger" id="ledger" data-keep><div class="lg-top">`;
+  Q.forEach((q,qi)=>{const s=S.q[qi];if(!s.typed)return;h+=`<span class="qchip${fr("lq"+qi)}"><span class="ic">${I.search}</span>${esc(q.text.slice(0,s.typed))}${s.done?"":`<span class="caret"></span>`}</span>`});
+  h+=`<span class="counts"><span><b>${c.found}</b> found</span><span><b>${c.read}</b> read</span><span><b>${c.taken}</b> taken</span></span></div>`;
+  h+=`<table class="lg"><thead><tr><th>Source</th><th>Found by</th><th>Read</th><th>Taken</th><th>Went to</th></tr></thead><tbody>`;
+  ALL.filter(i=>S.src[i].found).forEach(i=>{
+    const s=S.src[i],d=SRC[i],qi=Q.findIndex(q=>q.found.includes(i)),open=!!ui.open[i];
+    const st=s.st||(s.pick===false?"skipped":"found");
+    const went=[...new Set(shownTk(i).filter(t=>isWritten(TKB[t.id].b.id)).map(t=>secLabel(TKB[t.id].si)))];
+    h+=`<tr class="row st-${st}${open?" open":""}${fr("lr"+i)}" data-act="open" data-id="${i}" id="row-${i}">
+      <td><span class="srcc">${mono(i)}${srcMeta(i)}</span></td>
+      <td><div class="qcell">${esc(Q[qi].text)}</div></td>
+      <td><span class="state">${stateText(i).replace(/\d+ taken/,"read")||"·"}</span></td>
+      <td class="num">${s.st==="read"?s.tk:"·"}</td>
+      <td><div class="went">${went.map(w=>`<span>${esc(w)}</span>`).join("")}</div></td></tr>`;
+    if(open){
+      h+=`<tr class="detail"><td colspan="5">${why(i)?`<div class="why">${esc(why(i))}</div>`:""}<div class="pairs">`;
+      shownTk(i).forEach(t=>{h+=`<div class="pair${fr("lp"+t.id)}">${quoteHTML(t.quote)}<span class="arrow">${I.arrow}</span><div><div class="say2">${esc(t.say)}</div>${toHTML(t.id)}</div></div>`});
+      if(!shownTk(i).length&&!why(i))h+=`<div class="empty">${esc(d.desc)}</div>`;
+      h+=`</div></td></tr>`;
+    }
+  });
+  return h+`</tbody></table></div>`;
+}
+
+/* ─── variation 4: search together ─── */
+function edges(){
+  const e=[];
+  Q.forEach((q,qi)=>q.found.forEach(i=>{if(S.src[i].found)e.push(["q"+qi,i])}));
+  ALL.forEach(i=>shownTk(i).forEach(t=>{e.push([i,t.id]);if(isWritten(TKB[t.id].b.id))e.push([t.id,"sec"+TKB[t.id].si])}));
+  return e;
+}
+function linked(n){
+  const e=edges(),set=new Set([n]);
+  let grew=true;const down=new Set([n]),up=new Set([n]);
+  while(grew){grew=false;e.forEach(([a,b])=>{if(down.has(a)&&!down.has(b)){down.add(b);grew=true}if(up.has(b)&&!up.has(a)){up.add(a);grew=true}})}
+  down.forEach(x=>set.add(x));up.forEach(x=>set.add(x));
+  return set;
+}
+function flowHTML(){
+  let h=`<div class="flow-wrap" id="fwrap" data-keep><div class="flow" id="flow"><svg class="wires" id="wires"></svg>`;
+  h+=`<div class="fcol"><div class="fhead">Searched</div>`;
+  Q.forEach((q,qi)=>{const s=S.q[qi];if(!s.typed)return;
+    h+=`<div class="node${fr("fq"+qi)}" data-n="q${qi}" data-act="focus" data-id="q${qi}"><span class="qt2">${esc(q.text.slice(0,s.typed))}${s.done?"":`<span class="caret"></span>`}</span><span class="small">${esc(q.why)}</span></div>`});
+  h+=`</div><div class="fcol"><div class="fhead">Found</div>`;
+  ALL.filter(i=>S.src[i].found).forEach(i=>{
+    const s=S.src[i],st=s.st||(s.pick===false?"skipped":"found");
+    const cb=s.pick===null?"":`<span class="cb${s.pick?" on":""}">${s.pick?I.check:""}</span>`;
+    h+=`<div class="node st-${st}${S.waiting?" choose":""}${fr("fs"+i)}" data-n="${i}" data-act="${S.waiting?"pick":"focus"}" data-id="${i}">
+      <span class="row1">${cb}${mono(i)}${srcMeta(i)}</span>
+      ${s.pick!==null?`<span class="small">${esc(why(i))}</span>`:""}
+      ${s.st?`<span class="small" style="color:var(--ink-2)">${stateText(i)}</span>`:""}</div>`;
+  });
+  h+=`</div><div class="fcol"><div class="fhead">Taken</div>`;
+  ARRIVE.forEach(i=>shownTk(i).forEach(t=>{
+    h+=`<div class="node${fr("ft"+t.id)}" data-n="${t.id}" data-act="quote" data-id="${t.id}"><span class="say2">${esc(t.say)}</span>${ui.quote[t.id]?quoteHTML(t.quote):""}</div>`}));
+  h+=`</div><div class="fcol"><div class="fhead">Written</div>`;
+  if(S.written.length||S.step==="writing"){
+    h+=`<div class="small" style="font-size:13px;font-weight:600;color:var(--ink)">${PAGE_TITLE}</div>`;
+    SECTIONS.forEach((s,si)=>{const bs=s.blocks.filter(willWrite);if(!bs.length)return;
+      const n=bs.filter(b=>isWritten(b.id)).length;
+      h+=`<div class="node secnode${n?"":" wait"}${fr("fw"+si)}" data-n="sec${si}" data-act="focus" data-id="sec${si}"><span class="row1"><span class="tt">${esc(secLabel(si))}</span></span><span class="small">${n} of ${bs.length} ${bs.length>1?"blocks":"block"}</span></div>`});
+    if(done())h+=`<button class="btn${fr("open")}" data-act="view" data-view="page" style="align-self:flex-start;margin-top:6px">Open the page</button>`;
+  }
+  h+=`</div></div>`;
+  if(S.waiting){
+    const n=cnt().chosen;
+    h+=`<div class="choose-bar${fr("cbar")}"><span>I'd read the checked ones. Check or uncheck any, then I start reading.</span><button class="btn" data-act="go"${n?"":" disabled"}>${n?`Read ${n===1?"this one":"these "+n}`:"Pick at least one"}</button></div>`;
+  }
+  return h+`</div>`;
+}
+function drawWires(){
+  const f=$("flow"),svg=$("wires");if(!f||!svg)return;
+  const fr0=f.getBoundingClientRect();let p="";
+  edges().forEach(([a,b])=>{
+    const A=f.querySelector(`[data-n="${a}"]`),B=f.querySelector(`[data-n="${b}"]`);if(!A||!B)return;
+    const ra=A.getBoundingClientRect(),rb=B.getBoundingClientRect();
+    const x1=ra.right-fr0.left,y1=ra.top+Math.min(ra.height/2,22)-fr0.top,x2=rb.left-fr0.left,y2=rb.top+Math.min(rb.height/2,22)-fr0.top,dx=(x2-x1)/2;
+    p+=`<path data-a="${a}" data-b="${b}" d="M${x1.toFixed(1)},${y1.toFixed(1)} C${(x1+dx).toFixed(1)},${y1.toFixed(1)} ${(x2-dx).toFixed(1)},${y2.toFixed(1)} ${x2.toFixed(1)},${y2.toFixed(1)}"/>`;
+  });
+  svg.setAttribute("width",f.scrollWidth);svg.setAttribute("height",f.scrollHeight);svg.innerHTML=p;
+  applyFocus();
+}
+function applyFocus(){
+  const f=$("flow");if(!f)return;
+  const n=ui.hover||ui.focus,set=n?linked(n):null;
+  f.classList.toggle("focus",!!set);$("wires").classList.toggle("focus",!!set);
+  f.querySelectorAll("[data-n]").forEach(el=>el.classList.toggle("hot",!!set&&set.has(el.dataset.n)));
+  f.querySelectorAll("path").forEach(pa=>pa.classList.toggle("hot",!!set&&set.has(pa.dataset.a)&&set.has(pa.dataset.b)));
+}
+
+/* ─── the book ─── */
+function bookHTML(){
+  let h=`<div class="col book"><header class="goal"><span class="goal-title">${esc(GOAL[0])}</span><span class="goal-line">${esc(GOAL[1])}</span></header>`;
+  if(ui.v===0){h+=`<div></div><div class="view">${pageView()}</div></div>`;return h}
+  if(done()){
+    h+=`<div class="viewbar"><div class="tabs"><button class="${ui.view==="page"?"on":""}" data-act="view" data-view="page">${PAGE_TITLE}</button><button class="${ui.view==="search"?"on":""}" data-act="view" data-view="search">How it was found</button></div></div>`;
+  }else{
+    h+=`<div class="viewbar"><div class="lead">${I.search}<span>Searching for <b>${esc(QUESTION)}</b></span></div><span class="step">${esc(actText())}</span></div>`;
+  }
+  const searchView=ui.v===1?deskHTML():ui.v===2?ledgerHTML():flowHTML();
+  h+=`<div class="view">${done()&&ui.view==="page"?pageView():searchView}</div></div>`;
+  return h;
+}
+
+/* ─── behind the screen ─── */
+function logHTML(){
+  if(!S.log.length)return `<div class="log-empty">Waiting for the first search</div>`;
+  return S.log.map((l,k)=>`<div class="log-row${l.who==="Firecrawl"?" call":""}${fr("log"+k)}"><span class="who">${esc(l.who)}</span><span class="tx">${esc(l.text)}${l.out?`<span class="out">${esc(l.out)}</span>`:""}</span></div>`).join("");
+}
+
+/* ─── render ─── */
+const frame=$("frame");
+function render(){
+  const keep={};frame.querySelectorAll("[data-keep]").forEach(el=>{keep[el.id]=el.scrollTop});
+  const chat=$("chat"),stick=!chat||chat.scrollHeight-chat.scrollTop-chat.clientHeight<48,chatTop=chat?chat.scrollTop:0;
+  frame.innerHTML=`<div class="col chat-col"><div class="scroll" id="chat">${chatHTML()}</div><div class="composer-wrap"><div class="composer"><span>Ask anything</span><span class="send">${I.up}</span></div></div></div>${bookHTML()}`;
+  Object.keys(keep).forEach(id=>{const el=$(id);if(el)el.scrollTop=keep[id]});
+  const c=$("chat");
+  if(ui.v===0&&S.auto&&S.auto!==lastAuto&&ui.follow){reveal(c,$("row-"+S.auto))}
+  else c.scrollTop=stick?c.scrollHeight:chatTop;
+  lastAuto=S.auto;
+  const sel=ui.follow?(S.auto||ui.sel):ui.sel;
+  if(sel!==lastSel){const r=$("dread");if(r)r.scrollTop=0;lastSel=sel}
+  if(ui.reveal){const el=$("row-"+ui.reveal);reveal(el&&el.closest(".scroll,.ledger"),el);ui.reveal=null}
+  if(ui.revealBlock){const el=$("blk-"+ui.revealBlock),l=$("lesson");reveal(l,el);ui.revealBlock=null}
+  if(ui.v===3)drawWires();
+  const lg=$("log");const atEnd=lg.scrollHeight-lg.scrollTop-lg.clientHeight<24;lg.innerHTML=logHTML();if(atEnd)lg.scrollTop=lg.scrollHeight;
+}
+function reveal(box,el){
+  if(!box||!el)return;
+  const b=box.getBoundingClientRect(),r=el.getBoundingClientRect();
+  box.scrollTop+=r.top-b.top-16;
+}
+function renderTop(){
+  $("seg").innerHTML=VARS.map((v,k)=>`<button type="button" class="${ui.v===k?"on":""}" data-v="${k}">${esc(v.name)}</button>`).join("");
+  $("vdesc").textContent=VARS[ui.v].desc;
+}
+
+/* ─── interaction ─── */
+$("seg").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(!b)return;ui.v=+b.dataset.v;renderTop();play()});
+$("replay").addEventListener("click",()=>play());
+$("speed").addEventListener("click",e=>{speed=speed===1?2:1;e.currentTarget.classList.toggle("on",speed===2);e.currentTarget.setAttribute("aria-pressed",speed===2)});
+frame.addEventListener("click",e=>{
+  const el=e.target.closest("[data-act]");if(!el)return;
+  const a=el.dataset.act,id=el.dataset.id;
+  if(a==="open"){
+    const isOpen=ui.v===2?!!ui.open[id]:ui.open[id]===true||(ui.open[id]!==false&&S.auto===id&&ui.follow);
+    ui.open[id]=!isOpen;if(S.auto===id&&isOpen)ui.follow=false;render();return}
+  if(a==="sel"){ui.sel=id;ui.follow=false;render();return}
+  if(a==="follow"){ui.follow=true;ui.sel=null;render();return}
+  if(a==="view"){ui.view=el.dataset.view;render();return}
+  if(a==="goblock"){
+    if(ui.v!==0)ui.view="page";
+    e.stopPropagation();ui.revealBlock=id;render();return}
+  if(a==="src"){
+    if(ui.v===0){ui.open[id]=true;ui.reveal=id}
+    else if(ui.v===1){ui.view="search";ui.sel=id;ui.follow=false}
+    else if(ui.v===2){ui.view="search";ui.open[id]=true;ui.reveal=id}
+    else {ui.view="search";ui.focus=id}
+    render();return}
+  if(a==="mark"){const m=frame.querySelector(`mark[data-tkm="${id}"]`);reveal($("dread"),m);return}
+  if(a==="pick"){if(!S.waiting)return;const s=S.src[id];s.pick=!s.pick;s.by="you";render();return}
+  if(a==="go"){if(resume&&cnt().chosen)resume();return}
+  if(a==="focus"){ui.focus=ui.focus===id?null:id;applyFocus();return}
+  if(a==="quote"){ui.quote[id]=!ui.quote[id];ui.focus=id;render();return}
+});
+frame.addEventListener("mouseover",e=>{
+  if(ui.v===1){const c=e.target.closest("[data-tkh]");const n=c?c.dataset.tkh:null;if(n!==ui.hover){ui.hover=n;
+    frame.querySelectorAll("mark[data-tkm]").forEach(m=>m.classList.toggle("hot",m.dataset.tkm===n));
+    frame.querySelectorAll(".m-card").forEach(m=>m.classList.toggle("hot",m.dataset.tkh===n))}return}
+  if(ui.v===3){const c=e.target.closest("[data-n]");const n=c?c.dataset.n:null;if(n!==ui.hover){ui.hover=n;applyFocus()}}
+});
+frame.addEventListener("mouseleave",()=>{if(ui.hover){ui.hover=null;if(ui.v===3)applyFocus();else render()}});
+window.addEventListener("resize",()=>{if(ui.v===3)drawWires()});
+
+renderTop();play();
+})();
+</script>
