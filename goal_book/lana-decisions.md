@@ -1,7 +1,7 @@
-# Agentic Search Companion: decisions
+# Lana: decisions
 
-In-house notes for `agentic-search-companion/`. They stay in dev_master and
-never go into the companion's own repository.
+In-house notes for `lana/`. They stay in dev_master and never go into Lana's
+own repository (https://github.com/ALPHAbilal/Lana).
 
 ## Decided on 2026-10-23
 
@@ -11,7 +11,8 @@ never go into the companion's own repository.
   and the flows. The agent's intelligence comes later; until then a scripted
   scenario stands in for it. Expect the frontend to change once the agent is
   designed.
-- **Name:** agentic-search-companion.
+- **Name:** Lana (first called agentic-search-companion).
+- **Description:** You and your AI on the same page, learning faster together.
 - **Tooling:** WXT + React + TypeScript. `web-ext` removed: it only launches a
   browser during development, which cannot work from WSL, and it brought 9
   vulnerable dependencies.
@@ -19,7 +20,8 @@ never go into the companion's own repository.
   dev_master. To publish it alone, from dev_master:
 
   ```
-  git subtree push --prefix=agentic-search-companion <portfolio-remote> main
+  git remote add lana https://github.com/ALPHAbilal/Lana.git   (once)
+  git subtree push --prefix=lana lana main
   ```
 
   Rules that keep the portfolio repository clean:
