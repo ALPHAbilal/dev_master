@@ -1,6 +1,6 @@
 {
-  "name": "agentic-search-companion",
-  "description": "A Chrome side panel that searches beside you.",
+  "name": "lana",
+  "description": "You and your AI on the same page, learning faster together.",
   "private": true,
   "version": "0.0.0",
   "type": "module",

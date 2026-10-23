@@ -5,10 +5,9 @@ export default defineConfig({
   srcDir: 'src',
   modules: ['@wxt-dev/module-react'],
   manifest: {
-    name: 'Agentic Search Companion',
-    description:
-      'A side panel that searches beside you: it sees the page you are on, points to where to look, and keeps what you find.',
+    name: 'Lana',
+    description: 'You and your AI on the same page, learning faster together.',
     permissions: ['sidePanel'],
-    action: { default_title: 'Open the search companion' },
+    action: { default_title: 'Open Lana' },
   },
 });

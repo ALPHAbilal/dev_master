@@ -1,8 +1,9 @@
-# Agentic Search Companion
+# Lana
 
-A Chrome side panel that searches beside you. You do the searching, on the real
-sites; the companion sees which page you are on, suggests where to look, points
-to the part that matters, and keeps what you find.
+You and your AI on the same page, learning faster together.
+
+Lana lives in Chrome's side panel. You read and search the real sites; Lana sees
+the page you are on, points to the part that matters, and keeps what you find.
 
 ## Status
 
