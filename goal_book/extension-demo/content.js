@@ -40,7 +40,6 @@
     .label{position:absolute;right:10px;top:-13px;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px 0 4px;border-radius:7px;background:#fff;box-shadow:0 2px 10px rgba(30,32,36,.16);font-size:12px;font-weight:500;color:#385876;white-space:nowrap}
 
     .hint{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);pointer-events:auto;display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px 0 9px;border:0;border-radius:18px;background:#fff;box-shadow:0 6px 22px rgba(30,32,36,.2);font-size:13px;color:#1e2024;cursor:pointer;white-space:nowrap;animation:nudge 1.6s ease-in-out infinite}
-    .hint.up{top:24px;bottom:auto}
     .hint svg{color:#4f7290}
     .hint:hover{background:#f4f4f2}
 
@@ -206,9 +205,51 @@
     state.restyled = on;
   }
 
+  // The page's own bars that stay put while it scrolls (AWS: the black bar and
+  // the white menu bar). Our marks pass under them, like the page's text does.
+  const bars = { top: 0, bottom: 0, measuredAt: 0 };
+
+  function pinnedBar(element) {
+    for (let node = element; node && node !== document.body && node !== document.documentElement; node = node.parentElement) {
+      const position = getComputedStyle(node).position;
+      if (position !== "fixed" && position !== "sticky") continue;
+      const rect = node.getBoundingClientRect();
+      // A bar spans the page; a sticky side menu or "On this page" does not.
+      return rect.width >= innerWidth * 0.6 && rect.height < innerHeight * 0.4 ? rect : null;
+    }
+    return null;
+  }
+
+  function edgeAt(y, side) {
+    let edge = null;
+    for (const x of [innerWidth * 0.2, innerWidth * 0.5, innerWidth * 0.8]) {
+      for (const element of document.elementsFromPoint(x, y)) {
+        if (element === host) continue;
+        const rect = pinnedBar(element);
+        if (rect) edge = side === "top" ? Math.max(edge ?? 0, rect.bottom) : Math.min(edge ?? innerHeight, rect.top);
+      }
+    }
+    return edge;
+  }
+
+  function measureBars() {
+    // Bars can stack (a thin bar above a menu bar), so look again under each one.
+    let top = 0;
+    for (let i = 0; i < 3; i++) {
+      const edge = edgeAt(top + 1, "top");
+      if (edge === null || edge <= top) break;
+      top = edge;
+    }
+    const bottom = edgeAt(innerHeight - 1, "bottom");
+    bars.top = top;
+    bars.bottom = bottom === null ? 0 : innerHeight - bottom;
+  }
+
   // Follow the page every frame: it can scroll in the window or in an inner box,
   // and it can redraw its text, which empties our range, so find it again.
-  function follow() {
+  function follow(now) {
+    if (now - bars.measuredAt > 300) { measureBars(); bars.measuredAt = now; }
+    const visibleTop = bars.top, visibleBottom = innerHeight - bars.bottom;
     if (state.mark && (!passageRange || passageRange.collapsed)) renderMark();
     const part = targetPart();
     if (state.point && part.length) {
@@ -217,26 +258,35 @@
       const left = Math.min(...rects.map((rect) => rect.left)) - 12;
       const right = Math.max(...rects.map((rect) => rect.right)) + 12;
       Object.assign(frame.style, { top: top + "px", left: left + "px", width: right - left + "px", height: bottom - top + "px" });
-      frame.hidden = bottom < 0 || top > innerHeight;
+      // Cut off whatever is under the bars; the label goes under first, like text would.
+      const cutTop = Math.max(-30, visibleTop - top), cutBottom = Math.max(-30, bottom - visibleBottom);
+      frame.style.clipPath = `inset(${cutTop}px -30px ${cutBottom}px -30px)`;
+      frame.hidden = bottom < visibleTop || top > visibleBottom;
     } else frame.hidden = true;
 
     if (state.hint && part.length) {
-      const rect = part[0].getBoundingClientRect();
-      const below = rect.top > innerHeight - 90, above = rect.bottom < 70;
+      // Only when the whole part is out of sight, not while some of it shows.
+      const first = part[0].getBoundingClientRect(), last = part[part.length - 1].getBoundingClientRect();
+      const below = first.top > visibleBottom - 90, above = last.bottom < visibleTop + 20;
       hint.hidden = !(below || above);
       if (below || above) {
         const html = `${below ? ICON.down : ICON.up}${below ? "Scroll down" : "Scroll up"} · ${TARGET_NAME}`;
         if (hint.innerHTML !== html) hint.innerHTML = html;
-        hint.classList.toggle("up", above);
+        hint.style.top = above ? visibleTop + 14 + "px" : "auto";
+        hint.style.bottom = above ? "auto" : bars.bottom + 24 + "px";
       }
     } else hint.hidden = true;
+
+    toast.style.top = visibleTop + 14 + "px";
 
     if (!menu.hidden && savedRange) {
       const rect = savedRange.getBoundingClientRect();
       const width = menu.offsetWidth;
       const left = Math.max(8, Math.min(innerWidth - width - 8, rect.left + rect.width / 2 - width / 2));
-      const top = rect.top - 44 < 8 ? rect.bottom + 8 : rect.top - 44;
+      const top = rect.top - 44 < visibleTop + 8 ? rect.bottom + 8 : rect.top - 44;
       Object.assign(menu.style, { left: left + "px", top: top + "px" });
+      // When the selection goes under a bar, the menu goes with it.
+      menu.style.visibility = rect.bottom < visibleTop || rect.top > visibleBottom ? "hidden" : "visible";
     }
     requestAnimationFrame(follow);
   }
