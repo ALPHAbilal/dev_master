@@ -1,8 +1,22 @@
 # Handoff: continue here
 
-Updated 2026-10-23 (§8 Lana added). Claude's memory stays on the laptop it was made on. This file carries everything a new session needs, including how to work with the user (§4).
+Updated 2026-10-23 (§0 two open threads; §8 Lana added). Claude's memory stays on the laptop it was made on. This file carries everything a new session needs, including how to work with the user (§4).
 
 ## 0. Where we stopped
+
+Two threads are open. Pick either one.
+
+```
+ THREAD 1  the LEGO agentic layer   choice 1 of 7, waiting for a, b or c   (below)
+ THREAD 2  Lana, the side panel     build step 2, the contract: decision B
+                                    waiting for 1 or 2   (goal_book/lana-decisions.md)
+```
+
+**To resume Lana,** open Claude Code in `dev_master` and say:
+
+> Read `new_completly_desighn/HANDOFF.md` and follow §4. Then read `goal_book/lana-decisions.md`. We continue Lana's contract at decision B, one decision at a time, then C, D, F.
+
+### Thread 1 · the LEGO agentic layer
 
 Every hole of `LEGO.md` §16 is closed (§3 below). We are now going through **Claude's own choices 1 to 7**, which Claude wrote up without the user. **Choice 1** was explained, and the user has not answered yet.
 
