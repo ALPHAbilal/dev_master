@@ -1,0 +1,19 @@
+/* Colors and type shared by every surface: the side panel and the marks on the page. */
+:root {
+  --bg: #ffffff;
+  --canvas: #f4f4f2;
+  --hover: #ebeae6;
+  --line: #e3e1db;
+  --ink: #1e2024;
+  --ink-2: #4a4d53;
+  --ink-3: #7a7d84;
+  --ink-4: #a8a6a0;
+  --accent: #4f7290;
+  --accent-ink: #385876;
+  --accent-soft: rgba(79, 114, 144, 0.15);
+  --accent-wash: rgba(79, 114, 144, 0.1);
+  --on-accent: #ffffff;
+  --mark: rgba(79, 114, 144, 0.22);
+  --ui: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --mono: 'Geist Mono', 'Cascadia Code', 'SF Mono', Consolas, monospace;
+}
