@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Goal Book demo: drawing on a real page",
+  "version": "0.1.0",
+  "description": "Draws Look here, a highlight, a scroll hint and a selection menu on top of the real AWS S3 page, without changing it.",
+  "content_scripts": [
+    {
+      "matches": ["https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html*"],
+      "js": ["content.js"],
+      "css": ["page.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+/* The only stylesheet that reaches AWS's page. It names our two highlights
+   and matches no AWS element. */
+::highlight(goalbook-passage) {
+  background-color: rgba(79, 114, 144, 0.24);
+  text-decoration: underline 2px rgba(79, 114, 144, 0.9);
+}
+::highlight(goalbook-saved) {
+  background-color: rgba(79, 114, 144, 0.14);
+}
