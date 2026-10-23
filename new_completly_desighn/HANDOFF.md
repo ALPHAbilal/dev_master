@@ -1,6 +1,6 @@
 # Handoff: continue here
 
-Updated 2026-10-14. Claude's memory stays on the laptop it was made on. This file carries everything a new session needs, including how to work with the user (§4).
+Updated 2026-10-23 (§8 Lana added). Claude's memory stays on the laptop it was made on. This file carries everything a new session needs, including how to work with the user (§4).
 
 ## 0. Where we stopped
 
@@ -180,6 +180,8 @@ Demo mode plays task 3 from turn 6. Any message plays the next turn. The fifth t
              agentic-tutor repository (GitHub ALPHAbilal/agentic-tutor), which Vercel
              and Fly deploy; a push there rebuilds production. The frontend in both
              is the same since 2026-10-14
+ Lana        folder lana/ in dev_master, also published alone to
+             https://github.com/ALPHAbilal/Lana (the portfolio repository); see §8
  not ours    devmind-web.vercel.app is a different, older project
 ```
 
@@ -197,4 +199,57 @@ Demo mode plays task 3 from turn 6. Any message plays the next turn. The fifth t
               your message 15px on 20px, padding 12px by 16px, 12px corners; composer 48px
               tall, 14px corners; small text 13px on 17px
  teaching     the answer is never given; the answer key stays locked
+```
+
+## 8. Lana: one folder, two repositories
+
+Lana is the Chrome side panel of the Goal Book's search phase ("You and your AI on the same page, learning faster together."). Its code lives in `lana/` inside dev_master. Its decisions and planning live outside that folder, in `goal_book/lana-decisions.md`, and never go into Lana's own repository.
+
+```
+                      dev_master on the laptop
+                 (everything: planning + goal_book + lana/)
+                         │                     │
+        git push         │                     │   git subtree push --prefix=lana lana main
+                         ▼                     ▼
+   github.com/ALPHAbilal/dev_master      github.com/ALPHAbilal/Lana
+   EVERYTHING, lana/ included            ONLY what is inside lana/
+   (the workshop)                        (the portfolio)
+```
+
+The user pushes, from PowerShell in dev_master. Claude only commits.
+
+```
+ once per computer   git remote add lana https://github.com/ALPHAbilal/Lana.git
+ every time          git push                                    dev_master, as usual
+                     git subtree push --prefix=lana lana main    Lana, only lana/
+ check the remote    git remote -v                               lana must be listed
+```
+
+If the subtree push is refused (Lana's repository has a commit that dev_master does not, for example a README made on GitHub), replace it once:
+
+```
+ git subtree split --prefix=lana -b lana-only
+ git push lana lana-only:main --force
+ git branch -D lana-only
+```
+
+Rules that keep Lana's repository clean:
+
+```
+ 1  a commit that touches lana/ touches nothing else: its message goes to Lana's history
+ 2  planning, thoughts and decisions stay outside lana/
+ 3  inside lana/: code, tests, README
+ 4  dev_master is public, so lana/ and the planning are visible there too
+```
+
+Run Lana:
+
+```
+ cd lana
+ npm ci
+ npm run build        then Chrome: chrome://extensions · Developer mode (Mode développeur)
+                      · Load unpacked (Charger l'extension non empaquetée)
+                      · pick lana\.output\chrome-mv3
+ npm run dev          the same with live reload; load lana\.output\chrome-mv3-dev instead
+ npm run compile      the type check
 ```
