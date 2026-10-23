@@ -1,4 +1,4 @@
-// Goal Book demo: draws on top of the real AWS page from one layer of its own.
+// Goal Book demo: draws on top of the real AWS page from layers of its own.
 // AWS's elements are never edited, except by the "Restyle AWS instead" button,
 // which shows the other way and can be undone.
 (() => {
@@ -24,26 +24,33 @@
     up: icon('<path d="M8 13V3M4 7l4-4 4 4"/>'),
   };
 
-  // The layer sits beside <body>, not inside it, and is the only element we add.
-  const host = document.createElement("goalbook-layer");
-  host.style.cssText = "all:initial;position:fixed;inset:0;pointer-events:none;z-index:2147483647";
-  document.documentElement.appendChild(host);
-  const root = host.attachShadow({ mode: "open" });
+  // Our two layers sit beside <body>, not inside it.
+  function makeLayer(tag, css) {
+    const element = document.createElement(tag);
+    element.style.cssText = "all:initial;pointer-events:none;" + css;
+    document.documentElement.appendChild(element);
+    return [element, element.attachShadow({ mode: "open" })];
+  }
+  // The screen layer stays put: the card, the scroll hint, the toast.
+  const [host, root] = makeLayer("goalbook-layer", "position:fixed;inset:0;z-index:2147483647");
+  // The page layer scrolls with the page, so its marks move at the page's own speed.
+  // Its depth is set later, just under the page's top bar.
+  const [pageHost, pageRoot] = makeLayer("goalbook-page-layer", "position:absolute;top:0;left:0;width:0;height:0;z-index:2147483646");
 
-  root.innerHTML = `<style>
+  const STYLE = `<style>
     :host{all:initial}
     *{box-sizing:border-box;margin:0;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif}
     [hidden]{display:none!important}
     .g{flex:none;width:16px;height:16px;border-radius:4px;background:#4f7290;color:#fff;display:grid;place-items:center;font-size:9.5px;font-weight:700;line-height:1}
 
-    .frame{position:fixed;border-radius:10px;box-shadow:0 0 0 2px #4f7290,0 0 0 8px rgba(79,114,144,.13);animation:in .3s ease-out}
+    .frame{position:absolute;border-radius:10px;box-shadow:0 0 0 2px #4f7290,0 0 0 8px rgba(79,114,144,.13);animation:in .3s ease-out}
     .label{position:absolute;right:10px;top:-13px;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px 0 4px;border-radius:7px;background:#fff;box-shadow:0 2px 10px rgba(30,32,36,.16);font-size:12px;font-weight:500;color:#385876;white-space:nowrap}
 
     .hint{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);pointer-events:auto;display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px 0 9px;border:0;border-radius:18px;background:#fff;box-shadow:0 6px 22px rgba(30,32,36,.2);font-size:13px;color:#1e2024;cursor:pointer;white-space:nowrap;animation:nudge 1.6s ease-in-out infinite}
     .hint svg{color:#4f7290}
     .hint:hover{background:#f4f4f2}
 
-    .menu{position:fixed;pointer-events:auto;display:flex;gap:2px;padding:3px;border-radius:10px;background:#fff;box-shadow:0 6px 22px rgba(30,32,36,.22);animation:in .15s ease-out}
+    .menu{position:absolute;pointer-events:auto;display:flex;gap:2px;padding:3px;border-radius:10px;background:#fff;box-shadow:0 6px 22px rgba(30,32,36,.22);animation:in .15s ease-out}
     .menu button{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border:0;border-radius:7px;background:none;font-size:13px;color:#4a4d53;cursor:pointer;white-space:nowrap}
     .menu button:hover{background:#ebeae6}
     .menu .main{background:#4f7290;color:#fff;font-weight:500}
@@ -82,13 +89,17 @@
     @keyframes in{from{opacity:0}to{opacity:1}}
     @keyframes nudge{0%,100%{translate:0 0}50%{translate:0 3px}}
     @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-  </style>
+  </style>`;
+
+  pageRoot.innerHTML = `${STYLE}
   <div class="frame" hidden><span class="label"><span class="g">G</span>Look here</span></div>
-  <button class="hint" hidden></button>
   <div class="menu" hidden>
     <button class="main" data-act="add">${ICON.book}Add to the book</button>
     <button data-act="ask">${ICON.ask}Ask about this</button>
-  </div>
+  </div>`;
+
+  root.innerHTML = `${STYLE}
+  <button class="hint" hidden></button>
   <div class="toast" hidden><span class="g">G</span><span></span></div>
   <section class="card">
     <header>
@@ -107,14 +118,15 @@
         <div><b data-count="added">0</b>elements we added</div>
         <div><b data-count="styled">0</b>AWS elements we restyled</div>
       </div>
-      <p class="note" data-note="clean">All of the above lives in one element beside AWS's page, inside its own Shadow DOM.</p>
+      <p class="note" data-note="clean">All of the above lives in our own two layers beside AWS's page, each in its own Shadow DOM.</p>
       <p class="note warn" data-note="dirty" hidden>Possible, but this edits AWS's own page: it breaks when AWS changes the page, and the learner no longer sees the real one.</p>
       <button class="other">Restyle AWS instead</button>
     </div>
   </section>`;
 
   const $ = (selector) => root.querySelector(selector);
-  const frame = $(".frame"), hint = $(".hint"), menu = $(".menu"), toast = $(".toast"), card = $(".card");
+  const frame = pageRoot.querySelector(".frame"), menu = pageRoot.querySelector(".menu");
+  const hint = $(".hint"), toast = $(".toast"), card = $(".card");
 
   const target = () => document.getElementById(TARGET_ID);
   const targetPart = () => {
@@ -207,7 +219,17 @@
 
   // The page's own bars that stay put while it scrolls (AWS: the black bar and
   // the white menu bar). Our marks pass under them, like the page's text does.
-  const bars = { top: 0, bottom: 0, measuredAt: 0 };
+  const bars = { top: 0, bottom: 0, depth: null, measuredAt: 0 };
+
+  // How deep the bar sits among the page's layers: the outermost z-index it lives under.
+  function depthOf(element) {
+    let depth = null;
+    for (let node = element; node && node !== document.documentElement; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (style.position !== "static" && style.zIndex !== "auto") depth = Number(style.zIndex);
+    }
+    return depth;
+  }
 
   function pinnedBar(element) {
     for (let node = element; node && node !== document.body && node !== document.documentElement; node = node.parentElement) {
@@ -215,7 +237,7 @@
       if (position !== "fixed" && position !== "sticky") continue;
       const rect = node.getBoundingClientRect();
       // A bar spans the page; a sticky side menu or "On this page" does not.
-      return rect.width >= innerWidth * 0.6 && rect.height < innerHeight * 0.4 ? rect : null;
+      return rect.width >= innerWidth * 0.6 && rect.height < innerHeight * 0.4 ? { rect, node } : null;
     }
     return null;
   }
@@ -225,14 +247,20 @@
     for (const x of [innerWidth * 0.2, innerWidth * 0.5, innerWidth * 0.8]) {
       for (const element of document.elementsFromPoint(x, y)) {
         if (element === host) continue;
-        const rect = pinnedBar(element);
-        if (rect) edge = side === "top" ? Math.max(edge ?? 0, rect.bottom) : Math.min(edge ?? innerHeight, rect.top);
+        const bar = pinnedBar(element);
+        if (!bar) continue;
+        if (side === "top") {
+          edge = Math.max(edge ?? 0, bar.rect.bottom);
+          const depth = depthOf(bar.node);
+          if (depth !== null) bars.depth = Math.min(bars.depth ?? depth, depth);
+        } else edge = Math.min(edge ?? innerHeight, bar.rect.top);
       }
     }
     return edge;
   }
 
   function measureBars() {
+    bars.depth = null;
     // Bars can stack (a thin bar above a menu bar), so look again under each one.
     let top = 0;
     for (let i = 0; i < 3; i++) {
@@ -243,6 +271,9 @@
     const bottom = edgeAt(innerHeight - 1, "bottom");
     bars.top = top;
     bars.bottom = bottom === null ? 0 : innerHeight - bottom;
+    // Sit one step under the lowest bar, so the page's bars cover our marks
+    // exactly as they cover the page's text.
+    pageHost.style.zIndex = bars.depth > 0 ? String(bars.depth - 1) : "2147483646";
   }
 
   // Follow the page every frame: it can scroll in the window or in an inner box,
@@ -257,11 +288,9 @@
       const top = rects[0].top - 10, bottom = rects[rects.length - 1].bottom + 10;
       const left = Math.min(...rects.map((rect) => rect.left)) - 12;
       const right = Math.max(...rects.map((rect) => rect.right)) + 12;
-      Object.assign(frame.style, { top: top + "px", left: left + "px", width: right - left + "px", height: bottom - top + "px" });
-      // Cut off whatever is under the bars; the label goes under first, like text would.
-      const cutTop = Math.max(-30, visibleTop - top), cutBottom = Math.max(-30, bottom - visibleBottom);
-      frame.style.clipPath = `inset(${cutTop}px -30px ${cutBottom}px -30px)`;
-      frame.hidden = bottom < visibleTop || top > visibleBottom;
+      // Page coordinates: once placed, the browser scrolls the frame with the page.
+      Object.assign(frame.style, { top: top + scrollY + "px", left: left + scrollX + "px", width: right - left + "px", height: bottom - top + "px" });
+      frame.hidden = false;
     } else frame.hidden = true;
 
     if (state.hint && part.length) {
@@ -279,16 +308,16 @@
 
     toast.style.top = visibleTop + 14 + "px";
 
-    if (!menu.hidden && savedRange) {
-      const rect = savedRange.getBoundingClientRect();
-      const width = menu.offsetWidth;
-      const left = Math.max(8, Math.min(innerWidth - width - 8, rect.left + rect.width / 2 - width / 2));
-      const top = rect.top - 44 < visibleTop + 8 ? rect.bottom + 8 : rect.top - 44;
-      Object.assign(menu.style, { left: left + "px", top: top + "px" });
-      // When the selection goes under a bar, the menu goes with it.
-      menu.style.visibility = rect.bottom < visibleTop || rect.top > visibleBottom ? "hidden" : "visible";
-    }
     requestAnimationFrame(follow);
+  }
+
+  // Placed once, when the learner selects; then it scrolls with the page like the text.
+  function placeMenu() {
+    const rect = savedRange.getBoundingClientRect();
+    const width = menu.offsetWidth;
+    const left = Math.max(8, Math.min(innerWidth - width - 8, rect.left + rect.width / 2 - width / 2));
+    const top = rect.top - 44 < bars.top + 8 ? rect.bottom + 8 : rect.top - 44;
+    Object.assign(menu.style, { left: left + scrollX + "px", top: top + scrollY + "px" });
   }
 
   function onSelection() {
@@ -301,9 +330,10 @@
     }
     savedRange = selection.getRangeAt(0).cloneRange();
     menu.hidden = false;
+    placeMenu();
   }
 
-  const fromLayer = (event) => event.composedPath().includes(host);
+  const fromLayer = (event) => event.composedPath().some((node) => node === host || node === pageHost);
   document.addEventListener("mouseup", (event) => { if (!fromLayer(event)) setTimeout(onSelection); }, true);
   document.addEventListener("keyup", (event) => { if (event.shiftKey) setTimeout(onSelection); }, true);
   document.addEventListener("mousedown", (event) => { if (!fromLayer(event)) menu.hidden = true; }, true);
