@@ -1,0 +1,554 @@
+<title>Lana Find and Fit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Lana as a Chrome extension, on its real surfaces:
+   · the side panel (Chrome's own panel, Lana's page inside it): the conversation, FIND and FIT
+   · the page overlay (a content script in the site, its own layer in page coordinates): the frame on the
+     part that answers, the Keep handle on code, images and tables, the menu on a text selection
+   · the right-click menu and a keyboard shortcut: Keep with Lana, Ask Lana
+   · the toolbar icon: opens and closes the side panel
+   · a second tab: the Goal Book web app, where FIT shows the course; the side panel stays open across tabs
+   One loop, two moments: FIND opens wide on the real page; FIT closes it, find by find, in conversation,
+   with the course open beside the panel. Light only, Lana's tokens; Chrome's own parts are drawn plainly. */
+:root{
+  --bg:#ffffff; --canvas:#f4f4f2; --hover:#ebeae6; --hover-2:#e3e1db; --line:#e3e1db; --guide:#d8d6cf; --bar:#e3e1db;
+  --ink:#1e2024; --ink-2:#4a4d53; --ink-3:#7a7d84; --ink-4:#a8a6a0; --pale:#c3c1ba;
+  --accent:#4f7290; --accent-ink:#385876; --accent-soft:rgba(79,114,144,.15); --accent-wash:rgba(79,114,144,.08); --on-accent:#ffffff; --mark:rgba(79,114,144,.22);
+  --cr-frame:#dfe1e5; --cr-tab:#ffffff; --cr-bar:#ffffff; --cr-ink:#202124; --cr-ink-2:#5f6368; --cr-line:#dadce0; --cr-menu:#ffffff;
+  --site-ink:#16191f; --site-ink-2:#545b64; --site-head:#232f3e;
+  --ui:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;
+  --mono:"Geist Mono","Cascadia Code","SF Mono",Consolas,monospace;
+  --sys:system-ui,"Segoe UI",Roboto,sans-serif;
+  color-scheme:light;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{height:100%}
+body{height:100%;margin:0;background:var(--cr-frame);color:var(--ink);font-family:var(--ui);font-size:14px;line-height:21px;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+svg{flex:none}
+.win{display:flex;flex-direction:column;height:100%}
+
+/* ─── Chrome itself: tab strip, toolbar ─── */
+.tabstrip{flex:none;display:flex;align-items:flex-end;gap:2px;height:38px;padding:0 8px;background:var(--cr-frame);font-family:var(--sys)}
+.ctab{display:flex;align-items:center;gap:8px;width:220px;min-width:0;height:32px;padding:0 10px 0 12px;border:0;border-radius:9px 9px 0 0;background:transparent;font-size:12px;color:var(--cr-ink-2);cursor:pointer}
+.ctab:hover{background:rgba(255,255,255,.45)}
+.ctab.on{background:var(--cr-tab);color:var(--cr-ink)}
+.ctab .fav{flex:none;width:16px;height:16px;border-radius:4px;display:grid;place-items:center;font-size:9px;font-weight:700;color:#fff}
+.ctab .tt{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:left}
+.ctab .x{flex:none;color:var(--cr-ink-2);font-size:13px}
+.newtab{width:28px;height:28px;margin-bottom:2px;display:grid;place-items:center;color:var(--cr-ink-2);font-size:18px}
+.demo-ctl{margin-left:auto;margin-bottom:5px;display:flex;gap:6px}
+.demo-ctl button{height:26px;padding:0 10px;border:0;border-radius:6px;background:rgba(255,255,255,.6);font-family:var(--ui);font-size:12px;color:var(--ink-2);cursor:pointer}
+.toolbar{flex:none;display:flex;align-items:center;gap:6px;height:40px;padding:0 8px;background:var(--cr-bar);border-bottom:1px solid var(--cr-line);font-family:var(--sys)}
+.tb{width:30px;height:30px;flex:none;display:grid;place-items:center;border-radius:50%;color:var(--cr-ink-2)}
+.omni{flex:1;min-width:0;height:30px;display:flex;align-items:center;gap:8px;padding:0 14px;border-radius:15px;background:#f1f3f4;font-size:13px;color:var(--cr-ink);white-space:nowrap;overflow:hidden}
+.ext-btn{width:30px;height:30px;flex:none;display:grid;place-items:center;border:0;border-radius:50%;background:none;cursor:pointer}
+.ext-btn:hover{background:#f1f3f4}
+.ext-btn.on{background:#e8eef4}
+.lana-icon{width:18px;height:18px;border-radius:5px;background:var(--accent);color:#fff;display:grid;place-items:center;font-family:var(--ui);font-size:10.5px;font-weight:700;flex:none}
+.avatar{width:26px;height:26px;border-radius:50%;background:#c9d3dc;flex:none}
+
+.content{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) auto;background:var(--cr-bar)}
+
+/* ─── the tab's page ─── */
+.viewport{position:relative;min-width:0;min-height:0;overflow-y:auto;scrollbar-width:thin;background:#fff}
+.pagewrap{position:relative;min-height:100%}
+
+/* the AWS docs page, drawn plainly as someone else's site */
+.site{color:var(--site-ink);font-family:var(--sys)}
+.site-bar{position:sticky;top:0;z-index:3;height:44px;display:flex;align-items:center;gap:14px;padding:0 24px;background:var(--site-head);color:#fff;font-size:14px;font-weight:600}
+.site-bar .s{font-weight:400;color:#d5dbdb;font-size:13px}
+.site-in{max-width:760px;margin:0 auto;padding:30px 44px 140px}
+.site .crumbs{font-size:13px;color:var(--site-ink-2)}
+.site h1{margin:8px 0 0;font-size:30px;line-height:38px;font-weight:700}
+.site h2{margin:34px 0 0;font-size:21px;line-height:30px;font-weight:700}
+.site p{margin:14px 0 0;font-size:16px;line-height:27px}
+.site code.inline{font-family:var(--mono);font-size:14px;padding:1px 5px;border-radius:4px;background:#f2f3f3}
+.site pre{margin:14px 0 0;padding:16px 18px;border-radius:6px;background:#f2f3f3;color:#16191f;font-family:var(--mono);font-size:14px;line-height:22px;overflow-x:auto;border:1px solid #e9ebed}
+.site figure{margin:16px 0 0;padding:14px;border:1px solid #e9ebed;border-radius:6px}
+.site figure svg{display:block;width:100%;height:auto}
+.site figcaption{margin-top:8px;font-size:14px;color:var(--site-ink-2)}
+.site table{width:100%;margin-top:14px;border-collapse:collapse;font-size:15px;line-height:22px}
+.site th{padding:9px 10px;border-bottom:2px solid #e9ebed;text-align:left;font-weight:700;background:#fafafa}
+.site td{padding:9px 10px;border-bottom:1px solid #e9ebed;vertical-align:top}
+.site ::selection{background:#b3d4fc}
+
+/* the Goal Book web app, in its own tab */
+.app{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100%;font-family:var(--ui)}
+.app-nav{padding:20px 12px;background:var(--canvas);border-right:1px solid var(--line)}
+.app-goal{padding:0 12px 4px;font-size:14px;line-height:20px;font-weight:600}
+.app-g{margin:20px 12px 6px;font-size:14px;line-height:24px;font-weight:600}
+.app-p{display:flex;align-items:center;gap:6px;min-height:36px;padding:6px 12px;border-radius:12px;font-size:14px;color:var(--ink-2)}
+.app-p.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+.app-p .nw{margin-left:auto;font-size:11px;font-weight:600;color:var(--accent-ink)}
+.app-main{max-width:760px;width:100%;margin:0 auto;padding:32px 40px 120px}
+.app-crumb{font-size:14px;font-weight:600;color:var(--accent)}
+.app-main h1{margin:6px 0 0;font-size:30px;line-height:36px;font-weight:600;letter-spacing:-.02em}
+.ob{margin-top:20px}
+.ob-f{font-size:12px;font-weight:600;letter-spacing:.02em;color:var(--ink-3)}
+.ob-tx{margin-top:4px;font-size:16px;line-height:28px;color:var(--ink-2)}
+.ob ul{margin:6px 0 0;padding-left:22px;font-size:16px;line-height:28px;color:var(--ink-2)}
+.ob-empty{display:flex;align-items:center;gap:10px;margin-top:6px;font-size:14px;color:var(--ink-4)}
+.ob-empty .bar{width:120px;height:8px;border-radius:5px;background:var(--bar)}
+.empty-pg{margin-top:20px;padding:18px;border-radius:14px;background:var(--canvas);font-size:15px;color:var(--ink-3)}
+.nb{margin:20px -16px 0;padding:14px 16px;border-radius:14px}
+.nb.proposed{background:var(--accent-soft);box-shadow:inset 0 0 0 1.5px var(--accent)}
+.nb.placed{box-shadow:inset 0 0 0 1px var(--line)}
+.nb-h{display:flex;align-items:center;gap:8px}
+.nb-who{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--accent-ink)}
+.nb-src{margin-left:auto;font-size:12px;color:var(--ink-3)}
+.nb-tx{margin-top:6px;font-size:16px;line-height:28px;color:var(--ink)}
+.nb-orig{margin-top:4px;font-size:13px;line-height:20px;color:var(--ink-3);text-decoration:line-through}
+.nb pre{margin:8px 0 0;padding:12px 14px;border-radius:10px;background:var(--bg);border:1px solid var(--line);font-family:var(--mono);font-size:14px;line-height:22px;white-space:pre-wrap;word-break:break-all}
+.nb table{width:100%;margin-top:8px;border-collapse:collapse;font-size:14px;line-height:20px}
+.nb td,.nb th{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
+.nb svg{display:block;width:100%;height:auto;margin-top:8px;border:1px solid var(--line);border-radius:10px;background:#fff}
+
+/* ─── Lana's page overlay: the content script's own layer, in page coordinates ─── */
+.lana-layer{position:absolute;inset:0;z-index:2;pointer-events:none}
+.l-frame{position:absolute;border-radius:10px;box-shadow:0 0 0 2px var(--accent);background:var(--accent-wash)}
+.l-frame-tag{position:absolute;left:10px;top:-13px;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px 0 4px;border-radius:12px;background:var(--accent);color:#fff;font-family:var(--ui);font-size:12px;font-weight:600;white-space:nowrap}
+.l-frame-tag .lana-icon,.l-kept-tag .lana-icon,.l-toast .lana-icon{background:#fff;color:var(--accent)}
+.l-frame-tag .lana-icon{width:16px;height:16px;font-size:9.5px}
+.l-kept{position:absolute;border-radius:6px;box-shadow:inset 0 0 0 1.5px var(--accent);background:rgba(79,114,144,.10)}
+.l-kept-tag{position:absolute;right:6px;top:6px;display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px 0 4px;border-radius:11px;background:var(--accent);color:#fff;font-family:var(--ui);font-size:11.5px;font-weight:600}
+.l-kept-tag .lana-icon{width:14px;height:14px;font-size:8.5px}
+.l-handle{position:absolute;pointer-events:auto;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px 0 5px;border:0;border-radius:14px;background:var(--ink);color:#fff;font-family:var(--ui);font-size:12.5px;font-weight:600;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.l-sel{position:absolute;pointer-events:auto;display:flex;align-items:center;gap:2px;padding:3px 3px 3px 6px;border-radius:12px;background:var(--ink);box-shadow:0 4px 18px rgba(0,0,0,.22);font-family:var(--ui)}
+.l-sel button{height:28px;padding:0 10px;border:0;border-radius:9px;background:none;color:#fff;font-size:12.5px;font-weight:600;cursor:pointer}
+.l-sel button:hover{background:rgba(255,255,255,.14)}
+.l-toast{position:absolute;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px 0 5px;border-radius:14px;background:var(--accent);color:#fff;font-family:var(--ui);font-size:12.5px;font-weight:600}
+
+/* ─── the right-click menu: Chrome's, with Lana's entries ─── */
+.cmenu{position:fixed;z-index:50;min-width:270px;padding:6px 0;border-radius:8px;background:var(--cr-menu);box-shadow:0 2px 6px rgba(60,64,67,.25),0 6px 20px rgba(60,64,67,.18);font-family:var(--sys);font-size:13px;color:var(--cr-ink)}
+.cmenu .it{display:flex;align-items:center;gap:10px;height:30px;padding:0 14px;cursor:default}
+.cmenu .it.on{cursor:pointer}
+.cmenu .it.on:hover{background:#f1f3f4}
+.cmenu .it.dim{color:#9aa0a6}
+.cmenu .it .k{margin-left:auto;font-size:12px;color:var(--cr-ink-2)}
+.cmenu .sep{height:1px;margin:6px 0;background:var(--cr-line)}
+.cmenu .ico{width:18px;display:grid;place-items:center}
+
+/* ─── Chrome's side panel, with Lana's page inside ─── */
+.sidepanel{width:400px;min-width:0;display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--cr-line);background:#fff}
+.sidepanel[hidden]{display:none}
+.sp-head{flex:none;display:flex;align-items:center;gap:8px;height:40px;padding:0 6px 0 12px;border-bottom:1px solid var(--cr-line);font-family:var(--sys);font-size:13px;color:var(--cr-ink)}
+.sp-head .nm{display:flex;align-items:center;gap:6px;font-weight:500}
+.sp-head .grow{flex:1}
+.sp-head button{width:28px;height:28px;display:grid;place-items:center;border:0;border-radius:50%;background:none;color:var(--cr-ink-2);cursor:pointer}
+.sp-head button:hover{background:#f1f3f4}
+.l-goal{flex:none;padding:10px 14px 0;font-size:12.5px;line-height:18px;color:var(--ink-3)}
+.l-goal b{font-weight:600;color:var(--ink)}
+.loops{flex:none;display:flex;gap:2px;margin:10px 14px 0;padding:3px;border-radius:10px;background:var(--hover)}
+.loops button{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:34px;border:0;border-radius:8px;background:none;font-size:14px;color:var(--ink-3);cursor:pointer}
+.loops button.on{background:var(--bg);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.loops .n{font-size:12px;font-weight:500;color:var(--ink-4);font-variant-numeric:tabular-nums}
+.l-body{flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin}
+.turns{display:flex;flex-direction:column;gap:14px;padding:16px 14px}
+.turn{display:flex;flex-direction:column;gap:6px}
+.turn.learner{align-items:flex-end}
+.say{font-size:14.5px;line-height:22px;color:var(--ink);overflow-wrap:anywhere}
+.turn.learner .say{max-width:90%;padding:10px 14px;border-radius:12px;background:var(--hover);line-height:20px}
+.att{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;max-width:90%}
+.replies{display:flex;flex-wrap:wrap;gap:6px}
+.replies button{height:30px;padding:0 11px;border:1px solid var(--line);border-radius:15px;background:var(--bg);font-size:13px;color:var(--ink-2);cursor:pointer}
+.replies button:hover{border-color:var(--accent);color:var(--accent-ink)}
+.replies button.go{background:var(--accent);border-color:var(--accent);color:#fff}
+.replies button[disabled]{opacity:.45;cursor:default}
+.fc{border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.fc-h{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.kind{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:6px;background:var(--hover);font-size:12px;font-weight:500;color:var(--ink-2)}
+.fc-src{flex:1;min-width:0;font-size:12px;color:var(--ink-4);text-align:right;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.fc .tx{font-size:13.5px;line-height:21px;color:var(--ink)}
+.fc pre{margin:0;padding:10px 12px;border-radius:8px;background:var(--canvas);font-family:var(--mono);font-size:12px;line-height:19px;white-space:pre-wrap;word-break:break-all}
+.fc table{width:100%;border-collapse:collapse;font-size:12px;line-height:17px}
+.fc td,.fc th{padding:4px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.fc svg{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:8px}
+.go-tab{display:inline-flex;align-items:center;gap:6px;width:fit-content;height:26px;padding:0 9px;border:0;border-radius:7px;background:var(--hover);font-size:12px;color:var(--ink-2);cursor:pointer}
+.go-tab:hover{background:var(--hover-2);color:var(--ink)}
+.tray{flex:none;border-top:1px solid var(--line);padding:10px 14px 0}
+.tray-h{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--ink-2)}
+.tray-h .n{color:var(--ink-4);font-weight:500}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:8px 0 2px;scrollbar-width:thin}
+.chip{flex:none;display:inline-flex;align-items:center;gap:6px;max-width:210px;height:28px;padding:0 10px;border-radius:8px;background:var(--canvas);font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+.chip span{overflow:hidden;text-overflow:ellipsis}
+.chip.new{background:var(--accent-soft);color:var(--ink)}
+.chip.placed{background:var(--bg);box-shadow:inset 0 0 0 1px var(--line)}
+.chip.dropped{opacity:.45;text-decoration:line-through}
+.composer-wrap{flex:none;padding:10px 14px 14px}
+.composer{display:flex;flex-direction:column;gap:6px;padding:7px 7px 7px 13px;border:1px solid var(--line);border-radius:14px}
+.composer:focus-within{border-color:var(--pale)}
+.ctx{display:flex;flex-wrap:wrap;gap:4px}
+.ctx-chip{display:inline-flex;align-items:center;gap:5px;max-width:100%;height:24px;padding:0 4px 0 8px;border:0;border-radius:6px;background:var(--mark);font-size:12px;color:var(--ink);cursor:pointer}
+.ctx-chip span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:240px}
+.c-row{display:flex;align-items:center;gap:8px}
+.composer input{flex:1;min-width:0;border:0;outline:0;background:none;font-size:14.5px;line-height:21px;padding:5px 0}
+.composer input::placeholder{color:var(--ink-4)}
+.send{width:32px;height:32px;flex:none;border:0;border-radius:8px;background:var(--hover);color:var(--ink-4);display:grid;place-items:center;cursor:pointer}
+.send.ready{background:var(--accent);color:#fff}
+
+@media (max-width:900px){
+  .content{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1.1fr)}
+  .sidepanel{width:auto;border-left:0;border-top:1px solid var(--cr-line)}
+  .ctab{width:150px}.demo-ctl{display:none}
+  .site-in{padding:24px 20px 100px}
+  .app{grid-template-columns:minmax(0,1fr)}.app-nav{display:none}.app-main{padding:24px 20px 100px}
+}
+</style>
+
+<div class="win">
+  <div class="tabstrip" id="tabs"></div>
+  <div class="toolbar">
+    <span class="tb">‹</span><span class="tb">›</span><span class="tb">↻</span>
+    <div class="omni" id="omni"></div>
+    <button class="ext-btn" id="lana-btn" title="Lana"><span class="lana-icon">L</span></button>
+    <span class="avatar"></span>
+  </div>
+  <div class="content">
+    <div class="viewport" id="viewport"><div class="pagewrap" id="pagewrap"><div id="page"></div><div class="lana-layer" id="layer"></div></div></div>
+    <aside class="sidepanel" id="sidepanel"></aside>
+  </div>
+</div>
+<div class="cmenu" id="cmenu" hidden></div>
+
+<script>
+(function(){
+"use strict";
+const sv=(d,s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const I={
+  up:sv('<path d="M8 13V3.5M4 7.5l4-4 4 4"/>',16),x:sv('<path d="m4.5 4.5 7 7M11.5 4.5l-7 7"/>',14),xs:sv('<path d="m4.5 4.5 7 7M11.5 4.5l-7 7"/>',11),
+  pin:sv('<path d="M6 2.5h4l-.5 4 2 2v1h-7v-1l2-2z"/><path d="M8 9.5V14"/>',14),chev:sv('<path d="m4.5 6.5 3.5 3.5 3.5-3.5"/>',12),
+  text:sv('<path d="M3 4h10M3 8h10M3 12h6"/>',12),code:sv('<path d="M5.5 4.5 2 8l3.5 3.5M10.5 4.5 14 8l-3.5 3.5"/>',12),
+  image:sv('<rect x="2" y="3" width="12" height="10" rx="2"/><path d="m3 11 3.5-3.5 2.5 2.5 2-2 2 2"/>',12),
+  table:sv('<rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6.5h12M6.5 6.5v6.5"/>',12),
+  tab:sv('<rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6h12"/>',12)
+};
+const L=`<span class="lana-icon">L</span>`;
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const $=id=>document.getElementById(id);
+
+/* ─── the example: a beginner putting a portfolio website online ─── */
+const GOAL="Put my portfolio website online with AWS";
+const QUESTION="Where do my website's files live on AWS?";
+const AWS_URL="docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html";
+const APP_URL="agentic-tutor-lake.vercel.app/goal/portfolio-on-aws";
+const DIAGRAM=`<svg viewBox="0 0 520 170" role="img" aria-label="A bucket holding three objects, each found by its key"><rect x="20" y="22" width="480" height="128" rx="12" fill="#f6f7f8" stroke="#c9ccd1" stroke-width="1.5"/><text x="36" y="46" font-family="Inter,sans-serif" font-size="13" font-weight="600" fill="#16191f">bucket: my-portfolio-site</text>
+${[["index.html","index.html"],["style.css","style.css"],["photo.jpg","images/photo.jpg"]].map(([n,k],i)=>`<g transform="translate(${40+i*152},62)"><rect width="136" height="70" rx="8" fill="#ffffff" stroke="#c9ccd1"/><text x="12" y="26" font-family="Inter,sans-serif" font-size="13" font-weight="600" fill="#16191f">${n}</text><text x="12" y="48" font-family="Geist Mono,monospace" font-size="11" fill="#545b64">key: ${k}</text></g>`).join("")}</svg>`;
+const ITEMS={
+  def:{kind:"text",part:"Buckets and objects",content:"An object is a file and any metadata that describes the file. A bucket is a container for objects."},
+  rule:{kind:"text",part:"Buckets and objects",content:"Bucket names must be unique across all AWS accounts in a partition."},
+  fig:{kind:"image",part:"Buckets and objects",content:DIAGRAM,caption:"A bucket holds objects. Each object is found by its key."},
+  cmd:{kind:"code",part:"Upload a file",content:"aws s3 cp index.html s3://my-portfolio-site/"},
+  classes:{kind:"table",part:"Storage classes",content:[["Storage class","Use it for"],["S3 Standard","Data you use often"],["S3 Standard-IA","Data you use rarely but need quickly"],["S3 Glacier Flexible Retrieval","Archives you rarely restore"]]}
+};
+
+/* the goal's existing course, in the Goal Book web app */
+const COURSE=[
+  {group:"Get started",pages:[{id:"aws",t:"What AWS is",blocks:[{f:"Definition",text:"AWS rents you computers, storage and services over the internet. You pay for what you use."}]}]},
+  {group:"Store files",pages:[
+    {id:"bucket",t:"What a bucket is",blocks:[]},
+    {id:"create",t:"Create a bucket",blocks:[{f:"Steps",items:["Open the S3 console","Choose Create bucket","Enter a name and pick a Region","Choose Create bucket again"]}]},
+    {id:"upload",t:"Upload your site",blocks:[{f:"Practice",empty:true}]}]},
+  {group:"Serve the site",pages:[{id:"host",t:"Static website hosting",blocks:[]}]},
+  {group:"Costs",pages:[{id:"cost",t:"Paying for storage",blocks:[{f:"Definition",text:"With S3 you pay for what you store, per gigabyte per month, and for the requests you make."}]}]}
+];
+const PAGES=COURSE.flatMap(g=>g.pages.map(p=>({...p,group:g.group})));
+const coursePage=id=>PAGES.find(p=>p.id===id);
+
+/* FIT, as a conversation: for each find Lana says what the course already has there, gives its view, asks */
+const FIT={
+  def:{page:"bucket",frame:"Definition",
+    ask:"Look at the course tab: What a bucket is is still empty, and the only definition near it, in What AWS is, doesn't mention buckets. This sentence would be the page's first definition. Put it there?",
+    opts:[["Yes, as the definition","ok"],["Make it simpler first","simpler"]],
+    out:{ok:{say:"Placed as the definition of What a bucket is."},simpler:{frame:"Definition, simplified",say:"Same meaning and source, in shorter words. The original stays next to it, crossed out, so you can compare."}}},
+  rule:{page:"create",frame:"Watch out",after:true,
+    ask:"Create a bucket has steps already. The step “Enter a name and pick a Region” says nothing about names being taken, which is exactly where people get stuck. I'd put the rule right under that step. Agree?",
+    opts:[["Under that step","ok"],["At the top of the page","top"],["Drop it","drop"]],
+    out:{ok:{say:"Under the naming step, as a watch out."},top:{say:"At the top of Create a bucket, so it's read before any step."},drop:{drop:true,say:"Dropped. You'll meet it when you create the bucket anyway."}}},
+  cmd:{page:"upload",frame:"Practice",
+    ask:"Upload your site has a practice with no task yet. You kept this command to try it yourself. Should the practice give it to you, or should you find the command first and then compare? Which teaches you more?",
+    opts:[["Give me the command","give"],["Let me find it first","find"]],
+    out:{give:{frame:"Practice: run this",say:"The practice gives you the command and asks you to upload your index.html."},find:{frame:"Practice: find it, then compare",say:"The practice asks you to find the command first. This one stays hidden until you've tried."}}},
+  fig:{page:"bucket",frame:"Diagram",
+    ask:"The diagram says what the definition says, in a picture. Keep both on What a bucket is, or is one enough?",
+    opts:[["Keep both","both"],["The picture is enough","pic"],["The text is enough","text"]],
+    out:{both:{say:"Both: the picture right under the definition."},pic:{dropOther:"def",say:"The picture replaces the sentence. I took the definition back out."},text:{drop:true,say:"Text only. The picture is dropped."}}},
+  classes:{page:"cost",frame:"Comparison",
+    ask:"Paying for storage already says you pay per gigabyte per month. It doesn't say the price depends on the storage class. This table explains why. Add it under that line?",
+    opts:[["Add it","ok"],["Not now","drop"]],
+    out:{ok:{say:"Added under the price line, as a comparison."},drop:{drop:true,say:"Left out for now. It's still in your finds."}}}
+};
+const ORDER=["def","rule","cmd","fig","classes"];
+
+/* ─── state ─── */
+let S;
+function reset(){
+  S={tabs:["aws"],tab:"aws",panel:true,loop:"find",point:null,finds:[],ctx:[],step:0,turns:[],draft:QUESTION,fresh:null,
+     queue:[],cur:null,fitFrom:0,debated:false,gapShown:false,hover:null,sel:null,menu:null,toast:null,lastPage:"bucket"};
+}
+reset();
+const find=id=>S.finds.find(f=>f.id===id);
+const say=(text,replies,extra)=>S.turns.push(Object.assign({who:"agent",text,replies:replies||null},extra||{}));
+const me=(text,att)=>S.turns.push({who:"learner",text,att:att||null});
+
+/* ─── FIND ─── */
+function sendText(){
+  const t=S.draft.trim();if(!t)return;
+  const att=S.ctx.slice();S.ctx=[];me(t,att);S.draft="";
+  if(S.step===0){S.step=1;S.point="how";
+    say("In Amazon S3: your files are stored as objects, inside a bucket. I've framed the part of the page that says so. Keep what helps you: select some text, or use Keep on a picture, code or a table. Right-click works too.")}
+  else if(att.length)say("About what you attached: it's the core of the answer. Keep it if you'll want it in your course.");
+  else if(S.loop==="fit")say("Noted. Pick one of the answers above, or tell me what you'd do instead and I'll follow it.");
+  else say("Look at the framed part first. If it doesn't answer you, tell me and we'll look elsewhere.");
+  render(true);
+  if(S.point==="how"&&S.step===1){S.step=2;setTimeout(()=>scrollTo("how"),50)}
+}
+function keep(id,text){
+  S.sel=null;S.menu=null;
+  if(find(id)){render();return}
+  S.finds.push({id,kind:ITEMS[id].kind,text:text||null,why:null,frame:null,place:null,status:"raw"});S.fresh=id;
+  S.toast={id};
+  if(id==="def")say("Kept. Why does it help you?",[["It answers my question","why"],["I'll need the words later","why"]]);
+  else if(id==="rule")say("Kept. That rule will bite you on day one.");
+  else if(id==="fig"){say("Kept the picture. It's easier to remember than the sentence.");maybeDebate()}
+  else if(id==="cmd")say("That's the command you'll run. Why keep it?",[["To try it myself","why"],["To copy it later","why"]]);
+  else if(id==="classes")say("Kept. Storage classes decide part of your bill.");
+  if(S.finds.length===3)say("You have three finds. Keep going, or fit them into your course when you're ready.",[["Fit them now","to-fit"]]);
+  render(true);
+  setTimeout(()=>{S.toast=null;drawLayer()},1400);
+}
+function ask(id,text){
+  S.sel=null;S.menu=null;
+  const label=text||(ITEMS[id].kind==="image"?ITEMS[id].caption:ITEMS[id].kind==="table"?"Storage classes table":ITEMS[id].content);
+  if(!S.ctx.some(c=>c.label===label))S.ctx.push({id,label,kind:ITEMS[id].kind});
+  render();const el=$("talk");if(el)el.focus();
+}
+function maybeDebate(){
+  if(S.debated||find("rule"))return;S.debated=true;
+  say("One thing to think about before you go on: this page says bucket names are unique across every AWS account. Will “portfolio” be free?",[["Probably not","debate"],["Yes, why not","debate"]]);
+}
+
+/* ─── FIT ─── */
+function toFit(){
+  if(!S.finds.some(f=>f.status==="raw")){S.loop="fit";openCourse();render(true);return}
+  S.loop="fit";S.fitFrom=S.turns.length;S.gapShown=false;
+  S.queue=ORDER.filter(id=>find(id)&&find(id).status==="raw");
+  openCourse();
+  say("I opened your course in a new tab. This panel stays with you. Let's fit your "+S.queue.length+" finds one at a time: for each one, look at what the course already says there, then we decide together.");
+  present();
+}
+function openCourse(){if(!S.tabs.includes("app"))S.tabs.push("app");S.tab="app";S.point=null;S.sel=null}
+function present(){
+  const id=S.queue.shift();S.cur=id||null;
+  if(!id){gap();return}
+  const f=find(id),x=FIT[id];f.status="proposed";f.frame=x.frame;f.place=x.page;S.lastPage=x.page;
+  say(x.ask,x.opts.map(([l,k])=>[l,"fit:"+k]),{fit:id});
+  render(true);setTimeout(()=>scrollTo("nb-"+id),60);
+}
+function decide(id,key){
+  const f=find(id),o=FIT[id].out[key];
+  if(o.drop)f.status="dropped";else{f.status="placed";if(o.frame)f.frame=o.frame;if(key==="top")f.top=true}
+  if(o.dropOther){const g=find(o.dropOther);if(g)g.status="dropped"}
+  say(o.say);render(true);setTimeout(present,450);
+}
+function gap(){
+  if(S.gapShown)return;S.gapShown=true;S.cur=null;
+  say("Every find has its place. One gap: Serve the site is still empty, and it's your next step, making the bucket serve your website.",[["Find it","refind"],["Finish for now","finish"]]);
+  render(true);
+}
+function reply(turn,label,kind){
+  turn.used=true;me(label);
+  if(kind==="why"){const f=S.finds.slice().reverse().find(x=>!x.why);if(f)f.why=label;say("Noted. I'll use that when we fit it.");if(f&&f.id==="def")maybeDebate()}
+  else if(kind==="debate"){S.point="rule";say(label==="Probably not"?"Right: short names are taken fast. You'll need something like portfolio-yourname. I've marked that rule on the page. Worth keeping?":"It's very likely taken: names are shared by every account. You'll need something like portfolio-yourname. I've marked that rule on the page. Worth keeping?",[["Keep the rule","keep-rule"]]);if(S.tab==="aws")setTimeout(()=>scrollTo("k-rule"),60)}
+  else if(kind==="keep-rule"){keep("rule");return}
+  else if(kind==="to-fit"){toFit();return}
+  else if(kind.startsWith("fit:")){decide(turn.fit,kind.slice(4));return}
+  else if(kind==="refind"){S.loop="find";S.tab="aws";S.point=null;say("Back on the AWS tab. This page doesn't cover hosting, so I'd search the AWS docs for “static website hosting S3”, then we read the result together, the same way.");render(true);return}
+  else if(kind==="finish"){const n=S.finds.filter(f=>f.status==="placed").length;say("Done for now. Your course got "+n+" new piece"+(n===1?"":"s")+", each one pointing back to the page it came from.");render(true);return}
+  render(true);
+}
+
+/* ─── the tab's page ─── */
+function awsHTML(){
+  return `<div class="site"><div class="site-bar">Amazon S3<span class="s">User Guide</span></div><div class="site-in"><div class="crumbs">Documentation › Amazon S3 › User Guide</div><h1>What is Amazon S3?</h1>
+    <p>Amazon Simple Storage Service (Amazon S3) is an object storage service. You can use it to store and retrieve any amount of data, such as the files of a website.</p>
+    <section id="how"><h2>Buckets and objects</h2>
+      <p data-keep="def" id="k-def">${esc(ITEMS.def.content)} You store objects in one or more buckets.</p>
+      <p data-keep="rule" id="k-rule">${esc(ITEMS.rule.content)} If a name is already taken by any account, you can't use it.</p>
+      <figure data-keep="fig" data-block="1" id="k-fig">${DIAGRAM}<figcaption>${esc(ITEMS.fig.caption)}</figcaption></figure>
+    </section>
+    <section id="upload"><h2>Upload a file</h2>
+      <p>With the AWS Command Line Interface, <code class="inline">aws s3 cp</code> copies a file from your computer to a bucket.</p>
+      <pre data-keep="cmd" data-block="1" id="k-cmd">${esc(ITEMS.cmd.content)}</pre>
+    </section>
+    <section id="classes"><h2>Storage classes</h2>
+      <p>Each object has a storage class. It changes what you pay to store the object and to get it back.</p>
+      <table data-keep="classes" data-block="1" id="k-classes"><thead><tr><th>Storage class</th><th>Use it for</th></tr></thead><tbody>${ITEMS.classes.content.slice(1).map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join("")}</tbody></table>
+    </section></div></div>`;
+}
+function newBlockHTML(f){
+  const it=ITEMS[f.id];let body;
+  if(f.id==="def"&&/simplified/.test(f.frame))body=`<div class="nb-tx">A bucket holds your files. Each file in it is an object.</div><div class="nb-orig">${esc(it.content)}</div>`;
+  else if(it.kind==="code"&&/find it/.test(f.frame))body=`<div class="nb-tx">Find the command that copies index.html into your bucket. Then compare it with the one from the docs.</div><div class="ob-empty"><span class="bar"></span>the docs' command, hidden until you try</div>`;
+  else if(it.kind==="code")body=`<div class="nb-tx">Upload your index.html with this command, then check that it's in the bucket.</div><pre>${esc(it.content)}</pre>`;
+  else if(it.kind==="image")body=it.content;
+  else if(it.kind==="table")body=`<table>${it.content.map((r,i)=>`<tr>${r.map(c=>i?`<td>${esc(c)}</td>`:`<th>${esc(c)}</th>`).join("")}</tr>`).join("")}</table>`;
+  else body=`<div class="nb-tx">${esc(f.text||it.content)}</div>`;
+  const st=f.status==="placed"?"placed":"proposed";
+  return `<div class="nb ${st}" id="nb-${f.id}"><div class="nb-h"><span class="nb-who">${L}${st==="placed"?"New":"Lana proposes"} · ${esc(f.frame)}</span><span class="nb-src">from docs.aws.amazon.com</span></div>${body}</div>`;
+}
+function oldBlockHTML(b){
+  if(b.items)return `<div class="ob"><div class="ob-f">${esc(b.f)}</div><ul>${b.items.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`;
+  if(b.empty)return `<div class="ob"><div class="ob-f">${esc(b.f)}</div><div class="ob-empty"><span class="bar"></span>no task yet</div></div>`;
+  return `<div class="ob"><div class="ob-f">${esc(b.f)}</div><div class="ob-tx">${esc(b.text)}</div></div>`;
+}
+function appHTML(){
+  const pid=S.cur?FIT[S.cur].page:S.lastPage,pg=coursePage(pid);
+  const inc=S.finds.filter(f=>f.place===pid&&(f.status==="placed"||f.status==="proposed"));
+  let body=inc.filter(f=>f.top).map(newBlockHTML).join("");
+  if(!pg.blocks.length&&!inc.length)body+=`<div class="empty-pg">This page is empty.</div>`;
+  pg.blocks.forEach(b=>{body+=oldBlockHTML(b);if(b.items)body+=inc.filter(f=>!f.top&&FIT[f.id].after).map(newBlockHTML).join("")});
+  body+=inc.filter(f=>!f.top&&!(FIT[f.id].after&&pg.blocks.some(b=>b.items))).map(newBlockHTML).join("");
+  return `<div class="app"><nav class="app-nav"><div class="app-goal">${esc(GOAL)}</div>${COURSE.map(g=>`<div class="app-g">${esc(g.group)}</div>${g.pages.map(p=>`<div class="app-p${p.id===pid?" on":""}">${esc(p.t)}${S.finds.some(f=>f.place===p.id&&f.status==="placed")?`<span class="nw">new</span>`:""}</div>`).join("")}`).join("")}</nav>
+    <main class="app-main"><div class="app-crumb">${esc(pg.group)}</div><h1>${esc(pg.t)}</h1>${body}</main></div>`;
+}
+
+/* ─── Lana's overlay layer: frame, kept marks, the Keep handle, the selection menu ─── */
+function rel(el){const w=$("pagewrap").getBoundingClientRect(),r=el.getBoundingClientRect();return {x:r.left-w.left,y:r.top-w.top,w:r.width,h:r.height}}
+function drawLayer(){
+  const layer=$("layer");if(!layer)return;
+  if(S.tab!=="aws"){layer.innerHTML="";return}
+  let h="";
+  if(S.point==="how"&&S.loop==="find"){const el=$("how");if(el){const r=rel(el);h+=`<div class="l-frame" style="left:${r.x-14}px;top:${r.y-6}px;width:${r.w+28}px;height:${r.h+18}px"><span class="l-frame-tag">${L}This part answers you</span></div>`}}
+  if(S.point==="rule"&&!find("rule")){const el=$("k-rule");if(el){const r=rel(el);h+=`<div class="l-frame" style="left:${r.x-8}px;top:${r.y-4}px;width:${r.w+16}px;height:${r.h+8}px"><span class="l-frame-tag">${L}The rule we talked about</span></div>`}}
+  S.finds.forEach(f=>{const el=$("k-"+f.id);if(!el)return;const r=rel(el);h+=`<div class="l-kept" style="left:${r.x-4}px;top:${r.y-2}px;width:${r.w+8}px;height:${r.h+4}px">${ITEMS[f.id].kind!=="text"?`<span class="l-kept-tag">${L}Kept</span>`:""}</div>`});
+  if(S.hover&&!find(S.hover)&&!S.sel){const el=$("k-"+S.hover);if(el){const r=rel(el);h+=`<button class="l-handle" data-act="keep" data-id="${S.hover}" style="left:${r.x+r.w-92}px;top:${r.y+8}px">${L}Keep</button>`}}
+  if(S.sel)h+=`<div class="l-sel" style="left:${S.sel.x}px;top:${S.sel.y}px">${L}<button data-act="keep-sel">Keep</button><button data-act="ask-sel">Ask Lana</button></div>`;
+  if(S.toast){const el=$("k-"+S.toast.id);if(el){const r=rel(el);h+=`<div class="l-toast" style="left:${r.x}px;top:${Math.max(0,r.y-34)}px">${L}Kept in Lana</div>`}}
+  layer.innerHTML=h;
+}
+
+/* ─── the side panel ─── */
+function chipHTML(f){const it=ITEMS[f.id];const label=f.text||(it.kind==="image"?it.caption:it.kind==="table"?"Storage classes":it.content);
+  return `<span class="chip${S.fresh===f.id&&f.status==="raw"?" new":""}${f.status==="placed"?" placed":""}${f.status==="dropped"?" dropped":""}">${I[it.kind]}<span>${esc(label)}</span></span>`}
+function findCardHTML(id){
+  const it=ITEMS[id],f=find(id);
+  const body=it.kind==="code"?`<pre>${esc(it.content)}</pre>`:it.kind==="image"?it.content:it.kind==="table"?`<table>${it.content.map((r,i)=>`<tr>${r.map(c=>i?`<td>${esc(c)}</td>`:`<th>${esc(c)}</th>`).join("")}</tr>`).join("")}</table>`:`<div class="tx">${esc(f.text||it.content)}</div>`;
+  return `<div class="fc"><div class="fc-h"><span class="kind">${I[it.kind]}Your find</span><span class="fc-src">${esc(it.part)}${f.why?" · kept because: "+esc(f.why):""}</span></div>${body}</div>`;
+}
+function turnsHTML(from){
+  return `<div class="turns">${S.turns.length?"":`<div class="turn agent"><div class="say">Hi. What do you want to find out for “${esc(GOAL)}”?</div></div>`}`+
+    S.turns.map((t,i)=>{if(i<from)return "";
+      let h=`<div class="turn ${t.who}">`;
+      if(t.att&&t.att.length)h+=`<div class="att">${t.att.map(c=>`<span class="ctx-chip" style="cursor:default">${I[c.kind]}<span>${esc(c.label)}</span></span>`).join("")}</div>`;
+      if(t.fit){h+=findCardHTML(t.fit);if(S.tab!=="app"&&S.cur===t.fit)h+=`<button class="go-tab" data-act="tab" data-t="app">${I.tab}See it in your course</button>`}
+      h+=`<div class="say">${esc(t.text)}</div>`;
+      if(t.replies)h+=`<div class="replies">${t.replies.map(([l,k])=>`<button class="${["to-fit","refind","keep-rule"].includes(k)?"go":""}" data-act="reply" data-i="${i}" data-k="${k}" data-l="${esc(l)}"${t.used?" disabled":""}>${esc(l)}</button>`).join("")}</div>`;
+      return h+`</div>`}).join("")+`</div>`;
+}
+function panelHTML(){
+  const nF=S.finds.length,nP=S.finds.filter(f=>f.status==="placed"||f.status==="dropped").length;
+  let h=`<div class="sp-head"><span class="nm">${L}Lana${I.chev}</span><span class="grow"></span><button title="Pin">${I.pin}</button><button data-act="close-panel" title="Close">${I.x}</button></div>
+    <div class="l-goal">Goal · <b>${esc(GOAL)}</b></div>
+    <div class="loops" role="tablist"><button class="${S.loop==="find"?"on":""}" data-act="loop" data-l="find">Find<span class="n">${nF}</span></button><button class="${S.loop==="fit"?"on":""}" data-act="loop" data-l="fit"${nF?"":" disabled"}>Fit<span class="n">${nF?nP+"/"+nF:""}</span></button></div>
+    <div class="l-body" id="lbody">${turnsHTML(S.loop==="fit"?S.fitFrom:0)}</div>`;
+  if(nF)h+=`<div class="tray"><div class="tray-h">Finds<span class="n">${nF}</span></div><div class="chips">${S.finds.map(chipHTML).join("")}</div></div>`;
+  h+=`<div class="composer-wrap"><form class="composer" id="talk-form" autocomplete="off">${S.ctx.length?`<div class="ctx">${S.ctx.map((c,i)=>`<button type="button" class="ctx-chip" data-act="unctx" data-i="${i}">${I[c.kind]}<span>${esc(c.label)}</span>${I.xs}</button>`).join("")}</div>`:""}<div class="c-row"><input id="talk" placeholder="${S.loop==="find"?"Ask Lana…":"Tell Lana what you think…"}" value="${esc(S.draft)}"><button class="send${S.draft.trim()?" ready":""}" type="submit" aria-label="Send">${I.up}</button></div></form></div>`;
+  return h;
+}
+
+/* ─── Chrome: tabs and the address bar ─── */
+function tabsHTML(){
+  const meta={aws:{t:"What is Amazon S3? - Amazon Simple Storage Service",fav:`<span class="fav" style="background:#232f3e">a</span>`},
+              app:{t:"Store files · Goal Book",fav:`<span class="fav" style="background:var(--accent)">G</span>`}};
+  return S.tabs.map(k=>`<button class="ctab${S.tab===k?" on":""}" data-act="tab" data-t="${k}">${meta[k].fav}<span class="tt">${esc(meta[k].t)}</span><span class="x">×</span></button>`).join("")+
+    `<span class="newtab">+</span><div class="demo-ctl"><button data-act="restart">Restart the demo</button></div>`;
+}
+
+/* ─── render ─── */
+let lastTab=null;
+function render(toBottom){
+  const vp=$("viewport"),keepTop=vp.scrollTop,lb=$("lbody"),keepL=lb?lb.scrollTop:0;
+  $("tabs").innerHTML=tabsHTML();
+  $("omni").textContent=S.tab==="aws"?AWS_URL:APP_URL;
+  $("page").innerHTML=S.tab==="aws"?awsHTML():appHTML();
+  vp.scrollTop=S.tab===lastTab?keepTop:0;lastTab=S.tab;
+  const sp=$("sidepanel");sp.hidden=!S.panel;sp.innerHTML=S.panel?panelHTML():"";
+  $("lana-btn").classList.toggle("on",S.panel);
+  const lb2=$("lbody");if(lb2)lb2.scrollTop=toBottom?lb2.scrollHeight:keepL;
+  drawLayer();
+}
+function scrollTo(id){const vp=$("viewport"),el=$(id);if(!vp||!el)return;vp.scrollTo({top:Math.max(0,rel(el).y-60),behavior:matchMedia("(prefers-reduced-motion:reduce)").matches?"auto":"smooth"})}
+
+/* the content script's eyes: hover, selection, right-click, the shortcut */
+const vp=$("viewport");
+vp.addEventListener("mousemove",e=>{
+  if(S.tab!=="aws")return;
+  const b=e.target.closest("[data-block]"),h=e.target.closest(".l-handle");
+  const id=h?S.hover:b?b.dataset.keep:null;
+  if(id!==S.hover){S.hover=id;drawLayer()}
+});
+vp.addEventListener("mouseleave",()=>{if(S.hover){S.hover=null;drawLayer()}});
+vp.addEventListener("mouseup",e=>{
+  if(S.tab!=="aws"||e.target.closest(".lana-layer button"))return;
+  setTimeout(()=>{
+    const sel=window.getSelection();if(!sel||sel.isCollapsed){if(S.sel){S.sel=null;drawLayer()}return}
+    const a=sel.anchorNode&&(sel.anchorNode.nodeType===1?sel.anchorNode:sel.anchorNode.parentElement);
+    const p=a&&a.closest("[data-keep]");if(!p)return;
+    const text=sel.toString().replace(/\s+/g," ").trim();if(text.length<3)return;
+    const r=sel.getRangeAt(0).getBoundingClientRect(),w=$("pagewrap").getBoundingClientRect();
+    S.sel={id:p.dataset.keep,text,x:Math.max(8,r.left-w.left+r.width/2-100),y:Math.max(0,r.top-w.top-44)};drawLayer();
+  },0);
+});
+vp.addEventListener("contextmenu",e=>{
+  if(S.tab!=="aws")return;
+  e.preventDefault();
+  const p=e.target.closest("[data-keep]"),sel=window.getSelection(),text=sel&&!sel.isCollapsed?sel.toString().replace(/\s+/g," ").trim():"";
+  const kind=p?ITEMS[p.dataset.keep].kind:null;
+  S.menu={id:p?p.dataset.keep:null,text:text||null};
+  const what=text?"selection":kind==="image"?"image":kind==="code"?"code":kind==="table"?"table":p?"paragraph":null;
+  const m=$("cmenu");
+  m.innerHTML=`<div class="it dim"><span class="ico">←</span>Back</div><div class="it dim"><span class="ico">↻</span>Reload</div><div class="sep"></div>${text?`<div class="it dim"><span class="ico"></span>Copy<span class="k">Ctrl+C</span></div>`:""}<div class="it dim"><span class="ico"></span>${kind==="image"?"Save image as…":"Print…"}</div><div class="sep"></div>`+
+    (what?`<div class="it on" data-act="cm-keep"><span class="ico">${L}</span>Keep ${what} with Lana<span class="k">Ctrl+Shift+K</span></div><div class="it on" data-act="cm-ask"><span class="ico">${L}</span>Ask Lana about this ${what}</div>`:`<div class="it on" data-act="cm-ask-page"><span class="ico">${L}</span>Ask Lana about this page</div>`)+
+    `<div class="sep"></div><div class="it dim"><span class="ico"></span>Inspect</div>`;
+  m.hidden=false;
+  m.style.left=Math.min(e.clientX,window.innerWidth-290)+"px";m.style.top=Math.min(e.clientY,window.innerHeight-m.offsetHeight-8)+"px";
+});
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){$("cmenu").hidden=true;if(S.sel){S.sel=null;drawLayer()}}
+  if(e.ctrlKey&&e.shiftKey&&(e.key==="K"||e.key==="k")&&S.tab==="aws"){
+    e.preventDefault();
+    if(S.sel){const s=S.sel;window.getSelection().removeAllRanges();keep(s.id,s.text)}else if(S.hover)keep(S.hover);
+  }
+});
+window.addEventListener("resize",()=>drawLayer());
+
+document.addEventListener("click",e=>{
+  const m=$("cmenu");
+  const mi=e.target.closest("#cmenu [data-act]");
+  if(mi){const a=mi.dataset.act,ctx=S.menu;m.hidden=true;
+    if(a==="cm-keep"&&ctx&&ctx.id){window.getSelection().removeAllRanges();keep(ctx.id,ctx.text)}
+    if(a==="cm-ask"&&ctx&&ctx.id){S.panel=true;window.getSelection().removeAllRanges();ask(ctx.id,ctx.text)}
+    if(a==="cm-ask-page"){S.panel=true;if(!S.ctx.some(c=>c.page))S.ctx.push({page:true,label:"This page: What is Amazon S3?",kind:"text"});render();const t=$("talk");if(t)t.focus()}
+    return}
+  if(!m.hidden&&!e.target.closest("#cmenu"))m.hidden=true;
+  if(e.target.closest("#lana-btn")){S.panel=!S.panel;render(true);return}
+  const el=e.target.closest("[data-act]");if(!el)return;const a=el.dataset.act;
+  if(a==="keep"){keep(el.dataset.id);return}
+  if(a==="keep-sel"&&S.sel){const s=S.sel;window.getSelection().removeAllRanges();keep(s.id,s.text);return}
+  if(a==="ask-sel"&&S.sel){const s=S.sel;window.getSelection().removeAllRanges();ask(s.id,s.text);return}
+  if(a==="unctx"){S.ctx.splice(+el.dataset.i,1);render();return}
+  if(a==="reply"){const t=S.turns[+el.dataset.i];if(t&&!t.used)reply(t,el.dataset.l,el.dataset.k);return}
+  if(a==="loop"){if(el.dataset.l==="fit"&&S.finds.length){toFit();return}S.loop="find";S.tab="aws";render(true);return}
+  if(a==="tab"){S.tab=el.dataset.t;S.sel=null;render();if(S.tab==="app"&&S.cur)setTimeout(()=>scrollTo("nb-"+S.cur),60);return}
+  if(a==="close-panel"){S.panel=false;render();return}
+  if(a==="restart"){reset();lastTab=null;render();return}
+});
+document.addEventListener("input",e=>{if(e.target.id==="talk"){S.draft=e.target.value;const b=document.querySelector(".send");if(b)b.classList.toggle("ready",!!S.draft.trim())}});
+document.addEventListener("submit",e=>{e.preventDefault();if(e.target.id==="talk-form"){sendText();const t=$("talk");if(t)t.focus()}});
+render();
+})();
+</script>

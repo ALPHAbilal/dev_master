@@ -1,3 +1,6 @@
+/* The side panel. Chrome draws its own header with Lana's name above this page,
+   so the page starts with content. Flat and still; state is shown, not written. */
+
 html,
 body,
 #root {
@@ -9,6 +12,27 @@ body {
   background: var(--bg);
   color: var(--ink);
   font: 14px/1.5 var(--ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .panel {
@@ -17,36 +41,461 @@ body {
   height: 100%;
 }
 
-.title-row {
+/* ─── off ─── */
+.idle {
+  justify-content: center;
+  gap: 20px;
+  padding: 24px 16px 30vh;
+}
+
+.idle-mark {
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.composer {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 44px;
-  padding: 0 14px;
+  min-height: 48px;
+  padding: 7px 7px 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg);
+}
+
+.composer:focus-within {
+  border-color: var(--ink-4);
+}
+
+.composer input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  font: inherit;
+  font-size: 15px;
+}
+
+.composer input::placeholder {
+  color: var(--ink-4);
+}
+
+.send {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.send:disabled {
+  background: var(--hover);
+  color: var(--ink-4);
+  opacity: 1;
+}
+
+/* ─── on ─── */
+.question {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px 10px 12px 16px;
   border-bottom: 1px solid var(--line);
 }
 
-.mark {
+.question h1 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* research mode is on: a still dot, the same accent as the icon's badge */
+.live {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.icon-btn {
+  flex: none;
   display: grid;
   place-items: center;
-  width: 18px;
-  height: 18px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink-3);
+}
+
+.icon-btn:hover:not(:disabled),
+.icon-btn[aria-pressed='true'] {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px 8px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--canvas);
+}
+
+.tools input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.tools input:focus {
+  border-color: var(--accent);
+}
+
+.result {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+
+.result.found {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.result.missing {
+  background: var(--hover);
+  color: var(--ink-3);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 16px 24px;
+}
+
+.page-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+}
+
+.favicon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--hover);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.page-title {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ink-2);
+}
+
+.page-row .bar,
+.blank span {
+  display: block;
+  height: 8px;
   border-radius: 5px;
+  background: var(--hover);
+}
+
+.page-row .bar {
+  width: 60%;
+}
+
+.page-row.off .favicon {
+  color: var(--ink-4);
+}
+
+.taken-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.blank {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.taken {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.taken.ask {
+  background: var(--accent-wash);
+  border-color: transparent;
+}
+
+.taken .text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 21px;
+}
+
+.taken pre {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--canvas);
+  font: 12px/1.6 var(--mono);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.taken img {
+  display: block;
+  max-width: 100%;
+  border-radius: 8px;
+}
+
+.taken table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.taken td {
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.taken footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.taken footer span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ─── the conversation ─── */
+.page-row {
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.turns {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.turn p {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 22px;
+}
+
+.turn.lana {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.turn.you {
+  position: relative;
+  align-self: flex-end;
+  max-width: 88%;
+  padding: 9px 14px;
+  border-radius: 12px;
+  background: var(--hover);
+}
+
+.turn.you .turn-icon {
+  position: absolute;
+  left: -26px;
+  top: 9px;
+  color: var(--ink-4);
+}
+
+.turn.you pre,
+.turn.you img,
+.turn.you table {
+  max-width: 100%;
+}
+
+.turn.you pre {
+  margin: 0;
+  font: 12px/1.6 var(--mono);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.turn.you table {
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.turn.you td {
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.replies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.replies button {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg);
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.replies button.go {
+  border-color: var(--accent);
   background: var(--accent);
   color: var(--on-accent);
+}
+
+/* the pages worth opening: the verdict is the badge's tone, the state is the icon on the right */
+.sources {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.source {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 10px 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  text-align: left;
+}
+
+.source:hover {
+  border-color: var(--ink-4);
+}
+
+.source.now {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+
+.source .verdict {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
   font-size: 10.5px;
   font-weight: 700;
 }
 
-.title {
-  font-weight: 600;
+.source.read .verdict {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
-.empty {
-  flex: 1;
-  display: grid;
-  place-items: center;
-  padding: 24px;
+.source.later .verdict {
+  background: var(--bg);
   color: var(--ink-3);
-  text-align: center;
+  box-shadow: inset 0 0 0 1.5px var(--ink-4);
+}
+
+.s-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.s-title {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.s-why {
+  font-size: 12px;
+  color: var(--ink-3);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.s-state {
+  flex: none;
+  color: var(--ink-4);
+}
+
+.source.done .s-title {
+  color: var(--ink-3);
+}
+
+.source.done .s-state {
+  color: var(--accent);
 }
