@@ -53,6 +53,16 @@ export interface ResultLabel {
   verdict: Verdict;
 }
 
+/** One piece of knowledge, marked where it is on the page and named ("1 · Definition").
+ *  `text` is the exact passage. With `block`, the frame also takes in the code, figure or
+ *  table that follows the passage. */
+export interface Annotation {
+  id: string;
+  label: string;
+  text: string;
+  block?: boolean;
+}
+
 /** The answer to "point to" or "highlight": found, or why not. */
 export type MarkResult = { found: true } | { found: false; reason: 'not-on-page' | 'no-page-script' };
 
@@ -74,6 +84,8 @@ export type ToPage =
   | { type: 'mark:highlight'; text: string }
   | { type: 'mark:clear' }
   | { type: 'mark:results'; results: ResultLabel[] }
+  | { type: 'mark:annotate'; annotations: Annotation[] }
+  | { type: 'mark:focus'; id: string }
   | { type: 'pick:start' }
   | { type: 'pick:stop' };
 
@@ -95,6 +107,11 @@ export type ToPanel =
   | { type: 'panel:page-unavailable' }
   | { type: 'panel:picked'; part: PartRef; page: PageInfo }
   | { type: 'panel:captured'; action: CaptureAction; source: CaptureSource; capture: Capture };
+
+/** The answer to "annotate": which pieces were found on this page. */
+export interface AnnotateResult {
+  found: string[];
+}
 
 /** What the panel gets when it opens: research mode, and what it missed while closed. */
 export interface PanelStart {

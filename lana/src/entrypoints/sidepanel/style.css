@@ -334,3 +334,35 @@ button:disabled {
   padding: 0 16px;
   border-bottom: 1px solid var(--line);
 }
+
+/* ─── the pieces marked on this page ─── */
+.on-page {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.on-page button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--raised);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.on-page button:hover {
+  border-color: var(--accent);
+}
+
+.on-page .num {
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+}

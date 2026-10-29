@@ -1,4 +1,5 @@
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
+import type { Annotation } from '@/contract/messages';
 import { findText } from './find';
 import { headingOf } from './capture';
 import type { LabeledResult } from './results';
@@ -41,6 +42,15 @@ const CSS = `
 .read .badge { background: #4f7290; color: #fff; }
 .later .badge { background: #fff; color: #7a7d84; box-shadow: inset 0 0 0 1.5px #c3c1ba; }
 .skip .badge { background: #ebeae6; color: #a8a6a0; }
+.anno { position: absolute; border-radius: 3px; background: rgba(79,114,144,.2); pointer-events: none; }
+.anno-frame { position: absolute; border-radius: 10px; box-shadow: 0 0 0 2px #4f7290; background: rgba(79,114,144,.05); pointer-events: none; }
+.anno-tag { position: absolute; display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px 0 3px; border-radius: 11px;
+  background: #4f7290; color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+.anno-tag b { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 8px; background: #fff; color: #4f7290; font-size: 10px; }
+.focus.anno { background: rgba(79,114,144,.34); }
+.focus.anno-frame { box-shadow: 0 0 0 3px #4f7290; background: rgba(79,114,144,.08); }
+.focus.anno-tag, .focus.anno-frame { animation: lana-pulse 1.2s ease-out 1; }
+@keyframes lana-pulse { 0% { box-shadow: 0 0 0 0 rgba(79,114,144,.55); } 100% { box-shadow: 0 0 0 14px rgba(79,114,144,0); } }
 .hover { position: absolute; border-radius: 10px; background: rgba(79,114,144,.10); box-shadow: 0 0 0 1.5px rgba(79,114,144,.55); pointer-events: none; }
 [hidden] { display: none !important; }
 `;
@@ -69,6 +79,8 @@ export function createLayer(ctx: ContentScriptContext, hooks: Hooks) {
   let picking: ((heading: Element) => void) | null = null;
   let hovered: Element | null = null;
   let highlighted: { range: Range; text: string } | null = null;
+  let annotations: { note: Annotation; range: Range; blocks: Element[] }[] = [];
+  let focused: string | null = null;
 
   const page = (r: DOMRect) => ({ x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: r.height });
 
@@ -108,6 +120,32 @@ export function createLayer(ctx: ContentScriptContext, hooks: Hooks) {
       const b = page(r.block.getBoundingClientRect());
       html += `<div class="result ${r.verdict}" style="left:${b.x - 10}px;top:${b.y - 8}px;width:${b.w + 20}px;height:${b.h + 16}px"><span class="badge">L</span></div>`;
     }
+    annotations.forEach((a) => {
+      // Sites redraw their text after loading: when the range empties, find the words again.
+      if (!a.range.toString().trim()) {
+        const again = findText(a.note.text, host);
+        if (again) {
+          a.range = again;
+          if (a.note.block) a.blocks = blockWith(again);
+        }
+      }
+      const cls = a.note.id === focused ? ' focus' : '';
+      const tag = (x: number, y: number) =>
+        `<span class="anno-tag${cls}" style="left:${x}px;top:${y}px"><b>L</b>${escape(a.note.label)}</span>`;
+      if (a.note.block && a.blocks.length) {
+        const rects = a.blocks.filter((b) => b.isConnected).map((b) => page(b.getBoundingClientRect()));
+        if (!rects.length) return;
+        const x = Math.min(...rects.map((r) => r.x)) - 10;
+        const y = Math.min(...rects.map((r) => r.y)) - 8;
+        const w = Math.max(...rects.map((r) => r.x + r.w)) - x + 10;
+        const h = Math.max(...rects.map((r) => r.y + r.h)) - y + 8;
+        html += `<div class="anno-frame${cls}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px"></div>` + tag(x + 10, y - 12);
+        return;
+      }
+      const rects = [...a.range.getClientRects()].map(page);
+      rects.forEach((b) => (html += `<div class="anno${cls}" style="left:${b.x - 1}px;top:${b.y - 1}px;width:${b.w + 2}px;height:${b.h + 2}px"></div>`));
+      if (rects[0]) html += tag(rects[0].x - 2, rects[0].y - 27);
+    });
     if (picking && hovered?.isConnected) {
       const b = sectionBox(hovered);
       html += `<div class="hover" style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px"></div>`;
@@ -118,6 +156,8 @@ export function createLayer(ctx: ContentScriptContext, hooks: Hooks) {
 
   // ─── the scroll arrow: shown only while the marked part is off screen ───
   function target(): Element | null {
+    const focus = annotations.find((a) => a.note.id === focused);
+    if (focus) return focus.blocks[0] ?? elementOf(focus.range.startContainer);
     if (pointed?.isConnected) return pointed;
     const node = highlighted?.range.startContainer;
     return node ? (node instanceof Element ? node : node.parentElement) : null;
@@ -190,7 +230,7 @@ export function createLayer(ctx: ContentScriptContext, hooks: Hooks) {
   });
 
   // Redraw when the page changes size or shifts its layout; recheck the arrow on scroll.
-  const redraw = () => (pointed || highlighted || results.length) && draw();
+  const redraw = () => (pointed || highlighted || results.length || annotations.length) && draw();
   ctx.addEventListener(window, 'resize', redraw);
   ctx.addEventListener(window, 'scroll', updateArrow, { passive: true });
   const observer = new ResizeObserver(redraw);
@@ -206,6 +246,8 @@ export function createLayer(ctx: ContentScriptContext, hooks: Hooks) {
         pointed = null;
         highlighted = null;
         results = [];
+        annotations = [];
+        focused = null;
         picking = null;
         menu.hidden = true;
         draw();
@@ -223,8 +265,29 @@ export function createLayer(ctx: ContentScriptContext, hooks: Hooks) {
       pointed = null;
       highlighted = null;
       results = [];
+      annotations = [];
+      focused = null;
       picking = null;
       draw();
+    },
+    /** Marks each piece where it is, named; answers with the ones found. */
+    annotate(list: Annotation[]): string[] {
+      annotations = [];
+      for (const note of list) {
+        const range = findText(note.text, host);
+        if (range) annotations.push({ note, range, blocks: note.block ? blockWith(range) : [] });
+      }
+      draw();
+      return annotations.map((a) => a.note.id);
+    },
+    /** Brings one piece into view and makes it stand out. */
+    focus(id: string): boolean {
+      const a = annotations.find((n) => n.note.id === id);
+      if (!a) return false;
+      focused = id;
+      draw();
+      (a.blocks[0] ?? elementOf(a.range.startContainer))?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return true;
     },
     results(list: LabeledResult[]) {
       results = list;
@@ -245,4 +308,21 @@ export function createLayer(ctx: ContentScriptContext, hooks: Hooks) {
       toastTimer = window.setTimeout(() => (toastEl.hidden = true), 1600);
     },
   };
+}
+
+const escape = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+const elementOf = (n: Node) => (n instanceof Element ? n : n.parentElement);
+
+/** The passage's own block, and what follows it up to the first code, figure or table. */
+function blockWith(range: Range): Element[] {
+  const start = elementOf(range.startContainer)?.closest('p, li, dd, div, td');
+  if (!start) return [];
+  const blocks = [start];
+  const isMedia = (e: Element) => e.matches('pre, table, figure, img') || !!e.querySelector('pre, table, figure, img');
+  for (let next = start.nextElementSibling, i = 0; next && i < 3; next = next.nextElementSibling, i++) {
+    if (next.matches('h1, h2, h3, h4, h5, h6')) break;
+    blocks.push(next);
+    if (isMedia(next)) return blocks;
+  }
+  return [start];
 }

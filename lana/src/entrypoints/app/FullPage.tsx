@@ -2,21 +2,22 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import { toBackground, type FromPanel } from '@/contract/messages';
 import { newConversation, type Conversation, type Run, type Turn } from '@/ui/conversation';
 import { Icon } from '@/ui/icons';
-import { CHECK, FRAMING, PLAN, QUERIES, SOURCES, applyRunEvent, searchUrl, type RunEvent } from '@/ui/scenario';
+import { ANSWERS, BEATS, CHECKING_CODE, FINDING, PIECES, applyRunEvent, type RunEvent } from '@/ui/scenario';
 import { useConversation } from '@/ui/store';
 import { TurnView } from '@/ui/turns';
 
-// Lana's full page: where the learner and Lana talk things through.
-// It owns three moments of a research session: framing the question into a plan, choosing the
-// searches (and what each will give), and checking the finds against the plan. Reading happens
-// on the real site, with Lana in the side panel; searching hands over to it.
+// Lana's full page: where the learner and Lana talk.
+// First they define the session: what it must give (a definition, a diagram, code…) and how
+// each piece relates to the others. Lana searches only when the talk needs a fact, then the
+// talk goes on. Then Lana finds every piece on its own and answers each one twice, linked:
+// here in the chat, and annotated on the page it came from ("Show on the page").
 // For now a scripted agent (ui/scenario.ts) talks; the real one will use the same conversation.
 
 const send = (message: FromPanel) => browser.runtime.sendMessage(toBackground(message));
 type LanaTurn = Extract<Turn, { who: 'lana' }>;
 
-/** Scripted runs already playing in this page, so a re-render or StrictMode never starts one twice. */
-const playing = new Set<string>();
+/** Scripted moments already started in this page, so a re-render or StrictMode never starts one twice. */
+const started = new Set<string>();
 
 export default function FullPage() {
   const { conversation, loaded, update, start } = useConversation();
@@ -28,14 +29,17 @@ export default function FullPage() {
   }, []);
 
   const lana = (t: Omit<LanaTurn, 'who' | 'at' | 'home'>): LanaTurn => ({ ...t, who: 'lana', at: Date.now(), home: 'full' });
-  const you = (text: string, chip?: string): Turn => ({ who: 'you', at: Date.now(), text, chip });
-  const push = (...turns: Turn[]) => update((c) => ({ ...c, turns: [...c.turns, ...turns] }));
-  const closeReplies = () => update((c) => ({ ...c, turns: c.turns.map((t) => (t.who === 'lana' && t.home === 'full' && (t.replies || t.queries) ? { ...t, used: true } : t)) }));
+  const you = (text: string): Turn => ({ who: 'you', at: Date.now(), text });
+  const closeReplies = () => update((c) => ({ ...c, turns: c.turns.map((t) => (t.who === 'lana' && t.replies && !t.used ? { ...t, used: true } : t)) }));
+  const beat = (c: Conversation): Conversation => {
+    const b = BEATS[c.beat];
+    return b ? { ...c, beat: c.beat + 1, turns: [...c.turns, lana(b)] } : c;
+  };
 
-  /** Plays a scripted run on a new turn, then hands its final state to `after`. */
+  /** Plays a scripted run on a new turn of its own, then applies `after`. */
   function play(key: string, events: RunEvent[], after: (c: Conversation) => Conversation) {
-    if (playing.has(key)) return;
-    playing.add(key);
+    if (started.has(key)) return;
+    started.add(key);
     const startedAt = Date.now();
     let index = -1;
     void update((c) => {
@@ -48,30 +52,14 @@ export default function FullPage() {
     setTimeout(() => void update(after), events[events.length - 1]!.at + 500);
   }
 
-  // The moments this page owns start on their own when the session reaches them.
+  // A new session opens with Lana's first question; no search yet.
   useEffect(() => {
-    if (!conversation) return;
-    const id = String(conversation.turns[0]?.at ?? 0);
-    if (conversation.stage === 'framing')
-      play(`frame-${id}`, FRAMING, (c) => ({
-        ...c,
-        stage: 'plan',
-        plan: PLAN,
-        turns: [
-          ...c.turns,
-          lana({ text: 'Here’s how I’d frame it. Change anything before we search.', plan: PLAN, replies: [['Looks good', 'plan:ok'], ['Change something', 'plan:change']] }),
-        ],
-      }));
-    if (conversation.stage === 'check')
-      play(`check-${id}-${conversation.turns.length}`, CHECKING, (c) => ({
-        ...c,
-        stage: 'queries',
-        turns: [
-          ...c.turns,
-          lana({ text: 'What S3 is for and how it’s built: found, in two places. How you pay: still missing. One narrow search should close it.', check: CHECK, queries: [QUERIES[2]!] }),
-        ],
-      }));
-  }, [conversation?.stage]);
+    if (!conversation || conversation.beat > 0) return;
+    const key = `open-${conversation.turns[0]?.at}`;
+    if (started.has(key)) return;
+    started.add(key);
+    setTimeout(() => void update(beat), 600);
+  }, [conversation?.beat]);
 
   useEffect(() => {
     thread.current?.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -80,37 +68,48 @@ export default function FullPage() {
   function reply(key: string, label: string) {
     if (key === 'go:panel') return backToPage();
     void closeReplies();
-    void push(you(label));
-    if (key === 'plan:ok')
-      void update((c) => ({
+    void update((c) => ({ ...c, turns: [...c.turns, you(label)] }));
+    const id = conversation?.turns[0]?.at;
+    if (key === 'use') void update((c) => beat({ ...c, pieces: PIECES }));
+    if (key === 'code') {
+      // The talk needs a fact before it can go on: Lana looks it up, then answers.
+      play(`check-${id}`, CHECKING_CODE, beat);
+    }
+    if (key === 'find') {
+      void update((c) => ({ ...c, stage: 'find' }));
+      play(`find-${id}`, FINDING, (c) => ({
         ...c,
-        stage: 'queries',
-        turns: [...c.turns, lana({ text: 'Start wide, then narrow. Here’s what each search will give you. Edit any of them, then search.', queries: QUERIES })],
+        stage: 'read',
+        pieces: c.pieces.map((p) => ({ ...p, answer: ANSWERS[p.id] })),
+        turns: [
+          ...c.turns,
+          lana({
+            text: 'Here they are, each one marked on the page it came from. The diagram draws the definition; the code puts one object into that bucket.',
+            answers: c.pieces.map((p) => p.id),
+          }),
+        ],
       }));
-    if (key === 'plan:change') void push(lana({ text: 'Tell me what to add, remove or reword.' }));
+    }
+    if (key === 'change') void update((c) => ({ ...c, turns: [...c.turns, lana({ text: 'Tell me what to add, remove or change.' })] }));
   }
 
-  /** The learner wrote something. In the plan, it becomes part of it; elsewhere Lana notes it. */
+  /** The learner wrote something. The scripted agent notes it and offers to go on. */
   function say(text: string) {
-    if (!conversation) return;
-    if (conversation.stage === 'plan') {
-      void closeReplies();
-      const plan = { ...(conversation.plan ?? PLAN), find: [...(conversation.plan ?? PLAN).find, text] };
-      void update((c) => ({
-        ...c,
-        plan,
-        turns: [...c.turns, you(text), lana({ text: 'Added. Here’s the plan now.', plan, replies: [['Looks good', 'plan:ok'], ['Change something', 'plan:change']] })],
-      }));
-    } else void push(you(text), lana({ text: 'Noted. I’ll keep that in mind.' }));
+    void closeReplies();
+    const ready = conversation?.beat === BEATS.length && conversation.stage === 'talk';
+    void update((c) => ({
+      ...c,
+      turns: [...c.turns, you(text), lana({ text: ready ? 'Noted. Shall I find the pieces now?' : 'Noted. I’ll keep that in mind.', replies: ready ? [['Find them', 'find']] : undefined })],
+    }));
   }
 
-  /** Searching happens on the real results page, with Lana in the side panel beside it. */
-  function search(query: string) {
+  /** A piece on its page: the side panel opens, and this tab goes to the page with every piece marked. */
+  function show(pieceId: string) {
     // Opening the panel needs the click itself, so it comes before anything awaited.
     if (windowId.current !== undefined) void browser.sidePanel.open({ windowId: windowId.current });
-    void closeReplies()
-      .then(() => update((c) => ({ ...c, query, stage: 'searching', turns: [...c.turns, you(query, 'search')] })))
-      .then(() => send({ type: 'panel:open', url: searchUrl(query) }));
+    const url = conversation?.pieces.find((p) => p.id === pieceId)?.answer?.source.url;
+    if (!url) return;
+    void update((c) => ({ ...c, focus: pieceId })).then(() => send({ type: 'panel:open', url }));
   }
 
   /** Back to the site: the side panel opens and this page closes. */
@@ -133,21 +132,18 @@ export default function FullPage() {
           <Composer
             autoFocus
             placeholder="A topic, a question, a goal…"
-            onSend={(question) => {
-              void start(newConversation(question, SOURCES.length)).then(() => send({ type: 'panel:start-research', question }));
-            }}
+            onSend={(question) => void start(newConversation(question)).then(() => send({ type: 'panel:start-research', question }))}
           />
         </div>
       </div>
     );
 
-  const reading = conversation.stage === 'searching' || conversation.stage === 'triage';
   return (
     <div className="full">
       <header className="top">
         <span className="brand"><span className="hero-mark small" aria-hidden="true">L</span>Lana</span>
         <h1 title={conversation.question}>{conversation.question}</h1>
-        {reading && (
+        {conversation.focus && (
           <button className="top-btn" onClick={backToPage}>
             <Icon name="panel" size={14} />
             Back to the page
@@ -159,33 +155,15 @@ export default function FullPage() {
       </header>
       <main className="thread" ref={thread}>
         {conversation.turns.map((t, k) => (
-          <TurnView
-            key={k}
-            turn={t}
-            actions={{
-              view: 'full',
-              sources: conversation.sources,
-              current: conversation.current,
-              onReply: reply,
-              onSearch: search,
-              onOpenSource: backToPage,
-            }}
-          />
+          <TurnView key={k} turn={t} actions={{ view: 'full', pieces: conversation.pieces, onReply: reply, onShow: show }} />
         ))}
       </main>
       <div className="dock">
-        <Composer placeholder={conversation.stage === 'plan' ? 'Add to the plan…' : 'Reply to Lana…'} onSend={say} />
+        <Composer placeholder="Reply to Lana…" onSend={say} />
       </div>
     </div>
   );
 }
-
-/** Checking the finds against the plan, before saying what's missing. */
-const CHECKING: RunEvent[] = [
-  { at: 0, label: 'Comparing your finds with the plan' },
-  { at: 300, step: { id: 'think-check', kind: 'thinking', state: 'busy', text: 'Holding each find against the plan.' } },
-  { at: 2600, done: 'Compared 2 finds with the plan' },
-];
 
 function Composer({ placeholder, onSend, autoFocus }: { placeholder: string; onSend: (text: string) => void; autoFocus?: boolean }) {
   const [text, setText] = useState('');

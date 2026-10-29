@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Capture } from '@/contract/messages';
-import type { CheckItem, Home, Plan, Query, SourceStatus, Turn } from './conversation';
-import { SOURCES } from './scenario';
+import type { Home, Piece, Turn } from './conversation';
 import { StatusLine } from './StatusLine';
 import { Icon } from './icons';
 
@@ -11,11 +10,11 @@ import { Icon } from './icons';
 
 export interface TurnActions {
   view: Home;
-  sources: SourceStatus[];
-  current: number | null;
+  pieces: Piece[];
+  /** Pieces marked on the page the learner is on (side panel only). */
+  here?: string[];
   onReply: (key: string, label: string) => void;
-  onSearch: (query: string) => void;
-  onOpenSource: (index: number) => void;
+  onShow: (pieceId: string) => void;
 }
 
 /** Lana's words: shown whole when they're old, revealed piece by piece when they just arrived. */
@@ -37,78 +36,56 @@ function Words({ text, at }: { text: string; at: number }) {
   );
 }
 
-function PlanCard({ plan, compact }: { plan: Plan; compact: boolean }) {
+/** The session's pieces, and how each relates to the ones before it. */
+function PieceMap({ pieces }: { pieces: Piece[] }) {
   return (
-    <div className={`plan${compact ? ' compact' : ''}`}>
-      <section>
-        <h3>To find</h3>
-        <ul>{plan.find.map((f) => <li key={f}>{f}</li>)}</ul>
-      </section>
-      <section>
-        <h3>Your course gets</h3>
-        <ul>{plan.course.map((c) => <li key={c}>{c}</li>)}</ul>
-      </section>
-    </div>
-  );
-}
-
-function Queries({ queries, onSearch, active }: { queries: Query[]; onSearch: (q: string) => void; active: boolean }) {
-  const [texts, setTexts] = useState(queries.map((q) => q.text));
-  return (
-    <div className="queries">
-      {queries.map((q, i) => (
-        <div className="query" key={q.text}>
-          <div className="query-body">
-            <span className="width">{q.width}</span>
-            <input
-              value={texts[i]}
-              disabled={!active}
-              onChange={(e) => setTexts(texts.map((t, j) => (j === i ? e.target.value : t)))}
-              aria-label={`Search ${i + 1}`}
-              spellCheck={false}
-            />
-            <span className="gives">{q.gives}</span>
-          </div>
-          {active && (
-            <button className="search-btn" disabled={!texts[i]!.trim()} onClick={() => onSearch(texts[i]!.trim())}>
-              <Icon name="search" size={14} />
-              Search
-            </button>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function Check({ items }: { items: CheckItem[] }) {
-  return (
-    <ul className="check">
-      {items.map((c) => (
-        <li key={c.text} className={c.found ? 'found' : 'gap'}>
-          <Icon name={c.found ? 'check' : 'cross'} size={14} />
-          {c.text}
+    <ol className="piece-map">
+      {pieces.map((p) => (
+        <li key={p.id}>
+          <span className="num">{p.number}</span>
+          <span className="piece-body">
+            <span className="piece-name">{p.name}</span>
+            <span className="piece-what">{p.what}</span>
+            {p.relates && <span className="relates">↳ {p.relates}</span>}
+          </span>
         </li>
       ))}
-    </ul>
+    </ol>
   );
 }
 
-/** The pages worth opening, with where the learner stands on each. */
-export function Sources({ status, current, onOpen }: { status: SourceStatus[]; current: number | null; onOpen: (i: number) => void }) {
+function Diagram({ from, via, to }: { from: string; via: string; to: string }) {
   return (
-    <div className="sources">
-      {SOURCES.map((s, i) => (
-        <button key={s.open} className={`source ${s.label.verdict} ${status[i]}${current === i ? ' now' : ''}`} onClick={() => onOpen(i)}>
-          <span className="verdict" aria-hidden="true">L</span>
-          <span className="s-body">
-            <span className="s-title">{s.title}</span>
-            <span className="s-why">{s.site} · {s.why}</span>
-          </span>
-          <span className="s-state" aria-hidden="true">{status[i] === 'done' ? <Icon name="check" /> : <Icon name="open" />}</span>
-        </button>
-      ))}
+    <div className="diagram" role="img" aria-label={`${from}, through a ${via}, to an ${to}`}>
+      <span className="node">{from}<small>amzn-s3-demo-bucket</small></span>
+      <span className="edge">{via}<small>test2.txt</small></span>
+      <span className="node">{to}<small>file + metadata</small></span>
     </div>
+  );
+}
+
+/** A piece answered: what the chat shows of it, where it came from, and the way to its place on the page. */
+function AnswerCard({ piece, onShow, marked }: { piece: Piece; onShow: () => void; marked?: boolean }) {
+  const a = piece.answer!;
+  return (
+    <article className="answer">
+      <header>
+        <span className="num">{piece.number}</span>
+        <span className="piece-name">{piece.name}</span>
+        <span className="piece-what">{piece.what}</span>
+      </header>
+      <blockquote>{a.quote}</blockquote>
+      {a.diagram && <Diagram {...a.diagram} />}
+      {a.code && <pre className="code">{a.code}</pre>}
+      <footer>
+        <img src={`https://www.google.com/s2/favicons?sz=32&domain=${a.source.site}`} alt="" />
+        <span className="source">{a.source.site} · {a.source.title}</span>
+        <button className={`show${marked ? ' here' : ''}`} onClick={onShow}>
+          <Icon name={marked ? 'frame' : 'open'} size={14} />
+          {marked ? 'Show me' : 'Show on the page'}
+        </button>
+      </footer>
+    </article>
   );
 }
 
@@ -133,10 +110,9 @@ export function Preview({ capture }: { capture: Capture }) {
   }
 }
 
-const CHIP_ICON = { search: 'search', here: 'frame', ask: 'ask', keep: 'keep' } as const;
+const CHIP_ICON = { here: 'frame', ask: 'ask', keep: 'keep' } as const;
 
 export function TurnView({ turn, actions }: { turn: Turn; actions: TurnActions }) {
-  const compact = actions.view === 'panel';
   if (turn.who === 'you')
     return (
       <div className="turn you">
@@ -144,20 +120,25 @@ export function TurnView({ turn, actions }: { turn: Turn; actions: TurnActions }
         {turn.chip && <span className="turn-icon"><Icon name={CHIP_ICON[turn.chip as keyof typeof CHIP_ICON] ?? 'keep'} size={14} /></span>}
       </div>
     );
-  const here = turn.home === actions.view;
+  const own = turn.home === actions.view;
+  const answered = (turn.answers ?? []).map((id) => actions.pieces.find((p) => p.id === id)).filter((p): p is Piece => !!p?.answer);
   return (
     <div className="turn lana">
       {turn.run && <StatusLine run={turn.run} />}
       {turn.text && <Words text={turn.text} at={turn.at} />}
-      {turn.plan && <PlanCard plan={turn.plan} compact={compact} />}
-      {turn.check && <Check items={turn.check} />}
-      {turn.queries && <Queries queries={turn.queries} onSearch={actions.onSearch} active={here && !turn.used} />}
-      {turn.sources && <Sources status={actions.sources} current={actions.current} onOpen={actions.onOpenSource} />}
+      {turn.map && <PieceMap pieces={actions.pieces} />}
+      {answered.length > 0 && (
+        <div className="answers">
+          {answered.map((p) => (
+            <AnswerCard key={p.id} piece={p} marked={actions.here?.includes(p.id)} onShow={() => actions.onShow(p.id)} />
+          ))}
+        </div>
+      )}
       {turn.replies && !turn.used && (
         <div className="replies">
-          {here ? (
+          {own ? (
             turn.replies.map(([label, key], j) => (
-              <button key={key} className={j === 0 ? 'go' : ''} onClick={() => actions.onReply(key, label)}>{label}</button>
+              <button key={label} className={j === 0 ? 'go' : ''} onClick={() => actions.onReply(key, label)}>{label}</button>
             ))
           ) : (
             <button className="go" onClick={() => actions.onReply(`go:${turn.home}`, '')}>

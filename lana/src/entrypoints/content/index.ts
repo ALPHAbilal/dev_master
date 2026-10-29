@@ -1,4 +1,4 @@
-import { toBackground, type Envelope, type MarkResult, type Research, type ToPage } from '@/contract/messages';
+import { toBackground, type AnnotateResult, type Envelope, type MarkResult, type Research, type ToPage } from '@/contract/messages';
 import { capture, pageInfo, partOfHeading } from './capture';
 import { labelResults } from './results';
 import { createLayer } from './layer';
@@ -66,6 +66,11 @@ export default defineContentScript({
         case 'mark:clear':
           layer.clear();
           return { ok: true };
+        case 'mark:annotate':
+          if (!active) return { found: [] } satisfies AnnotateResult;
+          return { found: layer.annotate(message.annotations) } satisfies AnnotateResult;
+        case 'mark:focus':
+          return { found: active && layer.focus(message.id) };
         case 'mark:results': {
           if (!active) return { labeled: [] };
           const found = labelResults(message.results);

@@ -1,8 +1,16 @@
-import type { Capture } from '@/contract/messages';
+import { plainUrl, type Annotation, type Capture } from '@/contract/messages';
 
-// One conversation, shown by two views: the full page (to talk and decide) and the side
-// panel (beside the site, to read and show). It lives in Chrome's session storage, so either
-// view can close and the other picks up exactly where it was.
+// One conversation, shown by two views: the full page (to talk) and the side panel (beside the
+// site, to read). It lives in Chrome's session storage, so either view can close and the other
+// picks up exactly where it was.
+//
+// A session goes:  talk ──► find ──► read
+//   talk   Lana and the learner define what the session must give: its pieces (a definition,
+//          a diagram, code…) and how each relates to the others. Lana searches only when the
+//          talk itself needs a fact, then the talk goes on.
+//   find   Lana searches and reads on its own, and answers each piece twice, linked: in the
+//          chat, and annotated on the page where it found it.
+//   read   the learner opens the annotated pages, with Lana in the side panel.
 
 /** Where the conversation is kept, in Chrome's session storage. */
 export const CONVERSATION_KEY = 'conversation';
@@ -31,23 +39,30 @@ export interface Run {
   steps: Step[];
 }
 
-/** What the session must find, and what the course gets from it. */
-export interface Plan {
-  find: string[];
-  course: string[];
+export interface Source {
+  url: string;
+  title: string;
+  site: string;
 }
 
-/** A search the agent suggests, and what it will give the learner. */
-export interface Query {
-  text: string;
-  width: 'Wide' | 'Narrow';
-  gives: string;
+/** What a piece is answered with: the passage, where it is, and what the chat shows of it. */
+export interface Answer {
+  source: Source;
+  mark: Annotation;
+  quote: string;
+  code?: string;
+  diagram?: { from: string; via: string; to: string };
 }
 
-/** The plan held against what was found. */
-export interface CheckItem {
-  text: string;
-  found: boolean;
+/** One piece the session must give the learner, and how it relates to the others. */
+export interface Piece {
+  id: string;
+  number: number;
+  kind: 'definition' | 'diagram' | 'code';
+  name: string;
+  what: string;
+  relates?: string;
+  answer?: Answer;
 }
 
 export type Turn =
@@ -57,43 +72,37 @@ export type Turn =
       home: Home;
       text: string;
       run?: Run;
-      plan?: Plan;
-      queries?: Query[];
-      check?: CheckItem[];
-      sources?: boolean;
+      /** Show the session's pieces as a map. */
+      map?: boolean;
+      /** Show these pieces' answers. */
+      answers?: string[];
       replies?: Reply[];
       used?: boolean;
     }
   | { who: 'you'; at: number; text?: string; chip?: string; capture?: Capture };
 
-/** Where the session stands. Each view acts only on the stages it owns. */
-export type Stage =
-  | 'framing' // full page: the agent drafts the plan
-  | 'plan' // full page: the learner approves or changes it
-  | 'queries' // full page: the learner picks a search
-  | 'searching' // side panel: the results page is open
-  | 'triage' // side panel: results are labeled, the learner opens pages
-  | 'check'; // full page: the plan against the finds
-
-/** Where the learner stands with each source. */
-export type SourceStatus = 'unread' | 'reading' | 'done';
+/** Where the session stands. The full page owns talk and find; reading happens in the panel. */
+export type Stage = 'talk' | 'find' | 'read';
 
 export interface Conversation {
   question: string;
   stage: Stage;
-  query: string | null;
-  plan: Plan | null;
+  /** How far the scripted talk has gone; the real agent won't need it. */
+  beat: number;
+  pieces: Piece[];
+  /** The piece the learner asked to see on its page. */
+  focus: string | null;
   turns: Turn[];
-  sources: SourceStatus[];
-  current: number | null;
 }
 
-export const newConversation = (question: string, sources: number): Conversation => ({
+export const newConversation = (question: string): Conversation => ({
   question,
-  stage: 'framing',
-  query: null,
-  plan: null,
+  stage: 'talk',
+  beat: 0,
+  pieces: [],
+  focus: null,
   turns: [{ who: 'you', at: Date.now(), text: question }],
-  sources: Array.from({ length: sources }, () => 'unread'),
-  current: null,
 });
+
+/** Two addresses are the same page when they match without protocol, query or fragment. */
+export const samePage = (a: string, b: string) => plainUrl(a) === plainUrl(b);

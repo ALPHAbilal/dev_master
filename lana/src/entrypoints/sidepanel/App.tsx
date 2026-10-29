@@ -2,26 +2,25 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   RESEARCH_OFF,
   toBackground,
+  type AnnotateResult,
   type Envelope,
   type FromPanel,
   type MarkResult,
   type PageInfo,
   type PanelStart,
-  type PartRef,
   type Research,
   type ToPanel,
 } from '@/contract/messages';
-import { newConversation, type Conversation, type SourceStatus, type Turn } from '@/ui/conversation';
+import { newConversation, samePage, type Conversation, type Piece, type Turn } from '@/ui/conversation';
 import { Icon } from '@/ui/icons';
-import { LABELS, SOURCES, isSearchPage, samePart, sourceFor } from '@/ui/scenario';
 import { useConversation } from '@/ui/store';
 import { TurnView } from '@/ui/turns';
 
-// The side panel: Lana beside the real site, where the learner reads and shows.
-//   off  a single box: what do you want to find out? Answering opens the full page.
-//   on   the question, the page Lana sees, and the same conversation as the full page.
-// Talking things through happens in the full page; the panel hands over when it's time.
-// For now a scripted agent (ui/scenario.ts) talks; the real one will use the same messages.
+// The side panel: Lana beside the real site, where the learner reads.
+//   off  a single box: what do you want to learn? Answering opens the full page, where Lana talks.
+//   on   the same conversation as the full page, compact, with the pieces marked on this page.
+// When the learner opens a page that holds pieces, the panel asks the page to annotate every one
+// of them, and brings the one the learner chose into view.
 
 const send = (message: FromPanel) => browser.runtime.sendMessage(toBackground(message));
 const toPage = (message: Extract<FromPanel, { type: 'panel:to-page' }>['message']) => send({ type: 'panel:to-page', message });
@@ -31,8 +30,6 @@ function goFull() {
   void send({ type: 'view:full' });
   window.close();
 }
-
-const FULL_STAGES: Conversation['stage'][] = ['framing', 'plan', 'queries', 'check'];
 
 export default function App() {
   const [research, setResearch] = useState<Research>(RESEARCH_OFF);
@@ -71,7 +68,7 @@ export default function App() {
     return (
       <Idle
         onStart={async (question) => {
-          await store.start(newConversation(question, SOURCES.length));
+          await store.start(newConversation(question));
           await send({ type: 'panel:start-research', question });
           goFull();
         }}
@@ -91,8 +88,8 @@ function Idle({ onStart }: { onStart: (question: string) => void }) {
     <div className="panel idle">
       <div className="idle-mark" aria-hidden="true">L</div>
       <form className="composer" onSubmit={submit}>
-        <input autoFocus value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="What do you want to find out?" aria-label="Research question" />
-        <button className="send" type="submit" disabled={!question.trim()} aria-label="Start research">
+        <input autoFocus value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="What do you want to learn?" aria-label="What do you want to learn?" />
+        <button className="send" type="submit" disabled={!question.trim()} aria-label="Start">
           <Icon name="arrow" />
         </button>
       </form>
@@ -100,7 +97,7 @@ function Idle({ onStart }: { onStart: (question: string) => void }) {
   );
 }
 
-/* ─── on: the conversation, driven by the scripted agent ─── */
+/* ─── on: the conversation, and the pieces on this page ─── */
 function Active({
   research,
   page,
@@ -113,34 +110,26 @@ function Active({
   store: ReturnType<typeof useConversation>;
 }) {
   const [tools, setTools] = useState(false);
+  const [here, setHere] = useState<string[]>([]);
   const seen = useRef(events.length);
   const body = useRef<HTMLDivElement>(null);
   const { conversation, update } = store;
 
   // Research started elsewhere (the Goal Book web app): the conversation starts here.
   useEffect(() => {
-    if (!conversation && research.question) void store.start(newConversation(research.question, SOURCES.length));
+    if (!conversation && research.question) void store.start(newConversation(research.question));
   }, [conversation, research.question]);
 
-  const say = (t: Omit<Extract<Turn, { who: 'lana' }>, 'who' | 'at' | 'home'> | Omit<Extract<Turn, { who: 'you' }>, 'who' | 'at'>, who: 'lana' | 'you' = 'lana') =>
-    update((c) => ({ ...c, turns: [...c.turns, (who === 'lana' ? { ...t, who, at: Date.now(), home: 'panel' } : { ...t, who, at: Date.now() }) as Turn] }));
-  const closeReplies = () => update((c) => ({ ...c, turns: c.turns.map((t) => (t.who === 'lana' && t.replies ? { ...t, used: true } : t)) }));
+  const you = (t: Omit<Extract<Turn, { who: 'you' }>, 'who' | 'at'>) => update((c) => ({ ...c, turns: [...c.turns, { ...t, who: 'you', at: Date.now() }] }));
 
-  function nextOrDone(done: SourceStatus[]) {
-    const next = SOURCES.findIndex((s, i) => s.label.verdict === 'read' && done[i] !== 'done');
-    if (next >= 0) say({ text: `Next: ${SOURCES[next]!.title}.`, replies: [['Open it', `open:${next}`]] });
-    else say({ text: 'That covers what S3 is and how it’s built. Let’s hold it against the plan.', replies: [['Talk it through', 'check']] });
-  }
-
-  function answerFor(i: number, picked: PartRef | null) {
-    if (!conversation) return;
-    const src = SOURCES[i]!;
-    const same = picked ? samePart(picked, src.answer) : false;
-    say({ text: same ? `Same place I’d look: ${src.answer.say}.` : `I’d look at ${src.answer.heading}: ${src.answer.say}.` });
-    void toPage({ type: 'mark:point', part: src.answer });
-    const done = conversation.sources.map((s, j) => (j === i ? 'done' : s)) as SourceStatus[];
-    void update((c) => ({ ...c, sources: done, current: null }));
-    nextOrDone(done);
+  /** Marks every piece that lives on this page, then brings the chosen one into view. */
+  async function annotate(p: PageInfo, c: Conversation) {
+    const onPage = c.pieces.filter((x) => x.answer && samePage(x.answer.source.url, p.url));
+    if (!onPage.length) return setHere([]);
+    const r = (await toPage({ type: 'mark:annotate', annotations: onPage.map((x) => x.answer!.mark) })) as AnnotateResult | MarkResult;
+    const found = 'found' in r && Array.isArray(r.found) ? r.found : [];
+    setHere(found);
+    if (c.focus && found.includes(c.focus)) void toPage({ type: 'mark:focus', id: c.focus });
   }
 
   // What happens on the pages reaches the conversation.
@@ -148,50 +137,17 @@ function Active({
     const fresh = events.slice(seen.current);
     seen.current = events.length;
     for (const e of fresh) {
-      if (e.type === 'panel:page') onPage(e.page);
-      if (e.type === 'panel:picked') {
-        const i = SOURCES.findIndex((s) => s === sourceFor(e.page.url));
-        say({ text: e.part.heading ?? '', chip: 'here' }, 'you');
-        if (i >= 0) answerFor(i, e.part);
-      }
-      if (e.type === 'panel:captured') say({ capture: e.capture, chip: e.action }, 'you');
+      if (e.type === 'panel:page' && conversation) void annotate(e.page, conversation);
+      if (e.type === 'panel:picked') void you({ text: e.part.heading ?? '', chip: 'here' });
+      if (e.type === 'panel:captured') void you({ capture: e.capture, chip: e.action });
     }
   });
 
-  function onPage(p: PageInfo) {
-    if (!conversation) return;
-    const stage = conversation.stage;
-    if (isSearchPage(p.url) && (stage === 'searching' || stage === 'triage')) {
-      void toPage({ type: 'mark:results', results: LABELS });
-      if (stage === 'searching') {
-        void update((c) => ({ ...c, stage: 'triage' }));
-        say({ text: 'I marked the results. Three are worth it. Open each one, read, and show me where the answer is.', sources: true });
-      }
-      return;
-    }
-    const src = sourceFor(p.url);
-    if (!src) return;
-    const i = SOURCES.indexOf(src);
-    if (conversation.sources[i] === 'done' || conversation.current === i) return;
-    void update((c) => ({ ...c, current: i, sources: c.sources.map((x, j) => (j === i ? 'reading' : x)) }));
-    say({ text: `${src.title}. Read it, then show me where the answer is.`, replies: [['Show me on the page', `pick:${i}`], ['Not on this page', `none:${i}`]] });
-  }
-
-  function reply(key: string, label: string) {
-    if (key === 'go:full') return goFull();
-    void closeReplies();
-    const [what, arg] = key.split(':');
-    const i = Number(arg);
-    if (what === 'open') void send({ type: 'panel:open', url: SOURCES[i]!.open });
-    if (what === 'pick') {
-      say({ text: label }, 'you');
-      void toPage({ type: 'pick:start' });
-    }
-    if (what === 'none') {
-      say({ text: label }, 'you');
-      answerFor(i, null);
-    }
-    if (what === 'check') void update((c) => ({ ...c, stage: 'check' })).then(goFull);
+  /** A piece: on this page, scroll to it; on another, go there. */
+  function show(id: string) {
+    if (here.includes(id)) return void toPage({ type: 'mark:focus', id });
+    const url = conversation?.pieces.find((p) => p.id === id)?.answer?.source.url;
+    if (url) void update((c) => ({ ...c, focus: id })).then(() => send({ type: 'panel:open', url }));
   }
 
   useEffect(() => {
@@ -199,7 +155,8 @@ function Active({
   }, [conversation?.turns.length]);
 
   if (!conversation) return <div className="panel" />;
-  const waitingInFull = FULL_STAGES.includes(conversation.stage) && !conversation.turns.some((t) => t.who === 'lana' && t.home === 'full' && t.replies && !t.used);
+  const marked = conversation.pieces.filter((p) => here.includes(p.id));
+  const talking = conversation.stage !== 'read';
 
   return (
     <div className="panel">
@@ -218,33 +175,37 @@ function Active({
       </header>
       {tools && <MarkTools />}
       <PageRow page={page} />
+      {marked.length > 0 && <OnThisPage pieces={marked} onShow={(id) => void toPage({ type: 'mark:focus', id })} />}
 
       <main className="body" ref={body}>
         <div className="turns">
           {conversation.turns.map((t, k) => (
-            <TurnView
-              key={k}
-              turn={t}
-              actions={{
-                view: 'panel',
-                sources: conversation.sources,
-                current: conversation.current,
-                onReply: reply,
-                onSearch: (q) => void send({ type: 'panel:open', url: `https://www.google.com/search?q=${encodeURIComponent(q)}` }),
-                onOpenSource: (i) => void send({ type: 'panel:open', url: SOURCES[i]!.open }),
-              }}
-            />
+            <TurnView key={k} turn={t} actions={{ view: 'panel', pieces: conversation.pieces, here, onReply: (key) => key === 'go:full' && goFull(), onShow: show }} />
           ))}
-          {waitingInFull && (
+          {talking && (
             <div className="handoff">
               <button className="go" onClick={goFull}>
                 <Icon name="expand" size={14} />
-                Lana is in the full page
+                Lana is talking in the full page
               </button>
             </div>
           )}
         </div>
       </main>
+    </div>
+  );
+}
+
+/** The pieces marked on this page; a click brings one into view. */
+function OnThisPage({ pieces, onShow }: { pieces: Piece[]; onShow: (id: string) => void }) {
+  return (
+    <div className="on-page">
+      {pieces.map((p) => (
+        <button key={p.id} onClick={() => onShow(p.id)}>
+          <span className="num">{p.number}</span>
+          {p.name}
+        </button>
+      ))}
     </div>
   );
 }
