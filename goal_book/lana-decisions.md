@@ -132,6 +132,29 @@ Claude's proposal for the messages, not yet confirmed by the user:
 - Then: the user confirms the message list above, and Claude writes it as typed
   code in `lana/src/contract/`.
 
+## Two views: full page and side panel (decided 2026-10-29)
+
+- **Lana starts in a full page** (its own tab, `app.html`): the agent and the
+  learner talk there first, about which searches to run and what each gives.
+- **The side panel is for the site:** reading, and showing Lana things on the page.
+- **Back to the full page whenever there is something to discuss.**
+- **The look follows Claude's UI.**
+- Built in commit a41852b. Both views show one conversation, kept in Chrome's
+  session storage, so switching loses nothing.
+
+Claude's picks while building, to confirm or change:
+
+```
+ accent        Lana keeps its blue (#4f7290); Claude's orange is not used
+ serif         Georgia for Lana's voice (Claude's own serif belongs to Anthropic)
+ light / dark  follows the computer's setting
+ toolbar icon  research off → full page · research on → side panel
+ who owns what full page: frame, choose searches, check · side panel: search
+               results, read, show
+ check         after the last source, the panel offers "Talk it through"; the full
+               page holds the finds against the plan and suggests the gap's search
+```
+
 ## Open, later
 
 - Panel code: bundled in the extension, or a thin shell framing a Vercel page.
