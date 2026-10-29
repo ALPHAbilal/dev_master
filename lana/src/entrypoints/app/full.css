@@ -1,0 +1,257 @@
+/* Lana's full page: one wide conversation, Claude's layout. */
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 var(--ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.full {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* ─── nothing yet: one question ─── */
+.empty .hero {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  width: 100%;
+  max-width: 680px;
+  margin: auto;
+  padding: 0 16px 18vh;
+}
+
+.hero h1 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0;
+  font: 400 clamp(28px, 5vw, 38px) / 1.2 var(--serif);
+  letter-spacing: -0.01em;
+  text-align: center;
+}
+
+.hero-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: 700 19px/1 var(--ui);
+}
+
+.hero-mark.small {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  font-size: 13px;
+}
+
+/* ─── the session ─── */
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 52px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.top h1 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: center;
+  font: 500 14px/1 var(--ui);
+  color: var(--ink-2);
+}
+
+.top-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--raised);
+  font-size: 13px;
+}
+
+.top-btn.quiet {
+  padding: 0 8px;
+  border-color: transparent;
+  background: none;
+  color: var(--ink-3);
+}
+
+.top-btn:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.thread {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  max-width: 768px;
+  margin: 0 auto;
+  padding: 32px 16px 160px;
+}
+
+.full .turn.you {
+  max-width: 80%;
+  padding: 10px 16px;
+  border-radius: 16px;
+}
+
+.full .turn.you p {
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.full .turn.lana {
+  gap: 14px;
+}
+
+.full .turn.lana .words {
+  font-size: 16.5px;
+  line-height: 1.65;
+}
+
+.full .replies button {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 17px;
+}
+
+/* ─── the composer, docked at the bottom ─── */
+.dock {
+  position: sticky;
+  bottom: 0;
+  padding: 24px 16px 20px;
+  background: linear-gradient(transparent, var(--bg) 40%);
+}
+
+.dock .composer-box {
+  max-width: 736px;
+  margin: 0 auto;
+}
+
+.composer-box {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 12px 12px 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--raised);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+.composer-box:focus-within {
+  border-color: var(--ink-4);
+}
+
+.composer-box textarea {
+  flex: 1;
+  min-width: 0;
+  max-height: 200px;
+  padding: 4px 0;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: none;
+  font: 16px/24px var(--ui);
+  color: var(--ink);
+  field-sizing: content;
+}
+
+.composer-box textarea::placeholder {
+  color: var(--ink-4);
+}
+
+.composer-box .send {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.composer-box .send:disabled {
+  background: var(--hover);
+  color: var(--ink-4);
+  opacity: 1;
+}
+
+@media (max-width: 560px) {
+  .plan {
+    grid-template-columns: 1fr;
+  }
+
+  .plan section + section {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .query {
+    flex-wrap: wrap;
+  }
+}

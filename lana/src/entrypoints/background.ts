@@ -1,4 +1,5 @@
 import type { Browser } from 'wxt/browser';
+import { CONVERSATION_KEY } from '@/ui/conversation';
 import {
   RESEARCH_OFF,
   toPage,
@@ -19,12 +20,14 @@ import {
 
 // The background is the hub: the page script and the panel only talk to it.
 // It owns research mode, and what needs Chrome's own APIs: the toolbar icon,
-// the right-click menu, the keyboard shortcut and the side panel.
+// the right-click menu, the keyboard shortcut, the side panel and the full page.
+// Lana starts in the full page, to talk; during research the icon opens the side panel.
 
 const MENU_KEEP = 'lana-keep';
 const MENU_ASK = 'lana-ask';
 const COMMAND_KEEP = 'keep-selection';
 const ACCENT = '#4f7290';
+const FULL_PAGE = '/app.html';
 
 /** Messages for the panel that arrived while it was closed. */
 const waiting: ToPanel[] = [];
@@ -36,8 +39,8 @@ const loaded = browser.storage.session.get('research').then((s) => {
 });
 
 export default defineBackground(() => {
-  // Clicking the toolbar icon opens the side panel beside the page.
-  void browser.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+  // When the icon doesn't open the side panel (research is off), it opens the full page.
+  browser.action.onClicked.addListener(() => void openFullPage());
 
   browser.runtime.onInstalled.addListener(() => {
     browser.contextMenus.removeAll(() => {
@@ -115,6 +118,9 @@ async function handle(message: FromPage | FromPanel, sender: Browser.runtime.Mes
     case 'panel:start-research':
       await setResearch({ active: true, goal: research.goal, question: message.question, startedAt: Date.now() });
       return research;
+    case 'view:full':
+      await openFullPage();
+      return;
     case 'panel:stop-research':
       await setResearch(RESEARCH_OFF);
       return research;
@@ -130,18 +136,31 @@ async function handle(message: FromPage | FromPanel, sender: Browser.runtime.Mes
 async function setResearch(next: Research) {
   research = next;
   await browser.storage.session.set({ research });
+  if (!research.active) await browser.storage.session.remove(CONVERSATION_KEY);
   showResearch();
   const tabs = await browser.tabs.query({});
   for (const tab of tabs) if (tab.id) void sendToPage(tab.id, { type: 'research:changed', research });
   await sendToPanel({ type: 'panel:research', research });
 }
 
-/** The icon carries a dot while research mode is on; the right-click entries exist only then. */
+/** The icon carries a dot while research mode is on; the right-click entries exist only then.
+ *  During research the icon opens the side panel; otherwise the full page. */
 function showResearch() {
+  void browser.sidePanel.setPanelBehavior({ openPanelOnActionClick: research.active });
   void browser.action.setBadgeBackgroundColor({ color: ACCENT });
   void browser.action.setBadgeText({ text: research.active ? ' ' : '' });
   void browser.contextMenus.update(MENU_KEEP, { visible: research.active }).catch(() => {});
   void browser.contextMenus.update(MENU_ASK, { visible: research.active }).catch(() => {});
+}
+
+/** Brings Lana's full page forward, or opens it. */
+async function openFullPage() {
+  const url = browser.runtime.getURL(FULL_PAGE);
+  const [tab] = await browser.tabs.query({ url });
+  if (tab?.id) {
+    await browser.tabs.update(tab.id, { active: true });
+    if (tab.windowId) await browser.windows.update(tab.windowId, { focused: true });
+  } else await browser.tabs.create({ url });
 }
 
 async function activeTab() {

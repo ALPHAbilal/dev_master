@@ -2,7 +2,7 @@
 //
 //   PAGE SCRIPT  (content script, inside the website)
 //   BACKGROUND   (service worker, the hub: every message goes through it)
-//   PANEL        (Chrome's side panel)
+//   PANEL        (Chrome's side panel, and Lana's full page: the same app, two sizes)
 //
 // The page script and the panel never talk directly. The background carries
 // messages both ways, and keeps the ones the panel missed while it was closed.
@@ -84,7 +84,8 @@ export type FromPanel =
   | { type: 'panel:start-research'; question: string }
   | { type: 'panel:stop-research' }
   | { type: 'panel:to-page'; message: Extract<ToPage, { type: `mark:${string}` | `pick:${string}` }> }
-  | { type: 'panel:open'; url: string };
+  | { type: 'panel:open'; url: string }
+  | { type: 'view:full' };
 
 // ─── background ──► panel ───────────────────────────────────────────────────
 

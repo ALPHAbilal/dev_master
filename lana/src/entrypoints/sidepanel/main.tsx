@@ -2,6 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
 import '@/design/tokens.css';
+import '@/ui/status.css';
+import '@/ui/turns.css';
 import './style.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

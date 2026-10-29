@@ -18,6 +18,9 @@ const PATHS = {
   search: 'M7 2.75a4.25 4.25 0 1 0 0 8.5 4.25 4.25 0 0 0 0-8.5ZM10.25 10.25 13.5 13.5',
   open: 'M6 4h6v6M12 4l-7.5 7.5',
   keep: 'M4.5 2.5h7v11L8 10.5l-3.5 3z',
+  chevron: 'm6 4 4 4-4 4',
+  expand: 'M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9',
+  panel: 'M2.5 3h11v10h-11zM9.5 3v10',
 } as const;
 
 export type IconName = keyof typeof PATHS;

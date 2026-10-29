@@ -1,19 +1,55 @@
-/* Colors and type shared by every surface: the side panel and the marks on the page. */
+/* Colors and type shared by Lana's own pages: the side panel and the full page.
+   The look follows Claude's: warm neutrals, sans for the interface, serif for Lana's voice.
+   Dark values measured on claude.ai (2026-10-29). Lana keeps its own accent.
+   The marks drawn on websites keep their own colors (content/layer.ts). */
 :root {
-  --bg: #ffffff;
-  --canvas: #f4f4f2;
-  --hover: #ebeae6;
-  --line: #e3e1db;
-  --ink: #1e2024;
-  --ink-2: #4a4d53;
-  --ink-3: #7a7d84;
-  --ink-4: #a8a6a0;
+  color-scheme: light dark;
+
+  --bg: #faf9f5;
+  --canvas: #f5f4ed;
+  --raised: #ffffff;
+  --hover: #f0eee6;
+  --line: #e8e6dc;
+  --ink: #141413;
+  --ink-2: #3d3d3a;
+  --ink-3: #73726c;
+  --ink-4: #a3a19a;
+
   --accent: #4f7290;
   --accent-ink: #385876;
   --accent-soft: rgba(79, 114, 144, 0.15);
   --accent-wash: rgba(79, 114, 144, 0.1);
   --on-accent: #ffffff;
   --mark: rgba(79, 114, 144, 0.22);
-  --ui: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --danger: #b5403a;
+
+  --shimmer-ink: #73726c;
+  --shimmer-peak: color-mix(in srgb, #73726c 30%, white);
+
+  --ui: system-ui, 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif;
+  --serif: Georgia, 'Times New Roman', Times, serif;
   --mono: 'Geist Mono', 'Cascadia Code', 'SF Mono', Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #191919;
+    --canvas: #141414;
+    --raised: #212120;
+    --hover: rgba(255, 255, 255, 0.06);
+    --line: rgba(255, 255, 255, 0.09);
+    --ink: rgba(255, 255, 255, 0.93);
+    --ink-2: rgba(255, 255, 255, 0.76);
+    --ink-3: rgba(255, 255, 255, 0.57);
+    --ink-4: rgba(255, 255, 255, 0.4);
+
+    --accent-ink: #9dbbd6;
+    --accent-soft: rgba(109, 147, 179, 0.24);
+    --accent-wash: rgba(109, 147, 179, 0.14);
+    --mark: rgba(109, 147, 179, 0.3);
+    --danger: rgb(241, 119, 120);
+
+    --shimmer-ink: rgba(255, 255, 255, 0.4);
+    --shimmer-peak: color-mix(in srgb, rgba(255, 255, 255, 0.4) 30%, white);
+  }
 }

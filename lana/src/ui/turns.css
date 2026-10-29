@@ -1,0 +1,356 @@
+/* The conversation, shared by the side panel and the full page. The full page widens it. */
+
+.turns {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.turn p {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 22px;
+}
+
+.turn.lana {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.turn.you {
+  position: relative;
+  align-self: flex-end;
+  max-width: 88%;
+  padding: 9px 14px;
+  border-radius: 12px;
+  background: var(--hover);
+}
+
+.turn.you .turn-icon {
+  position: absolute;
+  left: -26px;
+  top: 9px;
+  color: var(--ink-4);
+}
+
+.turn.you pre,
+.turn.you img,
+.turn.you table {
+  max-width: 100%;
+}
+
+.turn.you pre {
+  margin: 0;
+  font: 12px/1.6 var(--mono);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.turn.you table {
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.turn.you td {
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.replies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.replies button {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg);
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.replies button.go {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* the pages worth opening: the verdict is the badge's tone, the state is the icon on the right */
+.sources {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.source {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 10px 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  text-align: left;
+}
+
+.source:hover {
+  border-color: var(--ink-4);
+}
+
+.source.now {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+
+.source .verdict {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.source.read .verdict {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.source.later .verdict {
+  background: var(--bg);
+  color: var(--ink-3);
+  box-shadow: inset 0 0 0 1.5px var(--ink-4);
+}
+
+.s-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.s-title {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.s-why {
+  font-size: 12px;
+  color: var(--ink-3);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.s-state {
+  flex: none;
+  color: var(--ink-4);
+}
+
+.source.done .s-title {
+  color: var(--ink-3);
+}
+
+.source.done .s-state {
+  color: var(--accent);
+}
+
+/* Lana speaks in serif, the learner in sans, like Claude */
+.turn.lana .words {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.replies button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.handoff {
+  display: flex;
+}
+
+.handoff .go {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 13px;
+}
+
+/* the plan: what to find, what the course gets */
+.plan {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--raised);
+  overflow: hidden;
+}
+
+.plan section {
+  padding: 14px 16px;
+}
+
+.plan section + section {
+  border-left: 1px solid var(--line);
+}
+
+.plan.compact {
+  grid-template-columns: 1fr;
+}
+
+.plan.compact section + section {
+  border-left: 0;
+  border-top: 1px solid var(--line);
+}
+
+.plan h3,
+.width {
+  margin: 0;
+  font: 600 11px/1.2 var(--ui);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.plan h3 {
+  margin-bottom: 8px;
+}
+
+.plan ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.plan li::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+}
+
+/* the searches Lana suggests, each with what it will give */
+.queries {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.query {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--raised);
+}
+
+.query-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.width {
+  color: var(--accent-ink);
+}
+
+.query input {
+  width: 100%;
+  padding: 2px 0;
+  border: 0;
+  border-bottom: 1px dashed transparent;
+  outline: 0;
+  background: none;
+  font: 500 15px/1.4 var(--ui);
+  color: var(--ink);
+}
+
+.query input:focus {
+  border-bottom-color: var(--ink-4);
+}
+
+.query input:disabled {
+  color: var(--ink-2);
+}
+
+.gives {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+
+.search-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* the plan against the finds */
+.check {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.check li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.check .found {
+  color: var(--ink-2);
+}
+
+.check .found svg {
+  color: var(--accent);
+}
+
+.check .gap svg {
+  color: var(--danger);
+}

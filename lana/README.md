@@ -2,8 +2,10 @@
 
 You and your AI on the same page, learning faster together.
 
-Lana lives in Chrome's side panel. You read and search the real sites; Lana sees
-the page you are on, points to the part that matters, and keeps what you find.
+Lana has two views of one conversation. In its **full page** you and Lana talk
+things through: what to find, which searches to run, what each will give you.
+In Chrome's **side panel**, beside the real site, you read and show; Lana sees the
+page you are on, points to the part that matters, and keeps what you find.
 
 ## Status
 
@@ -19,16 +21,20 @@ npm run build
 
 In Chrome, open `chrome://extensions`, turn on Developer mode, choose
 **Load unpacked**, and pick `.output/chrome-mv3`. Click the toolbar icon to open
-the side panel.
+Lana.
 
 `npm run dev` rebuilds on every change; load `.output/chrome-mv3-dev` instead.
 `npm run compile` checks the types.
 
 ## Try it
 
-- Click the toolbar icon. The panel asks one thing: what you want to find out.
+- Click the toolbar icon. Lana's full page asks one thing: what you want to learn.
   Answering it starts **research mode**: the icon gets a dot, and Lana starts
   working on every page. Off, Lana stays out of the way.
+- Lana frames the question into a plan, then suggests searches and what each
+  will give you. **Search** opens the results page with Lana in the side panel.
+- When there is something to talk through, the panel hands back to the full
+  page (the expand button does it anytime); **Back to the page** returns.
 - Open any article (reload tabs that were open before Lana was installed).
   The panel shows the page and follows you across tabs.
 - Select text: Lana's small menu appears over it, **Keep** or **Ask**.
@@ -56,7 +62,10 @@ src/
       layer.ts          Lana's own layer: frame, highlight, arrow, menu
       capture.ts        turns what was taken into text, code, image or table
       find.ts           finds a part by heading or id, a passage by its words
-    sidepanel/        the side panel app (React)
+    sidepanel/        the side panel: Lana beside the site (React)
+    app/              the full page: where Lana and the learner talk (React)
+  ui/                 shared by both views: the conversation and its store,
+                      the status line, how each turn is drawn, the scenario
   design/
     tokens.css        colors and type shared by every surface
 ```

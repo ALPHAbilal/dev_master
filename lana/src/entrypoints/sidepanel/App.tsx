@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   RESEARCH_OFF,
   toBackground,
-  type Capture,
   type Envelope,
   type FromPanel,
   type MarkResult,
@@ -12,27 +11,35 @@ import {
   type Research,
   type ToPanel,
 } from '@/contract/messages';
-import { Icon } from './icons';
-import { LABELS, SEARCH, SEARCH_URL, SOURCES, isSearchPage, samePart, sourceFor, type Status } from './scenario';
+import { newConversation, type Conversation, type SourceStatus, type Turn } from '@/ui/conversation';
+import { Icon } from '@/ui/icons';
+import { LABELS, SOURCES, isSearchPage, samePart, sourceFor } from '@/ui/scenario';
+import { useConversation } from '@/ui/store';
+import { TurnView } from '@/ui/turns';
 
-// The side panel. Two states, and nothing that explains itself in words:
-//   off  a single box: what do you want to find out?
-//   on   the question, the page Lana sees, and the conversation with Lana.
-// For now a scripted agent (scenario.ts) talks; the real one will use the same messages.
-
-type Reply = [label: string, key: string];
-type Turn =
-  | { who: 'lana'; text: string; replies?: Reply[]; used?: boolean; sources?: boolean }
-  | { who: 'you'; text?: string; chip?: string; capture?: Capture };
+// The side panel: Lana beside the real site, where the learner reads and shows.
+//   off  a single box: what do you want to find out? Answering opens the full page.
+//   on   the question, the page Lana sees, and the same conversation as the full page.
+// Talking things through happens in the full page; the panel hands over when it's time.
+// For now a scripted agent (ui/scenario.ts) talks; the real one will use the same messages.
 
 const send = (message: FromPanel) => browser.runtime.sendMessage(toBackground(message));
 const toPage = (message: Extract<FromPanel, { type: 'panel:to-page' }>['message']) => send({ type: 'panel:to-page', message });
+
+/** Moves the session to the full page and closes the panel. */
+function goFull() {
+  void send({ type: 'view:full' });
+  window.close();
+}
+
+const FULL_STAGES: Conversation['stage'][] = ['framing', 'plan', 'queries', 'check'];
 
 export default function App() {
   const [research, setResearch] = useState<Research>(RESEARCH_OFF);
   const [page, setPage] = useState<PageInfo | null | 'unavailable'>(null);
   const [ready, setReady] = useState(false);
   const [events, setEvents] = useState<ToPanel[]>([]);
+  const store = useConversation();
 
   useEffect(() => {
     const receive = (message: ToPanel) => {
@@ -59,12 +66,18 @@ export default function App() {
     return () => browser.runtime.onMessage.removeListener(listener);
   }, []);
 
-  if (!ready) return <div className="panel" />;
-  return research.active ? (
-    <Active key={research.startedAt ?? 0} research={research} page={page} events={events} />
-  ) : (
-    <Idle onStart={(question) => void send({ type: 'panel:start-research', question }).then((r) => setResearch(r as Research))} />
-  );
+  if (!ready || !store.loaded) return <div className="panel" />;
+  if (!research.active)
+    return (
+      <Idle
+        onStart={async (question) => {
+          await store.start(newConversation(question, SOURCES.length));
+          await send({ type: 'panel:start-research', question });
+          goFull();
+        }}
+      />
+    );
+  return <Active research={research} page={page} events={events} store={store} />;
 }
 
 /* ─── off: one box ─── */
@@ -88,34 +101,45 @@ function Idle({ onStart }: { onStart: (question: string) => void }) {
 }
 
 /* ─── on: the conversation, driven by the scripted agent ─── */
-function Active({ research, page, events }: { research: Research; page: PageInfo | null | 'unavailable'; events: ToPanel[] }) {
+function Active({
+  research,
+  page,
+  events,
+  store,
+}: {
+  research: Research;
+  page: PageInfo | null | 'unavailable';
+  events: ToPanel[];
+  store: ReturnType<typeof useConversation>;
+}) {
   const [tools, setTools] = useState(false);
-  const [turns, setTurns] = useState<Turn[]>([
-    { who: 'lana', text: 'Lots of places answer this. Let’s search first, then pick what’s worth reading.', replies: [['Search Google', 'search']] },
-  ]);
-  const [status, setStatus] = useState<Status[]>(SOURCES.map(() => 'unread'));
-  const [phase, setPhase] = useState<'start' | 'searching' | 'triage'>('start');
-  const [current, setCurrent] = useState<number | null>(null);
   const seen = useRef(events.length);
   const body = useRef<HTMLDivElement>(null);
+  const { conversation, update } = store;
 
-  const say = (t: Turn) => setTurns((all) => [...all, t]);
-  const closeReplies = () => setTurns((all) => all.map((t) => (t.who === 'lana' && t.replies ? { ...t, used: true } : t)));
+  // Research started elsewhere (the Goal Book web app): the conversation starts here.
+  useEffect(() => {
+    if (!conversation && research.question) void store.start(newConversation(research.question, SOURCES.length));
+  }, [conversation, research.question]);
 
-  function nextOrDone(done: Status[]) {
+  const say = (t: Omit<Extract<Turn, { who: 'lana' }>, 'who' | 'at' | 'home'> | Omit<Extract<Turn, { who: 'you' }>, 'who' | 'at'>, who: 'lana' | 'you' = 'lana') =>
+    update((c) => ({ ...c, turns: [...c.turns, (who === 'lana' ? { ...t, who, at: Date.now(), home: 'panel' } : { ...t, who, at: Date.now() }) as Turn] }));
+  const closeReplies = () => update((c) => ({ ...c, turns: c.turns.map((t) => (t.who === 'lana' && t.replies ? { ...t, used: true } : t)) }));
+
+  function nextOrDone(done: SourceStatus[]) {
     const next = SOURCES.findIndex((s, i) => s.label.verdict === 'read' && done[i] !== 'done');
-    if (next >= 0) say({ who: 'lana', text: `Next: ${SOURCES[next]!.title}.`, replies: [['Open it', `open:${next}`]] });
-    else say({ who: 'lana', text: 'Same answer in two places, said two ways. Keep what helps you.' });
+    if (next >= 0) say({ text: `Next: ${SOURCES[next]!.title}.`, replies: [['Open it', `open:${next}`]] });
+    else say({ text: 'That covers what S3 is and how it’s built. Let’s hold it against the plan.', replies: [['Talk it through', 'check']] });
   }
 
   function answerFor(i: number, picked: PartRef | null) {
+    if (!conversation) return;
     const src = SOURCES[i]!;
     const same = picked ? samePart(picked, src.answer) : false;
-    say({ who: 'lana', text: same ? `Same place I’d look: ${src.answer.say}.` : `I’d look at ${src.answer.heading}: ${src.answer.say}.` });
+    say({ text: same ? `Same place I’d look: ${src.answer.say}.` : `I’d look at ${src.answer.heading}: ${src.answer.say}.` });
     void toPage({ type: 'mark:point', part: src.answer });
-    const done = status.map((s, j) => (j === i ? 'done' : s)) as Status[];
-    setStatus(done);
-    setCurrent(null);
+    const done = conversation.sources.map((s, j) => (j === i ? 'done' : s)) as SourceStatus[];
+    void update((c) => ({ ...c, sources: done, current: null }));
     nextOrDone(done);
   }
 
@@ -127,60 +151,64 @@ function Active({ research, page, events }: { research: Research; page: PageInfo
       if (e.type === 'panel:page') onPage(e.page);
       if (e.type === 'panel:picked') {
         const i = SOURCES.findIndex((s) => s === sourceFor(e.page.url));
-        say({ who: 'you', text: e.part.heading ?? '', chip: 'here' });
+        say({ text: e.part.heading ?? '', chip: 'here' }, 'you');
         if (i >= 0) answerFor(i, e.part);
       }
-      if (e.type === 'panel:captured') say({ who: 'you', capture: e.capture, chip: e.action });
+      if (e.type === 'panel:captured') say({ capture: e.capture, chip: e.action }, 'you');
     }
   });
 
   function onPage(p: PageInfo) {
-    if (isSearchPage(p.url) && phase !== 'start') {
+    if (!conversation) return;
+    const stage = conversation.stage;
+    if (isSearchPage(p.url) && (stage === 'searching' || stage === 'triage')) {
       void toPage({ type: 'mark:results', results: LABELS });
-      if (phase === 'searching') {
-        setPhase('triage');
-        say({ who: 'lana', text: 'I marked the results. Three are worth it. Open each one, read, and show me where the answer is.', sources: true });
+      if (stage === 'searching') {
+        void update((c) => ({ ...c, stage: 'triage' }));
+        say({ text: 'I marked the results. Three are worth it. Open each one, read, and show me where the answer is.', sources: true });
       }
       return;
     }
     const src = sourceFor(p.url);
     if (!src) return;
     const i = SOURCES.indexOf(src);
-    if (status[i] === 'done' || current === i) return;
-    setCurrent(i);
-    setStatus((s) => s.map((x, j) => (j === i ? 'reading' : x)) as Status[]);
-    say({ who: 'lana', text: `${src.title}. Read it, then show me where the answer is.`, replies: [['Show me on the page', `pick:${i}`], ['Not on this page', `none:${i}`]] });
+    if (conversation.sources[i] === 'done' || conversation.current === i) return;
+    void update((c) => ({ ...c, current: i, sources: c.sources.map((x, j) => (j === i ? 'reading' : x)) }));
+    say({ text: `${src.title}. Read it, then show me where the answer is.`, replies: [['Show me on the page', `pick:${i}`], ['Not on this page', `none:${i}`]] });
   }
 
   function reply(key: string, label: string) {
-    closeReplies();
+    if (key === 'go:full') return goFull();
+    void closeReplies();
     const [what, arg] = key.split(':');
     const i = Number(arg);
-    if (what === 'search') {
-      say({ who: 'you', chip: 'search', text: SEARCH });
-      setPhase('searching');
-      void send({ type: 'panel:open', url: SEARCH_URL });
-    }
     if (what === 'open') void send({ type: 'panel:open', url: SOURCES[i]!.open });
     if (what === 'pick') {
-      say({ who: 'you', text: label });
+      say({ text: label }, 'you');
       void toPage({ type: 'pick:start' });
     }
     if (what === 'none') {
-      say({ who: 'you', text: label });
+      say({ text: label }, 'you');
       answerFor(i, null);
     }
+    if (what === 'check') void update((c) => ({ ...c, stage: 'check' })).then(goFull);
   }
 
   useEffect(() => {
     body.current?.scrollTo({ top: body.current.scrollHeight, behavior: 'smooth' });
-  }, [turns.length]);
+  }, [conversation?.turns.length]);
+
+  if (!conversation) return <div className="panel" />;
+  const waitingInFull = FULL_STAGES.includes(conversation.stage) && !conversation.turns.some((t) => t.who === 'lana' && t.home === 'full' && t.replies && !t.used);
 
   return (
     <div className="panel">
       <header className="question">
         <span className="live" aria-hidden="true" />
         <h1>{research.question}</h1>
+        <button className="icon-btn" onClick={goFull} aria-label="Open the full page">
+          <Icon name="expand" />
+        </button>
         <button className="icon-btn" onClick={() => setTools((t) => !t)} aria-pressed={tools} aria-label="Mark the page">
           <Icon name="target" />
         </button>
@@ -193,46 +221,30 @@ function Active({ research, page, events }: { research: Research; page: PageInfo
 
       <main className="body" ref={body}>
         <div className="turns">
-          {turns.map((t, k) =>
-            t.who === 'lana' ? (
-              <div className="turn lana" key={k}>
-                <p>{t.text}</p>
-                {t.sources && <Sources status={status} current={current} onOpen={(i) => void send({ type: 'panel:open', url: SOURCES[i]!.open })} />}
-                {t.replies && !t.used && (
-                  <div className="replies">
-                    {t.replies.map(([label, key], j) => (
-                      <button key={key} className={j === 0 ? 'go' : ''} onClick={() => reply(key, label)}>{label}</button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="turn you" key={k}>
-                {t.capture ? <Preview capture={t.capture} /> : <p>{t.text}</p>}
-                {t.chip && <span className="turn-icon"><Icon name={t.chip === 'search' ? 'search' : t.chip === 'here' ? 'frame' : t.chip === 'ask' ? 'ask' : 'keep'} size={14} /></span>}
-              </div>
-            ),
+          {conversation.turns.map((t, k) => (
+            <TurnView
+              key={k}
+              turn={t}
+              actions={{
+                view: 'panel',
+                sources: conversation.sources,
+                current: conversation.current,
+                onReply: reply,
+                onSearch: (q) => void send({ type: 'panel:open', url: `https://www.google.com/search?q=${encodeURIComponent(q)}` }),
+                onOpenSource: (i) => void send({ type: 'panel:open', url: SOURCES[i]!.open }),
+              }}
+            />
+          ))}
+          {waitingInFull && (
+            <div className="handoff">
+              <button className="go" onClick={goFull}>
+                <Icon name="expand" size={14} />
+                Lana is in the full page
+              </button>
+            </div>
           )}
         </div>
       </main>
-    </div>
-  );
-}
-
-/* the pages worth opening, with where the learner stands on each */
-function Sources({ status, current, onOpen }: { status: Status[]; current: number | null; onOpen: (i: number) => void }) {
-  return (
-    <div className="sources">
-      {SOURCES.map((s, i) => (
-        <button key={s.open} className={`source ${s.label.verdict} ${status[i]}${current === i ? ' now' : ''}`} onClick={() => onOpen(i)}>
-          <span className="verdict" aria-hidden="true">L</span>
-          <span className="s-body">
-            <span className="s-title">{s.title}</span>
-            <span className="s-why">{s.site} · {s.why}</span>
-          </span>
-          <span className="s-state" aria-hidden="true">{status[i] === 'done' ? <Icon name="check" /> : <Icon name="open" />}</span>
-        </button>
-      ))}
     </div>
   );
 }
@@ -277,25 +289,4 @@ function MarkTools() {
       {result && <span className={`result ${result}`} aria-label={result === 'found' ? 'Found' : 'Not on this page'}><Icon name={result === 'found' ? 'check' : 'cross'} /></span>}
     </div>
   );
-}
-
-function Preview({ capture }: { capture: Capture }) {
-  switch (capture.kind) {
-    case 'text':
-      return <p className="text">{capture.text}</p>;
-    case 'code':
-      return <pre>{capture.code}</pre>;
-    case 'image':
-      return <img src={capture.src} alt={capture.alt} />;
-    case 'table':
-      return (
-        <table>
-          <tbody>
-            {capture.rows.slice(0, 6).map((row, i) => (
-              <tr key={i}>{row.map((cell, j) => <td key={j}>{cell}</td>)}</tr>
-            ))}
-          </tbody>
-        </table>
-      );
-  }
 }
